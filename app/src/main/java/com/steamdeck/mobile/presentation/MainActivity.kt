@@ -14,6 +14,7 @@ import androidx.navigation.navArgument
 import com.steamdeck.mobile.presentation.theme.SteamDeckMobileTheme
 import com.steamdeck.mobile.presentation.ui.game.GameDetailScreen
 import com.steamdeck.mobile.presentation.ui.home.HomeScreen
+import com.steamdeck.mobile.presentation.ui.settings.SettingsScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
@@ -50,6 +51,9 @@ fun SteamDeckMobileNavHost(
             HomeScreen(
                 onGameClick = { gameId ->
                     navController.navigate(Screen.GameDetail.createRoute(gameId))
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
@@ -66,6 +70,12 @@ fun SteamDeckMobileNavHost(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
+
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
     }
 }
 
@@ -77,4 +87,5 @@ sealed class Screen(val route: String) {
     object GameDetail : Screen("game/{gameId}") {
         fun createRoute(gameId: Long) = "game/$gameId"
     }
+    object Settings : Screen("settings")
 }

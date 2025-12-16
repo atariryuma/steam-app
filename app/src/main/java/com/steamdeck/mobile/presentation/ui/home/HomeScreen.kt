@@ -28,6 +28,7 @@ import com.steamdeck.mobile.presentation.viewmodel.HomeViewModel
 @Composable
 fun HomeScreen(
     onGameClick: (Long) -> Unit,
+    onNavigateToSettings: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -54,6 +55,9 @@ fun HomeScreen(
                         }
                         IconButton(onClick = { viewModel.refresh() }) {
                             Icon(Icons.Default.Refresh, contentDescription = "更新")
+                        }
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "設定")
                         }
                     }
                 )

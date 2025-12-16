@@ -147,12 +147,13 @@ SteamDeckMobile/
 - [x] FTP/FTPS統合（Apache Commons Net）
 - [x] SAFローカルストレージ
 
-### Phase 4: ダウンロード管理 🚧 進行中
+### Phase 4: ダウンロード管理 ✅ 完了
+
 - [x] WorkManager統合
 - [x] マルチスレッドダウンロード（8MBチャンク）
 - [x] 一時停止/再開機能
 - [x] バックグラウンドダウンロード
-- [ ] ダウンロードUI実装
+- [x] ダウンロードUI実装（Material3）
 
 ### Phase 5: コントローラーサポート
 - [ ] InputDevice API統合
@@ -195,6 +196,6 @@ SteamDeckMobile/
 
 ---
 
-**現在の状態**: Phase 2（Steam統合）進行中 - MVP完了済み
+**現在の状態**: Phase 4（ダウンロード管理）完了 - MVP + Steam統合 + ファイルインポート + ダウンロード管理完成
 
 Made with ❤️ for Steam gamers on Android

@@ -105,6 +105,11 @@ dependencies {
     // DataStore
     implementation(libs.androidx.datastore.preferences)
 
+    // WorkManager
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.work)
+
     // File Import
     implementation(libs.libaums) // USB Mass Storage
     implementation(libs.jcifs.ng) // SMB/CIFS (SMB2/3 support)

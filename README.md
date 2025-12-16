@@ -133,22 +133,26 @@ SteamDeckMobile/
 - [x] 基本UI（ホーム、詳細画面）
 - [x] Winlator統合（スタブ実装）
 
-### Phase 2: Steam統合 🚧 進行中
+### Phase 2: Steam統合 ✅ 完了
+
 - [x] Steam Web API統合
 - [x] Steam API Service実装
 - [x] ライブラリ同期機能
-- [ ] OpenID認証UI
-- [ ] Steam認証画面実装
+- [x] Settings画面とSteam認証UI
+- [x] DataStore統合
 
-### Phase 3: ファイルインポート
-- [ ] USB OTGサポート
-- [ ] SMB/CIFS統合
-- [ ] FTP統合
+### Phase 3: ファイルインポート ✅ 完了
+- [x] USB OTGサポート（libaums）
+- [x] SMB/CIFS統合（jcifs-ng SMB2/3）
+- [x] FTP/FTPS統合（Apache Commons Net）
+- [x] SAFローカルストレージ
 
-### Phase 4: ダウンロード管理
-- [ ] マルチスレッドダウンロード
-- [ ] 一時停止/再開機能
-- [ ] バックグラウンドダウンロード
+### Phase 4: ダウンロード管理 🚧 進行中
+- [x] WorkManager統合
+- [x] マルチスレッドダウンロード（8MBチャンク）
+- [x] 一時停止/再開機能
+- [x] バックグラウンドダウンロード
+- [ ] ダウンロードUI実装
 
 ### Phase 5: コントローラーサポート
 - [ ] InputDevice API統合

@@ -2,10 +2,21 @@
 
 **Steam特化のAndroidゲームエミュレーター - Winlator統合による軽量アプリ**
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/YOUR_USERNAME/steamdeck-mobile)
+[![Android CI](https://github.com/atariryuma/steam-app/workflows/Android%20CI/badge.svg)](https://github.com/atariryuma/steam-app/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android)](https://www.android.com)
+[![Platform](https://img.shields.io/badge/Platform-Android%208.0%2B-green.svg?logo=android)](https://android.com)
+[![Architecture](https://img.shields.io/badge/Architecture-ARM64--v8a-blue.svg)](https://developer.android.com/ndk/guides/abis)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1.0-7F52FF?logo=kotlin)](https://kotlinlang.org)
+[![Compose](https://img.shields.io/badge/Jetpack%20Compose-2024.12.01-brightgreen.svg)](https://developer.android.com/jetpack/compose)
+
+## 🔗 Quick Links
+
+- [📥 Download Latest Release](https://github.com/atariryuma/steam-app/releases)
+- [🐛 Report a Bug](https://github.com/atariryuma/steam-app/issues/new?template=bug_report.md)
+- [💡 Request a Feature](https://github.com/atariryuma/steam-app/issues/new?template=feature_request.md)
+- [📚 Contributing Guide](CONTRIBUTING.md)
+- [🔒 Security Policy](SECURITY.md)
+- [🎮 Winlator Project](https://github.com/brunodev85/winlator)
 
 ## 📱 概要
 
@@ -52,14 +63,14 @@ Winlator（Wine + Box86/Box64）を統合し、Snapdragon搭載デバイスで�
 
 ```bash
 # リポジトリクローン
-git clone https://github.com/YOUR_USERNAME/steamdeck-mobile.git
-cd steamdeck-mobile
+git clone https://github.com/atariryuma/steam-app.git
+cd steam-app
 
 # Winlatorサブモジュール初期化（将来実装予定）
 git submodule update --init --recursive
 
 # Android Studioでプロジェクトを開く
-# File > Open > steamdeck-mobile
+# File > Open > steam-app/SteamDeckMobile
 ```
 
 ### ビルド
@@ -115,17 +126,19 @@ SteamDeckMobile/
 
 ## 🎯 開発ロードマップ
 
-### Phase 1: MVP（進行中）
+### Phase 1: MVP ✅ 完了
 - [x] プロジェクトセットアップ
 - [x] Clean Architectureパッケージ構造
-- [ ] Room DB実装（ゲーム、コンテナ管理）
-- [ ] 基本UI（ホーム、詳細画面）
-- [ ] Winlator統合
+- [x] Room DB実装（ゲーム、コンテナ管理）
+- [x] 基本UI（ホーム、詳細画面）
+- [x] Winlator統合（スタブ実装）
 
-### Phase 2: Steam統合
-- [ ] Steam Web API統合
-- [ ] OpenID認証
-- [ ] ライブラリ同期機能
+### Phase 2: Steam統合 🚧 進行中
+- [x] Steam Web API統合
+- [x] Steam API Service実装
+- [x] ライブラリ同期機能
+- [ ] OpenID認証UI
+- [ ] Steam認証画面実装
 
 ### Phase 3: ファイルインポート
 - [ ] USB OTGサポート
@@ -153,7 +166,7 @@ SteamDeckMobile/
 
 ### 報告方法
 
-1. [Issues](https://github.com/YOUR_USERNAME/steamdeck-mobile/issues)ページを開く
+1. [Issues](https://github.com/atariryuma/steam-app/issues)ページを開く
 2. 「New Issue」をクリック
 3. バグ報告または機能リクエストのテンプレートを選択
 4. 詳細を記入して送信
@@ -171,12 +184,13 @@ SteamDeckMobile/
 ## 📞 サポート
 
 問題が発生した場合：
-1. [FAQ](docs/FAQ.md)を確認
-2. [既存のIssue](https://github.com/YOUR_USERNAME/steamdeck-mobile/issues)を検索
-3. 該当するものがなければ新しいIssueを作成
+
+1. [既存のIssue](https://github.com/atariryuma/steam-app/issues)を検索
+2. 該当するものがなければ新しいIssueを作成
+3. [Contributing Guide](CONTRIBUTING.md)を参照
 
 ---
 
-**現在の状態**: Phase 0（プロジェクト初期化）完了 - MVP開発開始予定
+**現在の状態**: Phase 2（Steam統合）進行中 - MVP完了済み
 
 Made with ❤️ for Steam gamers on Android

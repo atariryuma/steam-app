@@ -3,7 +3,10 @@ package com.steamdeck.mobile.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.steamdeck.mobile.domain.model.Game
-import com.steamdeck.mobile.domain.repository.GameRepository
+import com.steamdeck.mobile.domain.usecase.DeleteGameUseCase
+import com.steamdeck.mobile.domain.usecase.GetGameByIdUseCase
+import com.steamdeck.mobile.domain.usecase.LaunchGameUseCase
+import com.steamdeck.mobile.domain.usecase.ToggleFavoriteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,11 +19,17 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class GameDetailViewModel @Inject constructor(
-    private val gameRepository: GameRepository
+    private val getGameByIdUseCase: GetGameByIdUseCase,
+    private val launchGameUseCase: LaunchGameUseCase,
+    private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
+    private val deleteGameUseCase: DeleteGameUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<GameDetailUiState>(GameDetailUiState.Loading)
     val uiState: StateFlow<GameDetailUiState> = _uiState.asStateFlow()
+
+    private val _launchState = MutableStateFlow<LaunchState>(LaunchState.Idle)
+    val launchState: StateFlow<LaunchState> = _launchState.asStateFlow()
 
     /**
      * ゲーム詳細を読み込み
@@ -28,7 +37,7 @@ class GameDetailViewModel @Inject constructor(
     fun loadGame(gameId: Long) {
         viewModelScope.launch {
             try {
-                val game = gameRepository.getGameById(gameId)
+                val game = getGameByIdUseCase(gameId)
                 _uiState.value = if (game != null) {
                     GameDetailUiState.Success(game)
                 } else {
@@ -45,17 +54,14 @@ class GameDetailViewModel @Inject constructor(
      */
     fun launchGame(gameId: Long) {
         viewModelScope.launch {
-            try {
-                // TODO: Winlator統合でゲームを起動
-                // 起動開始時刻を記録
-                val startTime = System.currentTimeMillis()
-
-                // ここでWinlatorEngineを呼び出してゲームを起動
-                // 一旦プレースホルダーとして、5分プレイしたことにする
-                gameRepository.updatePlayTime(gameId, 5, startTime)
-            } catch (e: Exception) {
-                // エラーハンドリング
-            }
+            _launchState.value = LaunchState.Launching
+            launchGameUseCase(gameId)
+                .onSuccess { processId ->
+                    _launchState.value = LaunchState.Running(processId)
+                }
+                .onFailure { error ->
+                    _launchState.value = LaunchState.Error(error.message ?: "起動エラー")
+                }
         }
     }
 
@@ -64,18 +70,19 @@ class GameDetailViewModel @Inject constructor(
      */
     fun toggleFavorite(gameId: Long, isFavorite: Boolean) {
         viewModelScope.launch {
-            try {
-                gameRepository.updateFavoriteStatus(gameId, isFavorite)
-                // UI状態を更新
-                val currentState = _uiState.value
-                if (currentState is GameDetailUiState.Success) {
-                    _uiState.value = GameDetailUiState.Success(
-                        currentState.game.copy(isFavorite = isFavorite)
-                    )
+            toggleFavoriteUseCase(gameId, isFavorite)
+                .onSuccess {
+                    // UI状態を更新
+                    val currentState = _uiState.value
+                    if (currentState is GameDetailUiState.Success) {
+                        _uiState.value = GameDetailUiState.Success(
+                            currentState.game.copy(isFavorite = isFavorite)
+                        )
+                    }
                 }
-            } catch (e: Exception) {
-                // エラーハンドリング
-            }
+                .onFailure { error ->
+                    // エラーハンドリング（必要に応じてSnackbar等で表示）
+                }
         }
     }
 
@@ -84,12 +91,13 @@ class GameDetailViewModel @Inject constructor(
      */
     fun deleteGame(game: Game) {
         viewModelScope.launch {
-            try {
-                gameRepository.deleteGame(game)
-                _uiState.value = GameDetailUiState.Deleted
-            } catch (e: Exception) {
-                _uiState.value = GameDetailUiState.Error(e.message ?: "削除エラー")
-            }
+            deleteGameUseCase(game)
+                .onSuccess {
+                    _uiState.value = GameDetailUiState.Deleted
+                }
+                .onFailure { error ->
+                    _uiState.value = GameDetailUiState.Error(error.message ?: "削除エラー")
+                }
         }
     }
 }
@@ -109,4 +117,21 @@ sealed class GameDetailUiState {
 
     /** エラー */
     data class Error(val message: String) : GameDetailUiState()
+}
+
+/**
+ * ゲーム起動状態
+ */
+sealed class LaunchState {
+    /** アイドル状態 */
+    object Idle : LaunchState()
+
+    /** 起動中 */
+    object Launching : LaunchState()
+
+    /** 実行中 */
+    data class Running(val processId: Int) : LaunchState()
+
+    /** エラー */
+    data class Error(val message: String) : LaunchState()
 }

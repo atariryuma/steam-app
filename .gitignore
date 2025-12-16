@@ -101,3 +101,7 @@ Desktop.ini
 # Gradle Wrapper
 !gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties
+
+# Claude Code local configuration (user-specific)
+CLAUDE.local.md
+.claude/commands/*.local.md

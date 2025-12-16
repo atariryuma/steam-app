@@ -1,0 +1,144 @@
+package com.steamdeck.mobile.presentation.viewmodel
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.steamdeck.mobile.core.download.DownloadManager
+import com.steamdeck.mobile.data.local.database.dao.DownloadDao
+import com.steamdeck.mobile.data.local.database.entity.DownloadEntity
+import com.steamdeck.mobile.data.local.database.entity.DownloadStatus
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+/**
+ * ダウンロード画面のViewModel
+ *
+ * Best Practices:
+ * - StateFlow for UI state management
+ * - Lifecycle-aware real-time updates
+ * - WorkManager for background downloads
+ *
+ * References:
+ * - https://proandroiddev.com/real-time-lifecycle-aware-updates-in-jetpack-compose-be2e80e613c2
+ * - https://developer.android.com/topic/libraries/architecture/workmanager
+ */
+@HiltViewModel
+class DownloadViewModel @Inject constructor(
+    private val downloadManager: DownloadManager,
+    private val downloadDao: DownloadDao
+) : ViewModel() {
+
+    /**
+     * 全ダウンロード一覧（リアルタイム更新）
+     */
+    val downloads: StateFlow<List<DownloadEntity>> = downloadDao.getAllDownloads()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    /**
+     * 進行中ダウンロード数
+     */
+    val activeDownloads: StateFlow<Int> = downloads
+        .map { list ->
+            list.count { download ->
+                download.status == DownloadStatus.DOWNLOADING ||
+                        download.status == DownloadStatus.PENDING ||
+                        download.status == DownloadStatus.QUEUED
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+
+    /**
+     * ダウンロード一時停止
+     */
+    fun pauseDownload(downloadId: Long) {
+        viewModelScope.launch {
+            downloadManager.pauseDownload(downloadId)
+        }
+    }
+
+    /**
+     * ダウンロード再開
+     */
+    fun resumeDownload(downloadId: Long) {
+        viewModelScope.launch {
+            downloadManager.resumeDownload(downloadId)
+        }
+    }
+
+    /**
+     * ダウンロードキャンセル
+     */
+    fun cancelDownload(downloadId: Long) {
+        viewModelScope.launch {
+            downloadManager.cancelDownload(downloadId)
+        }
+    }
+
+    /**
+     * ダウンロード再試行
+     */
+    fun retryDownload(downloadId: Long) {
+        viewModelScope.launch {
+            // Retry logic: resume download
+            downloadManager.resumeDownload(downloadId)
+        }
+    }
+
+    /**
+     * 完了済みダウンロードをクリア
+     */
+    fun clearCompleted() {
+        viewModelScope.launch {
+            val completedDownloads = downloads.value.filter { it.status == DownloadStatus.COMPLETED }
+            completedDownloads.forEach { download ->
+                downloadDao.deleteDownload(download.id)
+            }
+        }
+    }
+
+    /**
+     * ダウンロード開始（外部から呼び出し用）
+     */
+    fun startDownload(
+        url: String,
+        fileName: String,
+        destinationPath: String,
+        gameId: Long? = null
+    ) {
+        viewModelScope.launch {
+            // Insert download record
+            val downloadId = downloadDao.insertDownload(
+                DownloadEntity(
+                    id = 0, // Auto-generated
+                    gameId = gameId,
+                    fileName = fileName,
+                    url = url,
+                    status = DownloadStatus.PENDING,
+                    downloadedBytes = 0L,
+                    totalBytes = 0L,
+                    speedBytesPerSecond = 0L,
+                    error = null,
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+
+            // Start WorkManager download
+            downloadManager.startDownload(
+                downloadId = downloadId,
+                url = url,
+                destinationPath = destinationPath,
+                fileName = fileName
+            )
+        }
+    }
+}

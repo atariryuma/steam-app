@@ -35,6 +35,12 @@ interface DownloadDao {
     suspend fun getDownloadById(downloadId: Long): DownloadEntity?
 
     /**
+     * ダウンロードIDでダウンロードを取得（直接）
+     */
+    @Query("SELECT * FROM downloads WHERE id = :downloadId")
+    suspend fun getDownloadByIdDirect(downloadId: Long): DownloadEntity?
+
+    /**
      * ダウンロードを挿入
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -51,6 +57,12 @@ interface DownloadDao {
      */
     @Delete
     suspend fun deleteDownload(download: DownloadEntity)
+
+    /**
+     * ダウンロードIDでダウンロードを削除
+     */
+    @Query("DELETE FROM downloads WHERE id = :downloadId")
+    suspend fun deleteDownload(downloadId: Long)
 
     /**
      * ダウンロード進捗を更新
@@ -81,4 +93,22 @@ interface DownloadDao {
      */
     @Query("DELETE FROM downloads")
     suspend fun deleteAllDownloads()
+
+    /**
+     * ダウンロードステータスを更新
+     */
+    @Query("UPDATE downloads SET status = :status, updatedAt = :updatedAt WHERE id = :downloadId")
+    suspend fun updateDownloadStatus(downloadId: Long, status: DownloadStatus, updatedAt: Long = System.currentTimeMillis())
+
+    /**
+     * ダウンロード合計バイト数を更新
+     */
+    @Query("UPDATE downloads SET totalBytes = :totalBytes, updatedAt = :updatedAt WHERE id = :downloadId")
+    suspend fun updateDownloadTotalBytes(downloadId: Long, totalBytes: Long, updatedAt: Long = System.currentTimeMillis())
+
+    /**
+     * ダウンロード進捗を更新（バイト数のみ）
+     */
+    @Query("UPDATE downloads SET downloadedBytes = :downloadedBytes, updatedAt = :updatedAt WHERE id = :downloadId")
+    suspend fun updateDownloadProgress(downloadId: Long, downloadedBytes: Long, updatedAt: Long = System.currentTimeMillis())
 }

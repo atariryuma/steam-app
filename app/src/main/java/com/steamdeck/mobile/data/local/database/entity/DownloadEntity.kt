@@ -32,17 +32,29 @@ data class DownloadEntity(
     /** 総ファイルサイズ（バイト） */
     val totalBytes: Long = 0,
 
+    /** ダウンロード速度（バイト/秒） */
+    val speedBytesPerSecond: Long = 0,
+
     /** 保存先パス */
-    val destinationPath: String,
+    val destinationPath: String = "",
 
     /** ダウンロード開始日時（Unix timestamp） */
     val startedTimestamp: Long = System.currentTimeMillis(),
+
+    /** 作成日時（Unix timestamp） */
+    val createdAt: Long = System.currentTimeMillis(),
+
+    /** 更新日時（Unix timestamp） */
+    val updatedAt: Long = System.currentTimeMillis(),
 
     /** ダウンロード完了日時（Unix timestamp） */
     val completedTimestamp: Long? = null,
 
     /** エラーメッセージ */
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+
+    /** エラー詳細（廃止予定、errorMessageを使用） */
+    val error: String? = errorMessage
 )
 
 /**
@@ -51,6 +63,9 @@ data class DownloadEntity(
 enum class DownloadStatus {
     /** ダウンロード待機中 */
     PENDING,
+
+    /** キュー待ち */
+    QUEUED,
 
     /** ダウンロード中 */
     DOWNLOADING,
@@ -61,8 +76,11 @@ enum class DownloadStatus {
     /** 完了 */
     COMPLETED,
 
-    /** エラー */
+    /** エラー（廃止予定、FAILEDを使用） */
     ERROR,
+
+    /** 失敗 */
+    FAILED,
 
     /** キャンセル */
     CANCELLED

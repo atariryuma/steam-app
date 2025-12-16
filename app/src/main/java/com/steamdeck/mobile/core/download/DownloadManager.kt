@@ -13,7 +13,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
-import com.steamdeck.mobile.domain.model.DownloadStatus
+import com.steamdeck.mobile.data.local.database.entity.DownloadStatus
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers

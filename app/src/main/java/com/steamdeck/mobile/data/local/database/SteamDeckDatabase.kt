@@ -19,7 +19,7 @@ import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
         WinlatorContainerEntity::class,
         DownloadEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

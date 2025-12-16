@@ -4,20 +4,21 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.steamdeck.mobile.presentation.theme.SteamDeckMobileTheme
+import com.steamdeck.mobile.presentation.ui.game.GameDetailScreen
+import com.steamdeck.mobile.presentation.ui.home.HomeScreen
 import dagger.hilt.android.AndroidEntryPoint
 
+/**
+ * アプリケーションのメインActivity
+ */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,37 +26,55 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SteamDeckMobileTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MainScreen(
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                SteamDeckMobileApp()
             }
         }
     }
 }
 
 @Composable
-fun MainScreen(modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+fun SteamDeckMobileApp() {
+    val navController = rememberNavController()
+    SteamDeckMobileNavHost(navController = navController)
+}
+
+@Composable
+fun SteamDeckMobileNavHost(
+    navController: NavHostController
+) {
+    NavHost(
+        navController = navController,
+        startDestination = Screen.Home.route
     ) {
-        Box(
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "SteamDeck Mobile",
-                style = MaterialTheme.typography.headlineLarge
+        composable(Screen.Home.route) {
+            HomeScreen(
+                onGameClick = { gameId ->
+                    navController.navigate(Screen.GameDetail.createRoute(gameId))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.GameDetail.route,
+            arguments = listOf(
+                navArgument("gameId") { type = NavType.LongType }
+            )
+        ) { backStackEntry ->
+            val gameId = backStackEntry.arguments?.getLong("gameId") ?: 0L
+            GameDetailScreen(
+                gameId = gameId,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun MainScreenPreview() {
-    SteamDeckMobileTheme {
-        MainScreen()
+/**
+ * ナビゲーション画面定義
+ */
+sealed class Screen(val route: String) {
+    object Home : Screen("home")
+    object GameDetail : Screen("game/{gameId}") {
+        fun createRoute(gameId: Long) = "game/$gameId"
     }
 }

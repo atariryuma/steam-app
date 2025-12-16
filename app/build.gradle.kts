@@ -105,11 +105,10 @@ dependencies {
     // DataStore
     implementation(libs.androidx.datastore.preferences)
 
-    // USB Mass Storage
-    implementation(libs.libaums)
-
-    // SMB/CIFS
-    implementation(libs.jcifs)
+    // File Import
+    implementation(libs.libaums) // USB Mass Storage
+    implementation(libs.jcifs.ng) // SMB/CIFS (SMB2/3 support)
+    implementation(libs.commons.net) // FTP/FTPS
 
     // Testing
     testImplementation(libs.junit)

@@ -60,8 +60,11 @@ androidx-activity-compose = { group = "androidx.activity", name = "activity-comp
 # USB Mass Storage
 libaums = { group = "com.github.magnusja", name = "libaums", version = "0.7.6" }
 
-# SMB/CIFS
-jcifs = { group = "org.samba.jcifs", name = "jcifs", version = "1.3.18" }
+# SMB/CIFS (jcifs-ng supports SMB2/3 for Windows 10/11 compatibility)
+jcifs-ng = { group = "eu.agno3.jcifs", name = "jcifs-ng", version = "2.1.10" }
+
+# Apache Commons Net (FTP)
+commons-net = { group = "commons-net", name = "commons-net", version = "3.11.1" }
 
 # Testing
 junit = { group = "junit", name = "junit", version = "4.13.2" }

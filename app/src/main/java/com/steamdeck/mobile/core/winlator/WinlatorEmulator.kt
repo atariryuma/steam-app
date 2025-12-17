@@ -37,6 +37,9 @@ class WinlatorEmulator @Inject constructor(
     private val wineDir = File(rootfsDir, "opt/wine")
     private val containersDir = File(dataDir, "containers")
 
+    // Active processes map (processId -> Process)
+    private val activeProcesses = mutableMapOf<String, Process>()
+
     companion object {
         private const val TAG = "WinlatorEmulator"
 
@@ -284,31 +287,93 @@ class WinlatorEmulator @Inject constructor(
         arguments: List<String>
     ): Result<EmulatorProcess> = withContext(Dispatchers.IO) {
         try {
-            // TODO: Full implementation requires:
-            // 1. Wine binaries (wine64, wineserver)
-            // 2. Box64 binary (decompressed from .tzst)
-            // 3. Linux rootfs environment
-            // 4. Proper environment variable setup
+            Log.i(TAG, "Launching executable: ${executable.absolutePath}")
+            Log.d(TAG, "Container: ${container.name}, Arguments: $arguments")
 
-            Log.e(TAG, "launchExecutable not fully implemented yet")
-            Result.failure(
-                EmulatorException(
-                    """
-                    Winlator integration is not fully implemented yet.
-
-                    Required components:
-                    1. Wine binaries (not included in APK)
-                    2. Box64 binary extraction from .tzst archive
-                    3. Linux rootfs setup
-                    4. chroot/proot environment
-
-                    See WINLATOR_ARCHITECTURE_FINDINGS.md for details.
-                    """.trimIndent()
+            // 1. Verify executable exists
+            if (!executable.exists()) {
+                return@withContext Result.failure(
+                    EmulatorException("Executable not found: ${executable.absolutePath}")
                 )
+            }
+
+            // 2. Verify Wine and Box64 are initialized
+            val box64Binary = File(box64Dir, "box64")
+            val wine64Binary = File(wineDir, "bin/wine64")
+
+            if (!box64Binary.exists()) {
+                return@withContext Result.failure(
+                    EmulatorException("Box64 not initialized. Please run initialize() first.")
+                )
+            }
+
+            if (!wine64Binary.exists()) {
+                return@withContext Result.failure(
+                    EmulatorException("Wine not initialized. Please run initialize() first.")
+                )
+            }
+
+            // 3. Build environment variables
+            val environmentVars = buildEnvironmentVariables(container)
+
+            // 4. Build command
+            val command = buildList {
+                add(box64Binary.absolutePath)
+                add(wine64Binary.absolutePath)
+                add(executable.absolutePath)
+                addAll(arguments)
+            }
+
+            Log.d(TAG, "Command: ${command.joinToString(" ")}")
+            Log.d(TAG, "Environment: $environmentVars")
+
+            // 5. Start process
+            val processBuilder = ProcessBuilder(command)
+            processBuilder.environment().putAll(environmentVars)
+            processBuilder.redirectErrorStream(true)
+
+            // Set working directory to executable's parent
+            executable.parentFile?.let { workingDir ->
+                if (workingDir.exists()) {
+                    processBuilder.directory(workingDir)
+                    Log.d(TAG, "Working directory: ${workingDir.absolutePath}")
+                }
+            }
+
+            val process = processBuilder.start()
+            val pid = getPid(process)
+            val processId = "${System.currentTimeMillis()}_$pid"
+
+            Log.i(TAG, "Process launched: PID=$pid, ProcessId=$processId")
+
+            // 6. Monitor output in background (optional, for debugging)
+            kotlinx.coroutines.launch(Dispatchers.IO) {
+                try {
+                    process.inputStream.bufferedReader().use { reader ->
+                        reader.lineSequence().forEach { line ->
+                            Log.d(TAG, "[Wine:$pid] $line")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Output stream monitoring failed", e)
+                }
+            }
+
+            val emulatorProcess = EmulatorProcess(
+                id = processId,
+                containerId = container.id,
+                executable = executable.absolutePath,
+                startedAt = System.currentTimeMillis(),
+                pid = pid
             )
+
+            // Store process reference for status checking
+            activeProcesses[processId] = process
+
+            Result.success(emulatorProcess)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to launch executable", e)
-            Result.failure(EmulatorException("Failed to launch executable", e))
+            Result.failure(EmulatorException("Failed to launch executable: ${e.message}", e))
         }
     }
 
@@ -321,14 +386,75 @@ class WinlatorEmulator @Inject constructor(
         Result.failure(EmulatorException("installApplication not implemented"))
     }
 
-    override suspend fun getProcessStatus(processId: String): Result<EmulatorProcessStatus> {
-        // TODO: Implement process status checking
-        return Result.failure(EmulatorException("getProcessStatus not implemented"))
+    override suspend fun getProcessStatus(processId: String): Result<EmulatorProcessStatus> = withContext(Dispatchers.IO) {
+        try {
+            val process = activeProcesses[processId]
+                ?: return@withContext Result.failure(
+                    EmulatorException("Process not found: $processId")
+                )
+
+            val isRunning = process.isAlive
+            val exitCode = if (!isRunning) process.exitValue() else null
+
+            val status = EmulatorProcessStatus(
+                processId = processId,
+                isRunning = isRunning,
+                exitCode = exitCode,
+                cpuUsage = 0f, // TODO: Implement CPU monitoring
+                memoryUsageMB = 0, // TODO: Implement memory monitoring
+                uptime = 0 // TODO: Calculate uptime
+            )
+
+            Result.success(status)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get process status", e)
+            Result.failure(EmulatorException("Failed to get process status: ${e.message}", e))
+        }
     }
 
-    override suspend fun killProcess(processId: String, force: Boolean): Result<Unit> {
-        // TODO: Implement process killing
-        return Result.failure(EmulatorException("killProcess not implemented"))
+    override suspend fun killProcess(processId: String, force: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val process = activeProcesses[processId]
+                ?: return@withContext Result.failure(
+                    EmulatorException("Process not found: $processId")
+                )
+
+            Log.i(TAG, "Killing process: $processId (force=$force)")
+
+            if (force) {
+                // SIGKILL
+                process.destroyForcibly()
+                Log.d(TAG, "Process forcibly destroyed: $processId")
+            } else {
+                // SIGTERM - graceful shutdown
+                process.destroy()
+
+                // Wait up to 10 seconds for graceful shutdown
+                val exited = kotlinx.coroutines.withTimeoutOrNull(10_000) {
+                    while (process.isAlive) {
+                        kotlinx.coroutines.delay(100)
+                    }
+                    true
+                }
+
+                if (exited == null) {
+                    Log.w(TAG, "Process did not exit gracefully, force killing")
+                    process.destroyForcibly()
+                }
+            }
+
+            // Wait for exit
+            process.waitFor()
+
+            // Remove from active processes
+            activeProcesses.remove(processId)
+
+            Log.i(TAG, "Process killed successfully: $processId")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to kill process", e)
+            Result.failure(EmulatorException("Failed to kill process: ${e.message}", e))
+        }
     }
 
     override fun getEmulatorInfo(): EmulatorInfo {
@@ -381,6 +507,106 @@ class WinlatorEmulator @Inject constructor(
     }
 
     // Helper functions
+
+    /**
+     * Builds environment variables for Wine process execution.
+     */
+    private fun buildEnvironmentVariables(container: EmulatorContainer): Map<String, String> {
+        val config = container.config
+        val winePrefix = container.getWinePrefix()
+
+        return buildMap {
+            // Wine basic configuration
+            put("WINEPREFIX", winePrefix.absolutePath)
+            put("WINEDEBUG", "-all") // Reduce log noise
+            put("WINEARCH", "win64")
+
+            // Graphics configuration
+            when (config.directXWrapper) {
+                DirectXWrapperType.DXVK -> {
+                    put("DXVK_HUD", if (config.enableFPS) "fps" else "0")
+                    put("DXVK_LOG_LEVEL", "warn")
+                    put("DXVK_STATE_CACHE_PATH", File(dataDir, "cache/dxvk").absolutePath)
+                }
+                DirectXWrapperType.VKD3D -> {
+                    put("VKD3D_CONFIG", "dxr")
+                    put("VKD3D_DEBUG", "warn")
+                }
+                DirectXWrapperType.WINED3D -> {
+                    put("WINED3D", "1")
+                }
+                DirectXWrapperType.NONE -> {
+                    // No DirectX wrapper
+                }
+            }
+
+            // Box64 performance configuration
+            when (config.performancePreset) {
+                PerformancePreset.MAXIMUM_PERFORMANCE -> {
+                    put("BOX64_DYNAREC_BIGBLOCK", "3")
+                    put("BOX64_DYNAREC_STRONGMEM", "0")
+                    put("BOX64_DYNAREC_FASTNAN", "1")
+                    put("BOX64_DYNAREC_FASTROUND", "1")
+                }
+                PerformancePreset.BALANCED -> {
+                    put("BOX64_DYNAREC_BIGBLOCK", "2")
+                    put("BOX64_DYNAREC_STRONGMEM", "1")
+                    put("BOX64_DYNAREC_FASTNAN", "1")
+                }
+                PerformancePreset.MAXIMUM_STABILITY -> {
+                    put("BOX64_DYNAREC_BIGBLOCK", "1")
+                    put("BOX64_DYNAREC_STRONGMEM", "2")
+                    put("BOX64_DYNAREC_FASTNAN", "0")
+                    put("BOX64_DYNAREC_FASTROUND", "0")
+                }
+            }
+
+            // Box64 log configuration
+            put("BOX64_LOG", "0") // Disable verbose logging
+            put("BOX64_NOBANNER", "1") // Disable startup banner
+
+            // Display configuration
+            put("DISPLAY", ":0")
+            put("MESA_GL_VERSION_OVERRIDE", "4.6")
+            put("MESA_GLSL_VERSION_OVERRIDE", "460")
+
+            // Audio configuration
+            when (config.audioDriver) {
+                AudioDriverType.ALSA -> {
+                    put("AUDIODRIVER", "alsa")
+                }
+                AudioDriverType.PULSEAUDIO -> {
+                    put("AUDIODRIVER", "pulseaudio")
+                }
+                AudioDriverType.NONE -> {
+                    put("AUDIODRIVER", "null")
+                }
+            }
+
+            // Custom environment variables from config
+            putAll(config.customEnvVars)
+
+            // Add system paths
+            val existingPath = System.getenv("PATH") ?: ""
+            put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:$existingPath")
+            put("LD_LIBRARY_PATH", "${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu")
+        }
+    }
+
+    /**
+     * Gets the PID of a Process using reflection.
+     * Note: Process.pid() is available in Android API 24+, but not as a public method.
+     */
+    private fun getPid(process: Process): Int {
+        return try {
+            val pidField = process.javaClass.getDeclaredField("pid")
+            pidField.isAccessible = true
+            pidField.getInt(process)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to get PID via reflection, using fallback", e)
+            -1 // Fallback PID
+        }
+    }
 
     private fun extractAsset(assetPath: String, destination: File) {
         destination.parentFile?.mkdirs()

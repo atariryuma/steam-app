@@ -5,6 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,10 +26,15 @@ import com.steamdeck.mobile.presentation.viewmodel.GameDetailViewModel
 fun GameDetailScreen(
     gameId: Long,
     onNavigateBack: () -> Unit,
+    onNavigateToImport: () -> Unit = {},
     viewModel: GameDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val launchState by viewModel.launchState.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showLaunchErrorDialog by remember { mutableStateOf(false) }
+    var showDownloadDialog by remember { mutableStateOf(false) }
+    var launchErrorMessage by remember { mutableStateOf("") }
 
     // ゲーム詳細を読み込み
     LaunchedEffect(gameId) {
@@ -39,6 +45,14 @@ fun GameDetailScreen(
     LaunchedEffect(uiState) {
         if (uiState is GameDetailUiState.Deleted) {
             onNavigateBack()
+        }
+    }
+
+    // 起動エラーを監視
+    LaunchedEffect(launchState) {
+        if (launchState is com.steamdeck.mobile.presentation.viewmodel.LaunchState.Error) {
+            launchErrorMessage = (launchState as com.steamdeck.mobile.presentation.viewmodel.LaunchState.Error).message
+            showLaunchErrorDialog = true
         }
     }
 
@@ -81,6 +95,7 @@ fun GameDetailScreen(
                 GameDetailContent(
                     game = state.game,
                     onLaunchGame = { viewModel.launchGame(gameId) },
+                    onDownloadGame = { showDownloadDialog = true },
                     modifier = Modifier.padding(paddingValues)
                 )
 
@@ -93,6 +108,26 @@ fun GameDetailScreen(
                             showDeleteDialog = false
                         },
                         onDismiss = { showDeleteDialog = false }
+                    )
+                }
+
+                // ダウンロードダイアログ
+                if (showDownloadDialog) {
+                    SteamDownloadDialog(
+                        game = state.game,
+                        onDismiss = { showDownloadDialog = false },
+                        onNavigateToImport = {
+                            showDownloadDialog = false
+                            onNavigateToImport()
+                        }
+                    )
+                }
+
+                // 起動エラーダイアログ
+                if (showLaunchErrorDialog) {
+                    LaunchErrorDialog(
+                        message = launchErrorMessage,
+                        onDismiss = { showLaunchErrorDialog = false }
                     )
                 }
             }
@@ -114,6 +149,7 @@ fun GameDetailScreen(
 fun GameDetailContent(
     game: Game,
     onLaunchGame: () -> Unit,
+    onDownloadGame: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -141,10 +177,28 @@ fun GameDetailContent(
                 style = MaterialTheme.typography.headlineMedium
             )
 
+            // ダウンロードボタン（Steamゲーム & 未ダウンロードの場合のみ表示）
+            if (game.source == com.steamdeck.mobile.domain.model.GameSource.STEAM &&
+                game.executablePath.isBlank()
+            ) {
+                Button(
+                    onClick = onDownloadGame,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Icon(Icons.Outlined.Download, contentDescription = "ダウンロード")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("ゲームをダウンロード")
+                }
+            }
+
             // 起動ボタン
             Button(
                 onClick = onLaunchGame,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = game.executablePath.isNotBlank() // 実行ファイルがある場合のみ有効
             ) {
                 Icon(Icons.Default.PlayArrow, contentDescription = "起動")
                 Spacer(modifier = Modifier.width(8.dp))
@@ -234,7 +288,7 @@ fun DeleteConfirmDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.Warning, contentDescription = "警告") },
         title = { Text("ゲームを削除") },
-        text = { Text("「$gameName」を削除してもよろしいですか？\nこの操作は取り消せません。") },
+        text = { Text("「$gameName」を削除してもよろしいですか?\nこの操作は取り消せません。") },
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
@@ -248,6 +302,24 @@ fun DeleteConfirmDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("キャンセル")
+            }
+        }
+    )
+}
+
+@Composable
+fun LaunchErrorDialog(
+    message: String,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Info, contentDescription = "情報") },
+        title = { Text("ゲームを起動できません") },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("OK")
             }
         }
     )

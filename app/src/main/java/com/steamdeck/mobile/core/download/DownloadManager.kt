@@ -16,6 +16,7 @@ import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
 import com.steamdeck.mobile.data.local.database.entity.DownloadStatus
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -41,7 +42,7 @@ import kotlin.math.min
  */
 @Singleton
 class DownloadManager @Inject constructor(
-    private val context: Context,
+    @ApplicationContext private val context: Context,
     private val workManager: WorkManager,
     private val database: SteamDeckDatabase,
     private val okHttpClient: OkHttpClient
@@ -118,7 +119,7 @@ class DownloadManager @Inject constructor(
             startDownload(
                 downloadId = downloadId,
                 url = download.url,
-                destinationPath = download.fileName,
+                destinationPath = download.destinationPath,
                 fileName = download.fileName
             )
         }
@@ -234,12 +235,25 @@ class DownloadWorker @AssistedInject constructor(
                 downloadId = downloadId
             )
 
-            // Mark as completed
-            database.downloadDao().updateDownloadStatus(downloadId, DownloadStatus.COMPLETED)
+            // Mark as completed with 100% progress
+            database.downloadDao().updateDownloadProgress(
+                downloadId = downloadId,
+                downloadedBytes = totalSize,
+                progress = 100
+            )
+            database.downloadDao().markDownloadCompleted(
+                downloadId = downloadId,
+                status = DownloadStatus.COMPLETED,
+                completedTimestamp = System.currentTimeMillis()
+            )
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Download failed for ID: $downloadId", e)
-            database.downloadDao().updateDownloadStatus(downloadId, DownloadStatus.FAILED)
+            database.downloadDao().markDownloadError(
+                downloadId = downloadId,
+                status = DownloadStatus.FAILED,
+                errorMessage = e.message ?: "Unknown error"
+            )
             Result.failure()
         }
     }
@@ -264,6 +278,7 @@ class DownloadWorker @AssistedInject constructor(
     ) {
         var currentByte = startByte
         val buffer = ByteArray(8192)
+        var lastUpdateMB = currentByte / (1024 * 1024)
 
         while (currentByte < totalSize) {
             val endByte = min(currentByte + CHUNK_SIZE - 1, totalSize - 1)
@@ -294,15 +309,23 @@ class DownloadWorker @AssistedInject constructor(
                             chunkTransferred += bytesRead
                             currentByte += bytesRead
 
-                            // Update progress every 1MB
-                            if (chunkTransferred % (1024 * 1024) == 0L) {
+                            // 修正: 1MB毎に進捗を更新（正確にチェック）
+                            val currentMB = currentByte / (1024 * 1024)
+                            if (currentMB > lastUpdateMB) {
+                                lastUpdateMB = currentMB
+                                val progressPercent = if (totalSize > 0) {
+                                    ((currentByte * 100) / totalSize).toInt()
+                                } else {
+                                    0
+                                }
                                 database.downloadDao().updateDownloadProgress(
-                                    downloadId,
-                                    currentByte
+                                    downloadId = downloadId,
+                                    downloadedBytes = currentByte,
+                                    progress = progressPercent
                                 )
                                 setProgress(
                                     workDataOf(
-                                        "progress" to ((currentByte * 100) / totalSize).toInt()
+                                        "progress" to progressPercent
                                     )
                                 )
                             }
@@ -312,7 +335,16 @@ class DownloadWorker @AssistedInject constructor(
             }
 
             // Update final chunk progress
-            database.downloadDao().updateDownloadProgress(downloadId, currentByte)
+            val finalProgress = if (totalSize > 0) {
+                ((currentByte * 100) / totalSize).toInt()
+            } else {
+                0
+            }
+            database.downloadDao().updateDownloadProgress(
+                downloadId = downloadId,
+                downloadedBytes = currentByte,
+                progress = finalProgress
+            )
         }
     }
 }

@@ -55,15 +55,18 @@ data class Download(
     companion object {
         /**
          * バイトサイズを人間が読みやすい形式に変換
+         *
+         * Best Practice: 明示的にLocale.USを指定してロケール依存のフォーマット問題を回避
+         * Reference: https://developer.android.com/guide/topics/resources/localization
          */
         fun formatBytes(bytes: Long): String {
             if (bytes < 1024) return "$bytes B"
             val kb = bytes / 1024.0
-            if (kb < 1024) return String.format("%.2f KB", kb)
+            if (kb < 1024) return String.format(java.util.Locale.US, "%.2f KB", kb)
             val mb = kb / 1024.0
-            if (mb < 1024) return String.format("%.2f MB", mb)
+            if (mb < 1024) return String.format(java.util.Locale.US, "%.2f MB", mb)
             val gb = mb / 1024.0
-            return String.format("%.2f GB", gb)
+            return String.format(java.util.Locale.US, "%.2f GB", gb)
         }
 
         /**
@@ -108,7 +111,7 @@ enum class DownloadStatus {
     COMPLETED,
 
     /** エラー */
-    ERROR,
+    FAILED,
 
     /** キャンセル */
     CANCELLED;
@@ -122,7 +125,7 @@ enum class DownloadStatus {
             DOWNLOADING -> "ダウンロード中"
             PAUSED -> "一時停止"
             COMPLETED -> "完了"
-            ERROR -> "エラー"
+            FAILED -> "エラー"
             CANCELLED -> "キャンセル"
         }
 

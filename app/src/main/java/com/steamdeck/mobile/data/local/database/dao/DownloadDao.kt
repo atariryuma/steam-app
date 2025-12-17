@@ -29,13 +29,13 @@ interface DownloadDao {
     fun getDownloadsByGameId(gameId: Long): Flow<List<DownloadEntity>>
 
     /**
-     * ダウンロードIDでダウンロードを取得
+     * ダウンロードIDでダウンロードを取得（Flow版）
      */
     @Query("SELECT * FROM downloads WHERE id = :downloadId")
-    suspend fun getDownloadById(downloadId: Long): DownloadEntity?
+    fun getDownloadById(downloadId: Long): Flow<DownloadEntity?>
 
     /**
-     * ダウンロードIDでダウンロードを取得（直接）
+     * ダウンロードIDでダウンロードを取得（直接取得）
      */
     @Query("SELECT * FROM downloads WHERE id = :downloadId")
     suspend fun getDownloadByIdDirect(downloadId: Long): DownloadEntity?
@@ -53,22 +53,11 @@ interface DownloadDao {
     suspend fun updateDownload(download: DownloadEntity)
 
     /**
-     * ダウンロードを削除
-     */
-    @Delete
-    suspend fun deleteDownload(download: DownloadEntity)
-
-    /**
      * ダウンロードIDでダウンロードを削除
      */
     @Query("DELETE FROM downloads WHERE id = :downloadId")
     suspend fun deleteDownload(downloadId: Long)
 
-    /**
-     * ダウンロード進捗を更新
-     */
-    @Query("UPDATE downloads SET progress = :progress, downloadedBytes = :downloadedBytes, status = :status WHERE id = :downloadId")
-    suspend fun updateDownloadProgress(downloadId: Long, progress: Int, downloadedBytes: Long, status: DownloadStatus)
 
     /**
      * ダウンロード完了時刻を設定
@@ -107,8 +96,11 @@ interface DownloadDao {
     suspend fun updateDownloadTotalBytes(downloadId: Long, totalBytes: Long, updatedAt: Long = System.currentTimeMillis())
 
     /**
-     * ダウンロード進捗を更新（バイト数のみ）
+     * ダウンロード進捗を更新（バイト数と進捗率）
+     *
+     * 注意: progressは自動計算されません。呼び出し側で計算して渡す必要があります。
+     * progress = if (totalBytes > 0) ((downloadedBytes * 100) / totalBytes).toInt() else 0
      */
-    @Query("UPDATE downloads SET downloadedBytes = :downloadedBytes, updatedAt = :updatedAt WHERE id = :downloadId")
-    suspend fun updateDownloadProgress(downloadId: Long, downloadedBytes: Long, updatedAt: Long = System.currentTimeMillis())
+    @Query("UPDATE downloads SET downloadedBytes = :downloadedBytes, progress = :progress, updatedAt = :updatedAt WHERE id = :downloadId")
+    suspend fun updateDownloadProgress(downloadId: Long, downloadedBytes: Long, progress: Int = 0, updatedAt: Long = System.currentTimeMillis())
 }

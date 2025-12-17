@@ -29,12 +29,30 @@ android {
 
     buildTypes {
         release {
+            // R8コード最適化とリソース削減
             isMinifyEnabled = true
             isShrinkResources = true
+
+            // R8フルモード（AGP 8.0+でデフォルト有効）
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            // デバッグ情報削除でAPKサイズ削減
+            isDebuggable = false
+            isJniDebuggable = false
+
+            // ネイティブライブラリの最適化
+            ndk {
+                debugSymbolLevel = "NONE"
+            }
+        }
+
+        debug {
+            // Debug用設定（最適化なし）
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
         }
     }
 
@@ -54,7 +72,30 @@ android {
 
     packaging {
         resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // 不要なMETA-INFファイルを除外してAPKサイズ削減
+            excludes += setOf(
+                "/META-INF/{AL2.0,LGPL2.1}",
+                "/META-INF/LICENSE*",
+                "/META-INF/NOTICE*",
+                "/META-INF/*.md",
+                "/META-INF/*.txt",
+                "/META-INF/*.kotlin_module",
+                "/META-INF/versions/**",
+                "META-INF/com.android.tools/**",
+                "kotlin/**",
+                "DebugProbesKt.bin"
+            )
+
+            // 重複リソースのマージ
+            pickFirsts += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/io.netty.versions.properties"
+            )
+        }
+
+        // JNIライブラリの最適化
+        jniLibs {
+            useLegacyPackaging = false
         }
     }
 }
@@ -70,6 +111,7 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation("androidx.compose.material:material-icons-extended")
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
@@ -105,20 +147,35 @@ dependencies {
     // DataStore
     implementation(libs.androidx.datastore.preferences)
 
+    // Security
+    implementation(libs.androidx.security.crypto)
+
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
-    ksp(libs.androidx.hilt.work)
+
+    // Compression (Wine/Box64 binaries)
+    implementation(libs.zstd.jni)
+    implementation(libs.commons.compress)
 
     // File Import
-    implementation(libs.libaums) // USB Mass Storage
+    // TODO: Re-enable when libaums v0.10.0 migration is complete
+    // implementation(libs.libaums) // USB Mass Storage
     implementation(libs.jcifs.ng) // SMB/CIFS (SMB2/3 support)
     implementation(libs.commons.net) // FTP/FTPS
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
+    testImplementation(libs.mockk)
+    testImplementation(libs.androidx.arch.core.testing)
+
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.room.testing)
 }

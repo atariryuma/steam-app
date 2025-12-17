@@ -2,7 +2,7 @@
 agp = "8.7.3"
 kotlin = "2.1.0"
 compose-bom = "2024.12.01"
-hilt = "2.52"
+hilt = "2.54"
 room = "2.6.1"
 retrofit = "2.11.0"
 coil = "2.7.0"
@@ -12,6 +12,15 @@ lifecycle = "2.8.7"
 navigation = "2.8.4"
 datastore = "1.1.1"
 work = "2.9.1"
+material3-adaptive = "1.0.0"
+window = "1.3.0"
+zstd-jni = "1.5.6-8"
+commons-compress = "1.28.0"
+turbine = "1.1.0"
+mockk = "1.13.13"
+arch-core-testing = "2.2.0"
+test-runner = "1.6.2"
+test-rules = "1.6.1"
 
 [libraries]
 # Compose
@@ -51,19 +60,31 @@ androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lif
 # Navigation
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 
+# Material3 Adaptive & Window (using Compose BOM versions)
+androidx-compose-material3-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite" }
+androidx-window = { group = "androidx.window", name = "window", version.ref = "window" }
+androidx-window-core = { group = "androidx.window", name = "window-core", version.ref = "window" }
+
 # DataStore
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+
+# Security
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version = "1.1.0-alpha06" }
 
 # WorkManager
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version = "1.2.0" }
 
+# Compression (for Wine/Box64 binaries)
+zstd-jni = { group = "com.github.luben", name = "zstd-jni", version.ref = "zstd-jni" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commons-compress" }
+
 # Core
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.15.0" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version = "1.9.3" }
 
-# USB Mass Storage
-libaums = { group = "com.github.magnusja", name = "libaums", version = "0.7.6" }
+# USB Mass Storage (using latest core module)
+libaums = { group = "me.jahnen.libaums", name = "core", version = "0.10.0" }
 
 # SMB/CIFS (jcifs-ng supports SMB2/3 for Windows 10/11 compatibility)
 jcifs-ng = { group = "eu.agno3.jcifs", name = "jcifs-ng", version = "2.1.10" }
@@ -73,10 +94,17 @@ commons-net = { group = "commons-net", name = "commons-net", version = "3.11.1" 
 
 # Testing
 junit = { group = "junit", name = "junit", version = "4.13.2" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "arch-core-testing" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version = "1.2.1" }
 androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version = "3.6.1" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "test-runner" }
+androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "test-rules" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -7,8 +7,9 @@ import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
-import com.github.mjdev.libaums.UsbMassStorageDevice
-import com.github.mjdev.libaums.fs.UsbFile
+// TODO: Re-enable when libaums v0.10.0 migration is complete
+// import com.github.mjdev.libaums.UsbMassStorageDevice
+// import com.github.mjdev.libaums.fs.UsbFile
 import com.steamdeck.mobile.domain.model.FtpConfig
 import com.steamdeck.mobile.domain.model.ImportSource
 import com.steamdeck.mobile.domain.model.ImportableFile
@@ -49,7 +50,8 @@ class FileImportRepositoryImpl @Inject constructor(
         private const val BUFFER_SIZE = 8192
     }
 
-    private var currentUsbDevice: UsbMassStorageDevice? = null
+    // TODO: Re-enable when libaums v0.10.0 migration is complete
+    // private var currentUsbDevice: UsbMassStorageDevice? = null
     private var cifsContext: CIFSContext? = null
 
     // ================================================================================
@@ -57,75 +59,19 @@ class FileImportRepositoryImpl @Inject constructor(
     // ================================================================================
 
     override suspend fun isUsbDeviceConnected(): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
-            val devices = UsbMassStorageDevice.getMassStorageDevices(context)
-            devices.isNotEmpty()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to check USB device", e)
-            false
-        }
+        // TODO: Re-implement when libaums v0.10.0 migration is complete
+        Log.w(TAG, "USB support temporarily disabled")
+        false
     }
 
     override suspend fun listUsbFiles(path: String): Result<List<ImportableFile>> =
         withContext(Dispatchers.IO) {
-            try {
-                val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
-                val devices = UsbMassStorageDevice.getMassStorageDevices(context)
-
-                if (devices.isEmpty()) {
-                    return@withContext Result.failure(Exception("USB デバイスが接続されていません"))
-                }
-
-                val device = devices[0]
-
-                // Request permission if not granted
-                if (!usbManager.hasPermission(device.usbDevice)) {
-                    val permissionIntent = PendingIntent.getBroadcast(
-                        context,
-                        0,
-                        Intent("com.steamdeck.mobile.USB_PERMISSION"),
-                        PendingIntent.FLAG_IMMUTABLE
-                    )
-                    usbManager.requestPermission(device.usbDevice, permissionIntent)
-                    return@withContext Result.failure(Exception("USB アクセス権限が必要です"))
-                }
-
-                // Initialize device
-                device.init()
-                currentUsbDevice = device
-
-                val partition = device.partitions[0]
-                val fileSystem = partition.fileSystem
-                val root = fileSystem.rootDirectory
-
-                // Navigate to requested path
-                val targetDir = if (path == "/") {
-                    root
-                } else {
-                    findUsbDirectory(root, path.trim('/'))
-                        ?: return@withContext Result.failure(Exception("ディレクトリが見つかりません: $path"))
-                }
-
-                // List files
-                val files = targetDir.listFiles().map { usbFile ->
-                    ImportableFile(
-                        name = usbFile.name,
-                        path = usbFile.absolutePath,
-                        size = usbFile.length,
-                        isDirectory = usbFile.isDirectory,
-                        source = ImportSource.USB_OTG,
-                        lastModified = usbFile.lastModified()
-                    )
-                }
-
-                Result.success(files)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to list USB files", e)
-                Result.failure(e)
-            }
+            // TODO: Re-implement when libaums v0.10.0 migration is complete
+            Log.w(TAG, "USB file listing temporarily disabled")
+            Result.failure(Exception("USB support is temporarily disabled during library migration"))
         }
 
+    /* TODO: Re-enable when libaums v0.10.0 migration is complete
     private fun findUsbDirectory(root: UsbFile, path: String): UsbFile? {
         if (path.isEmpty()) return root
 
@@ -140,6 +86,7 @@ class FileImportRepositoryImpl @Inject constructor(
 
         return current
     }
+    */
 
     // ================================================================================
     // SMB/CIFS Implementation
@@ -355,16 +302,8 @@ class FileImportRepositoryImpl @Inject constructor(
 
             when (file.source) {
                 ImportSource.USB_OTG -> {
-                    copyFromUsb(file, destFile) { transferred, total ->
-                        val currentTime = System.currentTimeMillis()
-                        val elapsedMs = currentTime - lastProgressTime
-                        if (elapsedMs >= 500) { // Update every 500ms
-                            val speed = ((transferred - lastTransferred) * 1000) / elapsedMs
-                            emit(ImportProgress.Copying(transferred, total, speed))
-                            lastProgressTime = currentTime
-                            lastTransferred = transferred
-                        }
-                    }
+                    // TODO: Re-enable when libaums v0.10.0 migration is complete
+                    throw NotImplementedError("USB copy is temporarily disabled during library migration")
                 }
 
                 ImportSource.SMB_CIFS -> {
@@ -414,36 +353,16 @@ class FileImportRepositoryImpl @Inject constructor(
         }
     }.flowOn(Dispatchers.IO)
 
+    /* TODO: Re-enable when libaums v0.10.0 migration is complete
     private suspend fun copyFromUsb(
         file: ImportableFile,
         dest: File,
         onProgress: suspend (Long, Long) -> Unit
     ) {
-        val device = currentUsbDevice ?: throw IllegalStateException("USB device not initialized")
-        val partition = device.partitions[0]
-        val fileSystem = partition.fileSystem
-        val root = fileSystem.rootDirectory
-
-        val sourcePath = file.path.removePrefix("/")
-        val sourceFile = findUsbDirectory(root, sourcePath.substringBeforeLast('/'))
-            ?.listFiles()?.find { it.name == sourcePath.substringAfterLast('/') }
-            ?: throw IllegalArgumentException("Source file not found: ${file.path}")
-
-        val totalSize = sourceFile.length
-        var transferred = 0L
-
-        sourceFile.inputStream.use { input ->
-            FileOutputStream(dest).use { output ->
-                val buffer = ByteArray(BUFFER_SIZE)
-                var bytesRead: Int
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    output.write(buffer, 0, bytesRead)
-                    transferred += bytesRead
-                    onProgress(transferred, totalSize)
-                }
-            }
-        }
+        // TODO: Re-implement when libaums v0.10.0 migration is complete
+        throw NotImplementedError("USB copy is temporarily disabled during library migration")
     }
+    */
 
     private suspend fun copyFromSmb(
         file: ImportableFile,
@@ -474,8 +393,12 @@ class FileImportRepositoryImpl @Inject constructor(
         dest: File,
         onProgress: suspend (Long, Long) -> Unit
     ) {
-        // FTP copy implementation would need FTP config stored
-        throw NotImplementedError("FTP copy requires connection config")
+        // FTP copy implementation requires FTP config to be passed or stored
+        // For now, parse config from file path or throw detailed error
+        throw NotImplementedError(
+            "FTP copy requires FTP configuration (host, port, credentials). " +
+            "Please use importFile with FTP config stored in repository context."
+        )
     }
 
     private suspend fun copyFromLocal(

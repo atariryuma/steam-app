@@ -1,0 +1,461 @@
+package com.steamdeck.mobile.presentation.viewmodel
+
+import app.cash.turbine.test
+import com.steamdeck.mobile.domain.model.Game
+import com.steamdeck.mobile.domain.model.GameSource
+import com.steamdeck.mobile.domain.usecase.DeleteGameUseCase
+import com.steamdeck.mobile.domain.usecase.GetGameByIdUseCase
+import com.steamdeck.mobile.domain.usecase.LaunchGameUseCase
+import com.steamdeck.mobile.domain.usecase.ToggleFavoriteUseCase
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.*
+import org.junit.After
+import org.junit.Assert.*
+import org.junit.Before
+import org.junit.Test
+
+/**
+ * GameDetailViewModelの単体テスト
+ *
+ * テスト対象:
+ * - ゲーム詳細の読み込み（Success/Error）
+ * - ゲーム起動処理とLaunchState遷移
+ * - お気に入り切り替えとUI状態更新
+ * - ゲーム削除とDeleted状態
+ * - エラーハンドリング
+ *
+ * Best Practices:
+ * - Use case layer testing via mocking
+ * - Result<T> handling verification
+ * - State transitions validation
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+class GameDetailViewModelTest {
+
+    private lateinit var viewModel: GameDetailViewModel
+    private lateinit var getGameByIdUseCase: GetGameByIdUseCase
+    private lateinit var launchGameUseCase: LaunchGameUseCase
+    private lateinit var toggleFavoriteUseCase: ToggleFavoriteUseCase
+    private lateinit var deleteGameUseCase: DeleteGameUseCase
+    private lateinit var testDispatcher: TestDispatcher
+
+    // Mock data
+    private val mockGame = Game(
+        id = 1L,
+        name = "Portal 2",
+        steamAppId = 620L,
+        executablePath = "/games/portal2/portal2.exe",
+        installPath = "/games/portal2",
+        source = GameSource.STEAM,
+        winlatorContainerId = 10L,
+        playTimeMinutes = 180L,
+        lastPlayedTimestamp = System.currentTimeMillis() - 3600_000,
+        iconPath = "/icons/portal2.png",
+        bannerPath = "/banners/portal2.jpg",
+        addedTimestamp = System.currentTimeMillis() - 86400_000,
+        isFavorite = false
+    )
+
+    @Before
+    fun setup() {
+        testDispatcher = StandardTestDispatcher()
+        Dispatchers.setMain(testDispatcher)
+
+        getGameByIdUseCase = mockk()
+        launchGameUseCase = mockk()
+        toggleFavoriteUseCase = mockk()
+        deleteGameUseCase = mockk()
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    /**
+     * ゲーム詳細の読み込みが成功するテスト
+     */
+    @Test
+    fun `loadGame emits Success when game exists`() = runTest {
+        // Given
+        val gameId = 1L
+        coEvery { getGameByIdUseCase(gameId) } returns mockGame
+
+        viewModel = GameDetailViewModel(
+            getGameByIdUseCase,
+            launchGameUseCase,
+            toggleFavoriteUseCase,
+            deleteGameUseCase
+        )
+
+        // When
+        viewModel.loadGame(gameId)
+
+        // Then
+        viewModel.uiState.test {
+            assertTrue(awaitItem() is GameDetailUiState.Loading)
+
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val successState = awaitItem() as GameDetailUiState.Success
+            assertEquals(mockGame, successState.game)
+            assertEquals("Portal 2", successState.game.name)
+        }
+
+        coVerify { getGameByIdUseCase(gameId) }
+    }
+
+    /**
+     * ゲームが存在しない場合、Error状態を返すテスト
+     */
+    @Test
+    fun `loadGame emits Error when game does not exist`() = runTest {
+        // Given
+        val gameId = 999L
+        coEvery { getGameByIdUseCase(gameId) } returns null
+
+        viewModel = GameDetailViewModel(
+            getGameByIdUseCase,
+            launchGameUseCase,
+            toggleFavoriteUseCase,
+            deleteGameUseCase
+        )
+
+        // When
+        viewModel.loadGame(gameId)
+
+        // Then
+        viewModel.uiState.test {
+            assertTrue(awaitItem() is GameDetailUiState.Loading)
+
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val errorState = awaitItem() as GameDetailUiState.Error
+            assertEquals("ゲームが見つかりません", errorState.message)
+        }
+    }
+
+    /**
+     * ゲーム読み込み中の例外がError状態として処理されるテスト
+     */
+    @Test
+    fun `loadGame emits Error when usecase throws exception`() = runTest {
+        // Given
+        val gameId = 1L
+        val errorMessage = "Database read error"
+        coEvery { getGameByIdUseCase(gameId) } throws RuntimeException(errorMessage)
+
+        viewModel = GameDetailViewModel(
+            getGameByIdUseCase,
+            launchGameUseCase,
+            toggleFavoriteUseCase,
+            deleteGameUseCase
+        )
+
+        // When
+        viewModel.loadGame(gameId)
+
+        // Then
+        viewModel.uiState.test {
+            assertTrue(awaitItem() is GameDetailUiState.Loading)
+
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val errorState = awaitItem() as GameDetailUiState.Error
+            assertEquals(errorMessage, errorState.message)
+        }
+    }
+
+    /**
+     * ゲーム起動が成功する場合のLaunchState遷移テスト
+     */
+    @Test
+    fun `launchGame transitions from Launching to Running on success`() = runTest {
+        // Given
+        val gameId = 1L
+        val processId = 12345
+        coEvery { launchGameUseCase(gameId) } returns Result.success(processId)
+
+        viewModel = GameDetailViewModel(
+            getGameByIdUseCase,
+            launchGameUseCase,
+            toggleFavoriteUseCase,
+            deleteGameUseCase
+        )
+
+        // When
+        viewModel.launchGame(gameId)
+
+        // Then
+        viewModel.launchState.test {
+            assertEquals(LaunchState.Idle, awaitItem())
+
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val launchingState = awaitItem()
+            assertTrue(launchingState is LaunchState.Launching)
+
+            val runningState = awaitItem() as LaunchState.Running
+            assertEquals(processId, runningState.processId)
+        }
+
+        coVerify { launchGameUseCase(gameId) }
+    }
+
+    /**
+     * ゲーム起動が失敗する場合のLaunchState遷移テスト
+     */
+    @Test
+    fun `launchGame transitions to Error on failure`() = runTest {
+        // Given
+        val gameId = 1L
+        val errorMessage = "Winlator not found"
+        coEvery { launchGameUseCase(gameId) } returns Result.failure(
+            RuntimeException(errorMessage)
+        )
+
+        viewModel = GameDetailViewModel(
+            getGameByIdUseCase,
+            launchGameUseCase,
+            toggleFavoriteUseCase,
+            deleteGameUseCase
+        )
+
+        // When
+        viewModel.launchGame(gameId)
+
+        // Then
+        viewModel.launchState.test {
+            assertEquals(LaunchState.Idle, awaitItem())
+
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            assertTrue(awaitItem() is LaunchState.Launching)
+
+            val errorState = awaitItem() as LaunchState.Error
+            assertEquals(errorMessage, errorState.message)
+        }
+    }
+
+    /**
+     * お気に入り切り替えが成功してUI状態が更新されるテスト
+     */
+    @Test
+    fun `toggleFavorite updates game in Success state`() = runTest {
+        // Given
+        val gameId = 1L
+        val isFavorite = true
+        coEvery { getGameByIdUseCase(gameId) } returns mockGame
+        coEvery { toggleFavoriteUseCase(gameId, isFavorite) } returns Result.success(Unit)
+
+        viewModel = GameDetailViewModel(
+            getGameByIdUseCase,
+            launchGameUseCase,
+            toggleFavoriteUseCase,
+            deleteGameUseCase
+        )
+
+        viewModel.loadGame(gameId)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // When
+        viewModel.toggleFavorite(gameId, isFavorite)
+
+        // Then
+        viewModel.uiState.test {
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val successState = awaitItem() as GameDetailUiState.Success
+            assertTrue(successState.game.isFavorite)
+        }
+
+        coVerify { toggleFavoriteUseCase(gameId, isFavorite) }
+    }
+
+    /**
+     * お気に入り切り替えが失敗してもクラッシュしないテスト
+     */
+    @Test
+    fun `toggleFavorite handles errors gracefully`() = runTest {
+        // Given
+        val gameId = 1L
+        val isFavorite = true
+        coEvery { getGameByIdUseCase(gameId) } returns mockGame
+        coEvery { toggleFavoriteUseCase(gameId, isFavorite) } returns Result.failure(
+            RuntimeException("Update failed")
+        )
+
+        viewModel = GameDetailViewModel(
+            getGameByIdUseCase,
+            launchGameUseCase,
+            toggleFavoriteUseCase,
+            deleteGameUseCase
+        )
+
+        viewModel.loadGame(gameId)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // When
+        viewModel.toggleFavorite(gameId, isFavorite)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Then - should not crash, state remains Success
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue(state is GameDetailUiState.Success)
+        }
+    }
+
+    /**
+     * お気に入り解除が正しく動作するテスト
+     */
+    @Test
+    fun `toggleFavorite can unfavorite a game`() = runTest {
+        // Given
+        val gameId = 1L
+        val favoriteGame = mockGame.copy(isFavorite = true)
+        coEvery { getGameByIdUseCase(gameId) } returns favoriteGame
+        coEvery { toggleFavoriteUseCase(gameId, false) } returns Result.success(Unit)
+
+        viewModel = GameDetailViewModel(
+            getGameByIdUseCase,
+            launchGameUseCase,
+            toggleFavoriteUseCase,
+            deleteGameUseCase
+        )
+
+        viewModel.loadGame(gameId)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // When
+        viewModel.toggleFavorite(gameId, false)
+
+        // Then
+        viewModel.uiState.test {
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val successState = awaitItem() as GameDetailUiState.Success
+            assertFalse(successState.game.isFavorite)
+        }
+
+        coVerify { toggleFavoriteUseCase(gameId, false) }
+    }
+
+    /**
+     * ゲーム削除が成功する場合のテスト
+     */
+    @Test
+    fun `deleteGame transitions to Deleted state on success`() = runTest {
+        // Given
+        coEvery { deleteGameUseCase(mockGame) } returns Result.success(Unit)
+
+        viewModel = GameDetailViewModel(
+            getGameByIdUseCase,
+            launchGameUseCase,
+            toggleFavoriteUseCase,
+            deleteGameUseCase
+        )
+
+        // When
+        viewModel.deleteGame(mockGame)
+
+        // Then
+        viewModel.uiState.test {
+            assertTrue(awaitItem() is GameDetailUiState.Loading)
+
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val deletedState = awaitItem()
+            assertTrue(deletedState is GameDetailUiState.Deleted)
+        }
+
+        coVerify { deleteGameUseCase(mockGame) }
+    }
+
+    /**
+     * ゲーム削除が失敗する場合のテスト
+     */
+    @Test
+    fun `deleteGame transitions to Error on failure`() = runTest {
+        // Given
+        val errorMessage = "File deletion failed"
+        coEvery { deleteGameUseCase(mockGame) } returns Result.failure(
+            RuntimeException(errorMessage)
+        )
+
+        viewModel = GameDetailViewModel(
+            getGameByIdUseCase,
+            launchGameUseCase,
+            toggleFavoriteUseCase,
+            deleteGameUseCase
+        )
+
+        // When
+        viewModel.deleteGame(mockGame)
+
+        // Then
+        viewModel.uiState.test {
+            assertTrue(awaitItem() is GameDetailUiState.Loading)
+
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val errorState = awaitItem() as GameDetailUiState.Error
+            assertEquals(errorMessage, errorState.message)
+        }
+    }
+
+    /**
+     * LaunchStateの初期状態がIdleであることを確認するテスト
+     */
+    @Test
+    fun `launchState initial value is Idle`() = runTest {
+        // Given
+        viewModel = GameDetailViewModel(
+            getGameByIdUseCase,
+            launchGameUseCase,
+            toggleFavoriteUseCase,
+            deleteGameUseCase
+        )
+
+        // Then
+        viewModel.launchState.test {
+            val initialState = awaitItem()
+            assertTrue(initialState is LaunchState.Idle)
+        }
+    }
+
+    /**
+     * 複数回のゲーム起動が可能であることを確認するテスト
+     */
+    @Test
+    fun `multiple launchGame calls work correctly`() = runTest {
+        // Given
+        val gameId = 1L
+        coEvery { launchGameUseCase(gameId) } returnsMany listOf(
+            Result.success(111),
+            Result.success(222)
+        )
+
+        viewModel = GameDetailViewModel(
+            getGameByIdUseCase,
+            launchGameUseCase,
+            toggleFavoriteUseCase,
+            deleteGameUseCase
+        )
+
+        // When - First launch
+        viewModel.launchGame(gameId)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // When - Second launch
+        viewModel.launchGame(gameId)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Then
+        coVerify(exactly = 2) { launchGameUseCase(gameId) }
+    }
+}

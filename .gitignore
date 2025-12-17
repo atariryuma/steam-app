@@ -105,3 +105,4 @@ Desktop.ini
 # Claude Code local configuration (user-specific)
 CLAUDE.local.md
 .claude/commands/*.local.md
+nul

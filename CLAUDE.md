@@ -7,7 +7,7 @@
 
 **Name**: SteamDeck Mobile
 **Type**: Android Steam Game Launcher & Emulator
-**Target**: Steam-specialized lightweight app (<50MB APK)
+**Target**: Steam-specialized app (<80MB APK, 60% smaller than Winlator's 141MB)
 **Platform**: Android 8.0+ (API 26+), ARM64-v8a only
 **Primary Goal**: Run Steam Windows games on Android via Winlator integration
 
@@ -144,12 +144,13 @@ release {
 }
 ```
 
-### APK Optimization (Target: <50MB)
+### APK Optimization (Target: <80MB)
 - ✅ Enable R8/ProGuard in release builds
 - ✅ Use Android App Bundle (AAB)
 - ✅ Split by ABI (ARM64-v8a only)
 - ✅ Compress images (WebP, vector drawables)
 - ✅ Remove unused resources
+- ℹ️ Wine rootfs (53MB) is extracted on first launch, not included in final APK size calculation
 
 ## 📦 Key Dependencies & Usage
 

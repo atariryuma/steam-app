@@ -3,9 +3,11 @@ package com.steamdeck.mobile.data.local.database
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.steamdeck.mobile.data.local.database.dao.ControllerProfileDao
 import com.steamdeck.mobile.data.local.database.dao.DownloadDao
 import com.steamdeck.mobile.data.local.database.dao.GameDao
 import com.steamdeck.mobile.data.local.database.dao.WinlatorContainerDao
+import com.steamdeck.mobile.data.local.database.entity.ControllerProfileEntity
 import com.steamdeck.mobile.data.local.database.entity.DownloadEntity
 import com.steamdeck.mobile.data.local.database.entity.GameEntity
 import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
@@ -17,9 +19,10 @@ import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
     entities = [
         GameEntity::class,
         WinlatorContainerEntity::class,
-        DownloadEntity::class
+        DownloadEntity::class,
+        ControllerProfileEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -38,6 +41,11 @@ abstract class SteamDeckDatabase : RoomDatabase() {
      * ダウンロード履歴へのDAO
      */
     abstract fun downloadDao(): DownloadDao
+
+    /**
+     * コントローラープロファイルへのDAO
+     */
+    abstract fun controllerProfileDao(): ControllerProfileDao
 
     companion object {
         const val DATABASE_NAME = "steamdeck_mobile.db"

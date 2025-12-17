@@ -46,8 +46,7 @@ class DownloadViewModel @Inject constructor(
         .map { list ->
             list.count { download ->
                 download.status == DownloadStatus.DOWNLOADING ||
-                        download.status == DownloadStatus.PENDING ||
-                        download.status == DownloadStatus.QUEUED
+                        download.status == DownloadStatus.PENDING
             }
         }
         .stateIn(
@@ -115,6 +114,8 @@ class DownloadViewModel @Inject constructor(
         gameId: Long? = null
     ) {
         viewModelScope.launch {
+            val currentTime = System.currentTimeMillis()
+
             // Insert download record
             val downloadId = downloadDao.insertDownload(
                 DownloadEntity(
@@ -126,9 +127,12 @@ class DownloadViewModel @Inject constructor(
                     downloadedBytes = 0L,
                     totalBytes = 0L,
                     speedBytesPerSecond = 0L,
-                    error = null,
-                    createdAt = System.currentTimeMillis(),
-                    updatedAt = System.currentTimeMillis()
+                    destinationPath = destinationPath,
+                    startedTimestamp = currentTime,
+                    createdAt = currentTime,
+                    updatedAt = currentTime,
+                    completedTimestamp = null,
+                    errorMessage = null
                 )
             )
 

@@ -2,7 +2,7 @@ package com.steamdeck.mobile.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.steamdeck.mobile.data.local.preferences.SteamPreferences
+import com.steamdeck.mobile.data.local.preferences.SecureSteamPreferences
 import com.steamdeck.mobile.data.remote.steam.SteamRepository
 import com.steamdeck.mobile.domain.usecase.SyncSteamLibraryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,7 +20,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val steamPreferences: SteamPreferences,
+    private val steamPreferences: SecureSteamPreferences,
     private val steamRepository: SteamRepository,
     private val syncSteamLibraryUseCase: SyncSteamLibraryUseCase
 ) : ViewModel() {
@@ -40,13 +40,18 @@ class SettingsViewModel @Inject constructor(
      */
     private fun loadSettings() {
         viewModelScope.launch {
+            val apiKeyFlow = steamPreferences.getSteamApiKey()
+            val steamIdFlow = steamPreferences.getSteamId()
+            val usernameFlow = steamPreferences.getSteamUsername()
+            val lastSyncFlow = steamPreferences.getLastSyncTimestamp()
+
             combine(
-                steamPreferences.getSteamApiKey(),
-                steamPreferences.getSteamId(),
-                steamPreferences.getSteamUsername(),
-                steamPreferences.getLastSyncTimestamp(),
-                steamPreferences.isSteamConfigured()
-            ) { apiKey, steamId, username, lastSync, isConfigured ->
+                apiKeyFlow,
+                steamIdFlow,
+                usernameFlow,
+                lastSyncFlow
+            ) { apiKey, steamId, username, lastSync ->
+                val isConfigured = !apiKey.isNullOrBlank() && !steamId.isNullOrBlank()
                 SettingsData(
                     steamApiKey = apiKey.orEmpty(),
                     steamId = steamId.orEmpty(),

@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.steamdeck.mobile.data.local.database.entity.DownloadEntity
 import com.steamdeck.mobile.data.local.database.entity.DownloadStatus
+import com.steamdeck.mobile.presentation.viewmodel.DownloadViewModel
 
 /**
  * ダウンロード管理画面
@@ -115,8 +116,8 @@ private fun EmptyDownloadsPlaceholder() {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Download,
-                contentDescription = null,
+                imageVector = Icons.Default.Info,
+                contentDescription = "情報",
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.outline
             )
@@ -218,7 +219,7 @@ private fun DownloadItem(
                     }
                 }
 
-                DownloadStatus.PENDING, DownloadStatus.QUEUED -> {
+                DownloadStatus.PENDING -> {
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -240,10 +241,10 @@ private fun DownloadItem(
                 when (download.status) {
                     DownloadStatus.DOWNLOADING -> {
                         IconButton(onClick = onPause) {
-                            Icon(Icons.Default.Pause, contentDescription = "一時停止")
+                            Icon(Icons.Default.Clear, contentDescription = "一時停止")
                         }
                         IconButton(onClick = onCancel) {
-                            Icon(Icons.Default.Cancel, contentDescription = "キャンセル")
+                            Icon(Icons.Default.Close, contentDescription = "キャンセル")
                         }
                     }
 
@@ -252,13 +253,13 @@ private fun DownloadItem(
                             Icon(Icons.Default.PlayArrow, contentDescription = "再開")
                         }
                         IconButton(onClick = onCancel) {
-                            Icon(Icons.Default.Cancel, contentDescription = "キャンセル")
+                            Icon(Icons.Default.Close, contentDescription = "キャンセル")
                         }
                     }
 
                     DownloadStatus.FAILED -> {
                         TextButton(onClick = onRetry) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Icon(Icons.Default.Refresh, contentDescription = "再試行")
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("再試行")
                         }
@@ -288,10 +289,10 @@ private fun DownloadItem(
             }
 
             // エラーメッセージ
-            if (download.status == DownloadStatus.FAILED && download.error != null) {
+            if (download.status == DownloadStatus.FAILED && download.errorMessage != null) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "エラー: ${download.error}",
+                    text = "エラー: ${download.errorMessage}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -304,25 +305,19 @@ private fun DownloadItem(
 private fun DownloadStatusIcon(status: DownloadStatus) {
     when (status) {
         DownloadStatus.PENDING -> Icon(
-            Icons.Default.Schedule,
+            Icons.Default.Info,
             contentDescription = "待機中",
             tint = MaterialTheme.colorScheme.outline
         )
 
-        DownloadStatus.QUEUED -> Icon(
-            Icons.Default.Schedule,
-            contentDescription = "キュー待ち",
-            tint = MaterialTheme.colorScheme.outline
-        )
-
         DownloadStatus.DOWNLOADING -> Icon(
-            Icons.Default.Download,
+            Icons.Default.ArrowForward,
             contentDescription = "ダウンロード中",
             tint = MaterialTheme.colorScheme.primary
         )
 
         DownloadStatus.PAUSED -> Icon(
-            Icons.Default.Pause,
+            Icons.Default.Clear,
             contentDescription = "一時停止",
             tint = MaterialTheme.colorScheme.secondary
         )
@@ -334,13 +329,13 @@ private fun DownloadStatusIcon(status: DownloadStatus) {
         )
 
         DownloadStatus.FAILED -> Icon(
-            Icons.Default.Error,
+            Icons.Default.Warning,
             contentDescription = "失敗",
             tint = MaterialTheme.colorScheme.error
         )
 
         DownloadStatus.CANCELLED -> Icon(
-            Icons.Default.Cancel,
+            Icons.Default.Close,
             contentDescription = "キャンセル",
             tint = MaterialTheme.colorScheme.outline
         )

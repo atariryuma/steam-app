@@ -1,12 +1,18 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.kts.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# SteamDeck Mobile - ProGuard/R8 Configuration
+# Optimized for APK size reduction and performance
+# Target: < 50MB APK size
+# Last updated: 2025-12-17
+
+#==========================================
+# R8 Full Mode Optimization
+#==========================================
+-allowaccessmodification
+-repackageclasses ''
 
 # Kotlinリフレクション保護
 -keep class kotlin.Metadata { *; }
+-keep class kotlin.reflect.** { *; }
+-dontwarn kotlin.reflect.**
 
 # Room
 -keep class * extends androidx.room.RoomDatabase
@@ -44,10 +50,43 @@
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
 
-# Compose
+# Jetpack Compose (最適化版)
+-dontwarn androidx.compose.**
 -keep class androidx.compose.runtime.** { *; }
+-keepclassmembers class androidx.compose.** {
+    <init>(...);
+}
 
-# デバッグ情報削除
+# Compose Compiler
+-keep class androidx.compose.compiler.** { *; }
+-keepclassmembers @androidx.compose.runtime.Composable class * {
+    <methods>;
+}
+
+# Material3
+-keep class androidx.compose.material3.** { *; }
+-keep class androidx.compose.material.icons.** { *; }
+
+# Wine/Box64 Integration
+# Keep Winlator emulator classes and JNI bindings
+-keep class com.steamdeck.mobile.core.winlator.** { *; }
+-keep class com.steamdeck.mobile.domain.emulator.** { *; }
+
+# Apache Commons Compress (for tar/xz extraction)
+-dontwarn org.apache.commons.compress.**
+-keep class org.apache.commons.compress.** { *; }
+
+# zstd-jni (JNI bindings)
+-keep class com.github.luben.zstd.** { *; }
+
+# Google Error Prone Annotations (used by Tink)
+-dontwarn com.google.errorprone.annotations.**
+
+# Security Crypto (Tink)
+-dontwarn com.google.crypto.tink.**
+-keep class com.google.crypto.tink.** { *; }
+
+# デバッグ情報削除（本番環境では、デバッグ・詳細・情報ログを削除、警告・エラーは保持）
 -assumenosideeffects class android.util.Log {
     public static *** d(...);
     public static *** v(...);

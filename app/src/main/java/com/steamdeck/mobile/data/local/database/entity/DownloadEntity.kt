@@ -38,23 +38,35 @@ data class DownloadEntity(
     /** 保存先パス */
     val destinationPath: String = "",
 
-    /** ダウンロード開始日時（Unix timestamp） */
+    /**
+     * ダウンロード開始日時（Unix timestamp）
+     *
+     * 注意: デフォルト値として System.currentTimeMillis() を使用していますが、
+     * 実際の利用時には明示的に値を渡すことを推奨します。
+     */
     val startedTimestamp: Long = System.currentTimeMillis(),
 
-    /** 作成日時（Unix timestamp） */
+    /**
+     * 作成日時（Unix timestamp）
+     *
+     * 注意: デフォルト値として System.currentTimeMillis() を使用していますが、
+     * 実際の利用時には明示的に値を渡すことを推奨します。
+     */
     val createdAt: Long = System.currentTimeMillis(),
 
-    /** 更新日時（Unix timestamp） */
+    /**
+     * 更新日時（Unix timestamp）
+     *
+     * 注意: デフォルト値として System.currentTimeMillis() を使用していますが、
+     * 実際の利用時には明示的に値を渡すことを推奨します。
+     */
     val updatedAt: Long = System.currentTimeMillis(),
 
     /** ダウンロード完了日時（Unix timestamp） */
     val completedTimestamp: Long? = null,
 
     /** エラーメッセージ */
-    val errorMessage: String? = null,
-
-    /** エラー詳細（廃止予定、errorMessageを使用） */
-    val error: String? = errorMessage
+    val errorMessage: String? = null
 )
 
 /**
@@ -63,9 +75,6 @@ data class DownloadEntity(
 enum class DownloadStatus {
     /** ダウンロード待機中 */
     PENDING,
-
-    /** キュー待ち */
-    QUEUED,
 
     /** ダウンロード中 */
     DOWNLOADING,
@@ -76,10 +85,7 @@ enum class DownloadStatus {
     /** 完了 */
     COMPLETED,
 
-    /** エラー（廃止予定、FAILEDを使用） */
-    ERROR,
-
-    /** 失敗 */
+    /** エラー */
     FAILED,
 
     /** キャンセル */

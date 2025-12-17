@@ -36,7 +36,7 @@ class DownloadRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getDownloadById(downloadId: Long): Download? {
-        return downloadDao.getDownloadById(downloadId)?.let { entity ->
+        return downloadDao.getDownloadByIdDirect(downloadId)?.let { entity ->
             DownloadMapper.toDomain(entity)
         }
     }
@@ -52,8 +52,7 @@ class DownloadRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deleteDownload(download: Download) {
-        val entity = DownloadMapper.toEntity(download)
-        downloadDao.deleteDownload(entity)
+        downloadDao.deleteDownload(download.id)
     }
 
     override suspend fun updateDownloadProgress(
@@ -67,10 +66,16 @@ class DownloadRepositoryImpl @Inject constructor(
             DownloadStatus.DOWNLOADING -> EntityDownloadStatus.DOWNLOADING
             DownloadStatus.PAUSED -> EntityDownloadStatus.PAUSED
             DownloadStatus.COMPLETED -> EntityDownloadStatus.COMPLETED
-            DownloadStatus.ERROR -> EntityDownloadStatus.ERROR
+            DownloadStatus.FAILED -> EntityDownloadStatus.FAILED
             DownloadStatus.CANCELLED -> EntityDownloadStatus.CANCELLED
         }
-        downloadDao.updateDownloadProgress(downloadId, progress, downloadedBytes, entityStatus)
+        // Update progress (bytes and percentage) and status
+        downloadDao.updateDownloadProgress(
+            downloadId = downloadId,
+            downloadedBytes = downloadedBytes,
+            progress = progress
+        )
+        downloadDao.updateDownloadStatus(downloadId, entityStatus)
     }
 
     override suspend fun markDownloadCompleted(downloadId: Long, status: DownloadStatus, completedTimestamp: Long) {
@@ -79,7 +84,7 @@ class DownloadRepositoryImpl @Inject constructor(
             DownloadStatus.DOWNLOADING -> EntityDownloadStatus.DOWNLOADING
             DownloadStatus.PAUSED -> EntityDownloadStatus.PAUSED
             DownloadStatus.COMPLETED -> EntityDownloadStatus.COMPLETED
-            DownloadStatus.ERROR -> EntityDownloadStatus.ERROR
+            DownloadStatus.FAILED -> EntityDownloadStatus.FAILED
             DownloadStatus.CANCELLED -> EntityDownloadStatus.CANCELLED
         }
         downloadDao.markDownloadCompleted(downloadId, entityStatus, completedTimestamp)
@@ -91,7 +96,7 @@ class DownloadRepositoryImpl @Inject constructor(
             DownloadStatus.DOWNLOADING -> EntityDownloadStatus.DOWNLOADING
             DownloadStatus.PAUSED -> EntityDownloadStatus.PAUSED
             DownloadStatus.COMPLETED -> EntityDownloadStatus.COMPLETED
-            DownloadStatus.ERROR -> EntityDownloadStatus.ERROR
+            DownloadStatus.FAILED -> EntityDownloadStatus.FAILED
             DownloadStatus.CANCELLED -> EntityDownloadStatus.CANCELLED
         }
         downloadDao.markDownloadError(downloadId, entityStatus, errorMessage)

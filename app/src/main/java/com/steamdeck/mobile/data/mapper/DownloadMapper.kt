@@ -72,7 +72,7 @@ object DownloadMapper {
             EntityDownloadStatus.DOWNLOADING -> DomainDownloadStatus.DOWNLOADING
             EntityDownloadStatus.PAUSED -> DomainDownloadStatus.PAUSED
             EntityDownloadStatus.COMPLETED -> DomainDownloadStatus.COMPLETED
-            EntityDownloadStatus.ERROR -> DomainDownloadStatus.ERROR
+            EntityDownloadStatus.FAILED -> DomainDownloadStatus.FAILED
             EntityDownloadStatus.CANCELLED -> DomainDownloadStatus.CANCELLED
         }
     }
@@ -86,7 +86,7 @@ object DownloadMapper {
             DomainDownloadStatus.DOWNLOADING -> EntityDownloadStatus.DOWNLOADING
             DomainDownloadStatus.PAUSED -> EntityDownloadStatus.PAUSED
             DomainDownloadStatus.COMPLETED -> EntityDownloadStatus.COMPLETED
-            DomainDownloadStatus.ERROR -> EntityDownloadStatus.ERROR
+            DomainDownloadStatus.FAILED -> EntityDownloadStatus.FAILED
             DomainDownloadStatus.CANCELLED -> EntityDownloadStatus.CANCELLED
         }
     }

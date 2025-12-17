@@ -146,7 +146,7 @@ fun GameDetailContent(
                 onClick = onLaunchGame,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                Icon(Icons.Default.PlayArrow, contentDescription = "起動")
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("ゲームを起動")
             }
@@ -232,7 +232,7 @@ fun DeleteConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Warning, contentDescription = null) },
+        icon = { Icon(Icons.Default.Warning, contentDescription = "警告") },
         title = { Text("ゲームを削除") },
         text = { Text("「$gameName」を削除してもよろしいですか？\nこの操作は取り消せません。") },
         confirmButton = {
@@ -279,7 +279,7 @@ fun ErrorContent(
         ) {
             Icon(
                 imageVector = Icons.Default.Warning,
-                contentDescription = null,
+                contentDescription = "エラー",
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.error
             )

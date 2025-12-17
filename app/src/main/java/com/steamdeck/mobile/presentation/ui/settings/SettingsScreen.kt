@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -65,6 +66,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToWineTest: () -> Unit = {},
+    onNavigateToControllerSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -147,6 +150,8 @@ fun SettingsScreen(
                     onSaveSteamCredentials = viewModel::saveSteamCredentials,
                     onSyncLibrary = viewModel::syncSteamLibrary,
                     onClearSettings = viewModel::clearSteamSettings,
+                    onNavigateToWineTest = onNavigateToWineTest,
+                    onNavigateToControllerSettings = onNavigateToControllerSettings,
                     modifier = Modifier.padding(paddingValues)
                 )
             }
@@ -182,6 +187,8 @@ private fun SettingsContent(
     onSaveSteamCredentials: (String, String) -> Unit,
     onSyncLibrary: () -> Unit,
     onClearSettings: () -> Unit,
+    onNavigateToWineTest: () -> Unit,
+    onNavigateToControllerSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -204,6 +211,12 @@ private fun SettingsContent(
             syncState = syncState,
             onSync = onSyncLibrary
         )
+
+        // コントローラー設定セクション
+        ControllerSection(onNavigateToControllerSettings = onNavigateToControllerSettings)
+
+        // Wine/Winlator テストセクション
+        WineTestSection(onNavigateToWineTest = onNavigateToWineTest)
 
         // アプリ設定セクション（将来実装）
         AppSettingsSection()
@@ -237,7 +250,7 @@ private fun SteamAuthSection(
             ) {
                 Icon(
                     imageVector = if (data.isSteamConfigured) Icons.Default.Check else Icons.Default.Warning,
-                    contentDescription = null,
+                    contentDescription = if (data.isSteamConfigured) "認証済み" else "未認証",
                     tint = if (data.isSteamConfigured)
                         MaterialTheme.colorScheme.primary
                     else
@@ -260,7 +273,7 @@ private fun SteamAuthSection(
                 )
             } else {
                 Text(
-                    text = "Steam Web API KeyとSteam IDを入力してください",
+                    text = "Steam Web API KeyとSteam IDを入力してください\n※Winlator内蔵Steamクライアントでのログインを推奨",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -315,7 +328,7 @@ private fun SteamAuthSection(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Clear,
-                            contentDescription = null
+                            contentDescription = "クリア"
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("クリア")
@@ -350,7 +363,7 @@ private fun LibrarySyncSection(
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
+                    contentDescription = "同期",
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -395,7 +408,7 @@ private fun LibrarySyncSection(
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = null
+                    contentDescription = "同期"
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -410,6 +423,118 @@ private fun LibrarySyncSection(
                     color = MaterialTheme.colorScheme.error
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ControllerSection(
+    onNavigateToControllerSettings: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SportsEsports,
+                    contentDescription = "コントローラー",
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "コントローラー設定",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+
+            Text(
+                text = "ゲームコントローラーのボタンマッピングとプロファイル管理",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+
+            FilledTonalButton(
+                onClick = onNavigateToControllerSettings,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SportsEsports,
+                    contentDescription = "コントローラー設定"
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("コントローラー設定を開く")
+            }
+        }
+    }
+}
+
+@Composable
+private fun WineTestSection(
+    onNavigateToWineTest: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "警告",
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Wine/Winlator 統合",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            }
+
+            Text(
+                text = "🚧 Windowsゲーム実行環境（実験的機能）",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+
+            FilledTonalButton(
+                onClick = onNavigateToWineTest,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "テスト"
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Wine環境をテスト")
+            }
+
+            Text(
+                text = "※ Wine環境はダウンロードが必要です (~100MB)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
         }
     }
 }

@@ -1,0 +1,351 @@
+package com.steamdeck.mobile.presentation.ui.settings
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.steamdeck.mobile.domain.model.Box64Preset
+import com.steamdeck.mobile.presentation.viewmodel.GameSettingsViewModel
+
+/**
+ * ゲーム設定画面
+ *
+ * 機能:
+ * - Box64パフォーマンスプリセット選択
+ * - Wine設定
+ * - DirectX Wrapper設定
+ * - 画面解像度設定
+ * - FPS表示設定
+ *
+ * Material3 Best Practices:
+ * - Segmented buttons for presets
+ * - Switch components for toggles
+ * - Dropdown menus for selections
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GameSettingsScreen(
+    gameId: Long,
+    onNavigateBack: () -> Unit,
+    viewModel: GameSettingsViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(gameId) {
+        viewModel.loadGameSettings(gameId)
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("ゲーム設定") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, "戻る")
+                    }
+                },
+                actions = {
+                    TextButton(
+                        onClick = { viewModel.saveSettings() },
+                        enabled = uiState is GameSettingsUiState.Loaded
+                    ) {
+                        Text("保存")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        when (val state = uiState) {
+            is GameSettingsUiState.Loading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = androidx.compose.ui.Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            is GameSettingsUiState.Loaded -> {
+                GameSettingsContent(
+                    container = state.container,
+                    enableFps = state.enableFps,
+                    onBox64PresetChange = { viewModel.updateBox64Preset(it) },
+                    onWineVersionChange = { viewModel.updateWineVersion(it) },
+                    onDxvkChange = { viewModel.updateDxvk(it) },
+                    onResolutionChange = { viewModel.updateResolution(it) },
+                    onFpsChange = { viewModel.updateFpsDisplay(it) },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                )
+            }
+
+            is GameSettingsUiState.Error -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = androidx.compose.ui.Alignment.Center
+                ) {
+                    Text(
+                        text = state.message,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GameSettingsContent(
+    container: com.steamdeck.mobile.domain.model.WinlatorContainer,
+    enableFps: Boolean,
+    onBox64PresetChange: (Box64Preset) -> Unit,
+    onWineVersionChange: (String) -> Unit,
+    onDxvkChange: (Boolean) -> Unit,
+    onResolutionChange: (String) -> Unit,
+    onFpsChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        // Box64パフォーマンスプリセット
+        SettingsSection(title = "Box64パフォーマンスプリセット") {
+            Box64PresetSelector(
+                selectedPreset = container.box64Preset,
+                onPresetChange = onBox64PresetChange
+            )
+        }
+
+        HorizontalDivider()
+
+        // Wine設定
+        SettingsSection(title = "Wine設定") {
+            WineVersionSelector(
+                selectedVersion = container.wineVersion,
+                onVersionChange = onWineVersionChange
+            )
+        }
+
+        HorizontalDivider()
+
+        // DirectX設定
+        SettingsSection(title = "DirectX設定") {
+            DxvkToggle(
+                enabled = container.enableDXVK,
+                onToggle = onDxvkChange
+            )
+        }
+
+        HorizontalDivider()
+
+        // 画面設定
+        SettingsSection(title = "画面設定") {
+            ResolutionSelector(
+                selectedResolution = container.screenResolution,
+                onResolutionChange = onResolutionChange
+            )
+        }
+
+        HorizontalDivider()
+
+        // パフォーマンス表示
+        SettingsSection(title = "パフォーマンス表示") {
+            FpsToggle(
+                enabled = enableFps,
+                onToggle = onFpsChange
+            )
+        }
+    }
+}
+
+@Composable
+fun SettingsSection(
+    title: String,
+    content: @Composable () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        content()
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun Box64PresetSelector(
+    selectedPreset: Box64Preset,
+    onPresetChange: (Box64Preset) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box64Preset.entries.forEach { preset ->
+            FilterChip(
+                selected = selectedPreset == preset,
+                onClick = { onPresetChange(preset) },
+                label = {
+                    Column {
+                        Text(preset.name)
+                        Text(
+                            text = preset.description,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WineVersionSelector(
+    selectedVersion: String,
+    onVersionChange: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val wineVersions = listOf("8.0", "9.0", "10.0")
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = selectedVersion,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Wineバージョン") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            wineVersions.forEach { version ->
+                DropdownMenuItem(
+                    text = { Text("Wine $version") },
+                    onClick = {
+                        onVersionChange(version)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DxvkToggle(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("DXVK有効化")
+            Text(
+                text = "Vulkanベースのグラフィックス変換（推奨）",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = onToggle
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ResolutionSelector(
+    selectedResolution: String,
+    onResolutionChange: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val resolutions = listOf(
+        "1280x720" to "720p (推奨)",
+        "1920x1080" to "1080p",
+        "2560x1440" to "1440p",
+        "854x480" to "480p (低性能端末向け)"
+    )
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = resolutions.find { it.first == selectedResolution }?.second ?: selectedResolution,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("画面解像度") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            resolutions.forEach { (resolution, label) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        onResolutionChange(resolution)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FpsToggle(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("FPS表示")
+            Text(
+                text = "画面上にフレームレートを表示",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = onToggle
+        )
+    }
+}

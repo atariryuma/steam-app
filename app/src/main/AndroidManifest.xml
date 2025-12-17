@@ -35,7 +35,18 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.SteamDeckMobile"
+        android:resizeableActivity="true"
         tools:targetApi="31">
+
+        <!-- Support 21:9 aspect ratios for wide/foldable displays -->
+        <meta-data
+            android:name="android.max_aspect"
+            android:value="2.4" />
+
+        <!-- Support standard 16:9 displays -->
+        <meta-data
+            android:name="android.min_aspect"
+            android:value="1.7" />
 
         <!-- Disable default WorkManager initialization for Hilt integration -->
         <provider
@@ -53,12 +64,19 @@
             android:name=".presentation.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.SteamDeckMobile"
+            android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Google Password Manager / Autofill support -->
+            <!-- https://developer.android.com/identity/sign-in/credential-manager -->
+            <meta-data
+                android:name="asset_statements"
+                android:resource="@string/asset_statements" />
         </activity>
     </application>
 

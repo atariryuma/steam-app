@@ -93,6 +93,94 @@ class HomeViewModel @Inject constructor(
         _uiState.value = HomeUiState.Loading
         loadGames()
     }
+
+    /**
+     * 手動でゲームを追加
+     *
+     * ベストプラクティス:
+     * - 入力値のバリデーション
+     * - 重複チェック
+     * - insertGameの戻り値を検証
+     * - 適切なエラーハンドリング
+     */
+    fun addGame(name: String, executablePath: String, installPath: String) {
+        viewModelScope.launch {
+            try {
+                // 1. 入力値のバリデーション
+                if (name.isBlank()) {
+                    _uiState.value = HomeUiState.Error("ゲーム名を入力してください")
+                    return@launch
+                }
+                if (executablePath.isBlank()) {
+                    _uiState.value = HomeUiState.Error("実行ファイルを選択してください")
+                    return@launch
+                }
+                if (installPath.isBlank()) {
+                    _uiState.value = HomeUiState.Error("インストールフォルダを選択してください")
+                    return@launch
+                }
+
+                // 2. URIの検証（content://スキームであることを確認）
+                // Storage Access Framework経由で取得したURIのみを許可
+                if (!executablePath.startsWith("content://")) {
+                    android.util.Log.w("HomeViewModel", "Executable path is not a content URI: $executablePath")
+                    // Note: 下位互換性のため警告のみ（実際のファイルアクセスでエラーになる）
+                }
+                if (!installPath.startsWith("content://")) {
+                    android.util.Log.w("HomeViewModel", "Install path is not a content URI: $installPath")
+                }
+
+                // 3. 重複チェック（同じ名前 or 同じ実行パス）
+                val currentGames = when (val state = _uiState.value) {
+                    is HomeUiState.Success -> state.games
+                    else -> emptyList()
+                }
+
+                val isDuplicateName = currentGames.any { it.name.equals(name, ignoreCase = true) }
+                val isDuplicatePath = currentGames.any { it.executablePath == executablePath }
+
+                if (isDuplicateName) {
+                    _uiState.value = HomeUiState.Error("同じ名前のゲームが既に存在します: $name")
+                    return@launch
+                }
+                if (isDuplicatePath) {
+                    _uiState.value = HomeUiState.Error("同じ実行ファイルが既に登録されています")
+                    return@launch
+                }
+
+                // 4. ゲームを作成
+                val game = Game(
+                    name = name,
+                    executablePath = executablePath,
+                    installPath = installPath,
+                    source = com.steamdeck.mobile.domain.model.GameSource.IMPORTED
+                )
+
+                // 5. データベースに挿入し、IDを取得
+                val insertedId = gameRepository.insertGame(game)
+
+                // 6. 挿入結果を検証
+                if (insertedId <= 0) {
+                    _uiState.value = HomeUiState.Error("ゲームの追加に失敗しました（無効なID: $insertedId）")
+                    return@launch
+                }
+
+                android.util.Log.d("HomeViewModel", "Game added successfully with ID: $insertedId")
+
+                // 7. 追加後、リストを更新
+                // Note: Flowで自動更新されるが、明示的にrefresh()を呼ぶことで即座に反映
+                refresh()
+
+            } catch (e: android.database.sqlite.SQLiteConstraintException) {
+                // データベース制約違反（UNIQUE制約等）
+                _uiState.value = HomeUiState.Error("ゲームが既に存在します")
+                android.util.Log.e("HomeViewModel", "SQLite constraint error", e)
+            } catch (e: Exception) {
+                _uiState.value = HomeUiState.Error("ゲームの追加に失敗しました: ${e.message}")
+                android.util.Log.e("HomeViewModel", "Error adding game", e)
+            }
+        }
+    }
 }
 
 /**

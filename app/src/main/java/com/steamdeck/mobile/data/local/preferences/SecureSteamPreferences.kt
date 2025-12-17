@@ -51,6 +51,8 @@ class SecureSteamPreferences @Inject constructor(
     private val _steamIdFlow = MutableStateFlow<String?>(null)
     private val _steamUsernameFlow = MutableStateFlow<String?>(null)
     private val _lastSyncTimestampFlow = MutableStateFlow<Long?>(null)
+    private val _steamAccessTokenFlow = MutableStateFlow<String?>(null)
+    private val _steamRefreshTokenFlow = MutableStateFlow<String?>(null)
 
     /**
      * Mutex for thread-safe initialization (coroutine-safe replacement for synchronized)
@@ -77,6 +79,8 @@ class SecureSteamPreferences @Inject constructor(
                         _steamUsernameFlow.value = encryptedPreferences.getString(KEY_STEAM_USERNAME, null)
                         _lastSyncTimestampFlow.value = encryptedPreferences.getLong(KEY_LAST_SYNC_TIMESTAMP, -1L)
                             .takeIf { it != -1L }
+                        _steamAccessTokenFlow.value = encryptedPreferences.getString(KEY_STEAM_ACCESS_TOKEN, null)
+                        _steamRefreshTokenFlow.value = encryptedPreferences.getString(KEY_STEAM_REFRESH_TOKEN, null)
                     }
                     isInitialized = true
                 }
@@ -90,6 +94,8 @@ class SecureSteamPreferences @Inject constructor(
         private const val KEY_STEAM_ID = "steam_id"
         private const val KEY_STEAM_USERNAME = "steam_username"
         private const val KEY_LAST_SYNC_TIMESTAMP = "last_sync_timestamp"
+        private const val KEY_STEAM_ACCESS_TOKEN = "steam_access_token"
+        private const val KEY_STEAM_REFRESH_TOKEN = "steam_refresh_token"
     }
 
     /**
@@ -173,13 +179,27 @@ class SecureSteamPreferences @Inject constructor(
 
     /**
      * Steam認証情報が設定されているかチェック
+     *
+     * 2つの認証方法をサポート:
+     * 1. API Key認証: API Key + Steam ID
+     * 2. QR認証: Access Token (JWT with Steam ID in "sub" claim)
+     *
+     * @return true if either authentication method is configured
      */
     suspend fun isSteamConfigured(): Boolean {
         ensureInitialized()
         return withContext(Dispatchers.IO) {
+            // 方法1: API Key認証が完了しているか
             val apiKey = encryptedPreferences.getString(KEY_STEAM_API_KEY, null)
-            val steamId = encryptedPreferences.getString(KEY_STEAM_ID, null)
-            !apiKey.isNullOrBlank() && !steamId.isNullOrBlank()
+            val steamIdFromApiKey = encryptedPreferences.getString(KEY_STEAM_ID, null)
+            val hasApiKeyAuth = !apiKey.isNullOrBlank() && !steamIdFromApiKey.isNullOrBlank()
+
+            // 方法2: QR認証が完了しているか
+            val accessToken = encryptedPreferences.getString(KEY_STEAM_ACCESS_TOKEN, null)
+            val hasQrAuth = !accessToken.isNullOrBlank()
+
+            // どちらかの認証方法が設定されていればtrue
+            hasApiKeyAuth || hasQrAuth
         }
     }
 
@@ -194,5 +214,85 @@ class SecureSteamPreferences @Inject constructor(
         _steamIdFlow.value = null
         _steamUsernameFlow.value = null
         _lastSyncTimestampFlow.value = null
+        _steamAccessTokenFlow.value = null
+        _steamRefreshTokenFlow.value = null
+    }
+
+    // ===== Steam QR Authentication Token Management =====
+
+    /**
+     * Steam Access Tokenを暗号化して保存
+     * QR認証成功時に使用
+     */
+    suspend fun setSteamAccessToken(accessToken: String) = withContext(Dispatchers.IO) {
+        encryptedPreferences.edit()
+            .putString(KEY_STEAM_ACCESS_TOKEN, accessToken)
+            .apply()
+        _steamAccessTokenFlow.value = accessToken
+    }
+
+    /**
+     * 暗号化されたSteam Access Tokenを取得
+     */
+    suspend fun getSteamAccessToken(): Flow<String?> {
+        ensureInitialized()
+        return _steamAccessTokenFlow
+    }
+
+    /**
+     * Steam Access Tokenを同期的に取得（Repository層でのみ使用）
+     */
+    suspend fun getSteamAccessTokenDirect(): String? = withContext(Dispatchers.IO) {
+        encryptedPreferences.getString(KEY_STEAM_ACCESS_TOKEN, null)
+    }
+
+    /**
+     * Steam Refresh Tokenを暗号化して保存
+     * トークン更新に使用
+     */
+    suspend fun setSteamRefreshToken(refreshToken: String) = withContext(Dispatchers.IO) {
+        encryptedPreferences.edit()
+            .putString(KEY_STEAM_REFRESH_TOKEN, refreshToken)
+            .apply()
+        _steamRefreshTokenFlow.value = refreshToken
+    }
+
+    /**
+     * 暗号化されたSteam Refresh Tokenを取得
+     */
+    suspend fun getSteamRefreshToken(): Flow<String?> {
+        ensureInitialized()
+        return _steamRefreshTokenFlow
+    }
+
+    /**
+     * Steam Refresh Tokenを同期的に取得（Repository層でのみ使用）
+     */
+    suspend fun getSteamRefreshTokenDirect(): String? = withContext(Dispatchers.IO) {
+        encryptedPreferences.getString(KEY_STEAM_REFRESH_TOKEN, null)
+    }
+
+    /**
+     * Steam認証トークンが設定されているかチェック
+     * QR認証の成功を確認するために使用
+     */
+    suspend fun isSteamAuthTokenAvailable(): Boolean {
+        ensureInitialized()
+        return withContext(Dispatchers.IO) {
+            val accessToken = encryptedPreferences.getString(KEY_STEAM_ACCESS_TOKEN, null)
+            !accessToken.isNullOrBlank()
+        }
+    }
+
+    /**
+     * Steam認証トークンのみをクリア（API Key/Steam IDは保持）
+     */
+    suspend fun clearSteamAuthTokens() = withContext(Dispatchers.IO) {
+        encryptedPreferences.edit()
+            .remove(KEY_STEAM_ACCESS_TOKEN)
+            .remove(KEY_STEAM_REFRESH_TOKEN)
+            .apply()
+        _steamAccessTokenFlow.value = null
+        _steamRefreshTokenFlow.value = null
     }
 }

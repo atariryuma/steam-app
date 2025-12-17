@@ -41,6 +41,22 @@
 -keep class * implements com.google.gson.JsonSerializer
 -keep class * implements com.google.gson.JsonDeserializer
 
+# Kotlinx Serialization
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.**
+-keep,includedescriptorclasses class com.steamdeck.mobile.**$$serializer { *; }
+-keepclassmembers class com.steamdeck.mobile.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.steamdeck.mobile.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep class kotlinx.serialization.** { *; }
+
+# ZXing QR Code
+-keep class com.google.zxing.** { *; }
+-dontwarn com.google.zxing.**
+
 # Hilt
 -keep class dagger.hilt.** { *; }
 -keep class javax.inject.** { *; }

@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SteamDeck Mobile</string>
+
+    <!-- Google Password Manager / Autofill support -->
+    <!-- Digital Asset Links for Google Credential Manager -->
+    <!-- https://developer.android.com/training/sign-in/passkeys#add-support-dal -->
+    <string name="asset_statements" translatable="false">
+        [{
+            \"include\": \"https://steamcommunity.com/.well-known/assetlinks.json\"
+        }]
+    </string>
 </resources>

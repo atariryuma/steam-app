@@ -1,75 +1,98 @@
 @echo off
-REM SteamDeck Mobile - Release APK Build Script
-REM このスクリプトはRelease APK (最適化済み) をビルドします
+REM ============================================================================
+REM Steam Deck Mobile - Release APK Build Script
+REM
+REM Based on Android best practices 2025:
+REM - https://developer.android.com/build/building-cmdline
+REM - https://www.codegenes.net/blog/how-to-create-a-release-signed-apk-file-using-gradle/
+REM ============================================================================
 
+setlocal enabledelayedexpansion
+
+echo.
 echo ========================================
-echo SteamDeck Mobile - Release Build Script
+echo Steam Deck Mobile - Release Build
 echo ========================================
 echo.
 
-REM Java環境チェック
-echo [1/4] Checking Java environment...
-where java >nul 2>&1
-if %errorlevel% neq 0 (
-    echo ERROR: Java not found in PATH
+REM Step 1: Set JAVA_HOME
+echo [1/5] Setting up Java environment...
+set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot"
+set "PATH=%JAVA_HOME%\bin;%PATH%"
+
+REM Verify Java version
+java -version 2>&1 | findstr /C:"17.0" >nul
+if errorlevel 1 (
+    echo ERROR: Java 17 not found or JAVA_HOME not set correctly
+    echo Current JAVA_HOME: %JAVA_HOME%
     pause
     exit /b 1
 )
-
-java -version
+echo ✓ Java 17 detected
 echo.
 
-REM Gradleキャッシュをクリーンアップ
-echo [2/4] Cleaning build cache...
-call gradlew clean
+REM Step 2: Clean previous build
+echo [2/5] Cleaning previous build artifacts...
+call gradlew.bat clean --console=plain
+if errorlevel 1 (
+    echo ERROR: Clean failed
+    pause
+    exit /b 1
+)
+echo ✓ Clean completed
 echo.
 
-REM Release APKをビルド
-echo [3/4] Building Release APK with ProGuard/R8 optimization...
-echo This may take several minutes...
-call gradlew assembleRelease
-if %errorlevel% neq 0 (
+REM Step 3: Build Release APK
+echo [3/5] Building release APK...
+echo This may take 2-5 minutes (R8 optimization + ProGuard)...
+echo.
+call gradlew.bat assembleRelease --console=plain --stacktrace
+if errorlevel 1 (
     echo.
-    echo ERROR: Release build failed!
+    echo ERROR: Build failed
+    echo Check the error messages above for details
     pause
     exit /b 1
 )
+echo ✓ Build completed successfully
 echo.
 
-REM 成功メッセージ
-echo [4/4] Release build successful!
-echo.
-echo ========================================
-echo APK Location:
-echo app\build\outputs\apk\release\app-release.apk
-echo ========================================
-echo.
-
-REM APKファイルのサイズを表示
+REM Step 4: Verify APK output
+echo [4/5] Verifying APK output...
 if exist "app\build\outputs\apk\release\app-release.apk" (
-    for %%I in ("app\build\outputs\apk\release\app-release.apk") do (
-        set size=%%~zI
-        set /a sizeMB=!size!/1024/1024
-        echo Optimized APK Size: !sizeMB! MB
-        echo Target: ^<50 MB
-    )
-    echo.
-    echo WARNING: This APK is NOT signed!
-    echo For production release, you need to:
-    echo 1. Create a keystore
-    echo 2. Sign the APK with jarsigner
-    echo 3. Optimize with zipalign
-    echo.
-    echo See SETUP.md for detailed instructions
-    echo.
+    echo ✓ APK found: app\build\outputs\apk\release\app-release.apk
 
-    choice /C YN /M "Open APK folder"
-    if !errorlevel! equ 1 (
-        explorer "app\build\outputs\apk\release"
+    REM Get file size
+    for %%A in ("app\build\outputs\apk\release\app-release.apk") do (
+        set "size=%%~zA"
     )
+
+    REM Convert to MB
+    set /a sizeMB=!size! / 1048576
+    echo ✓ APK size: !sizeMB! MB
 ) else (
-    echo WARNING: APK file not found
+    echo ERROR: APK not found at expected location
+    pause
+    exit /b 1
 )
-
 echo.
+
+REM Step 5: Summary
+echo [5/5] Build summary
+echo ========================================
+echo Status:        SUCCESS
+echo APK Location:  app\build\outputs\apk\release\app-release.apk
+echo APK Size:      !sizeMB! MB
+echo Build Type:    Release (unsigned)
+echo Version:       0.1.0-alpha
+echo ========================================
+echo.
+echo NOTE: This APK is unsigned and suitable for testing only.
+echo For Play Store distribution, you need to sign it with a release keystore.
+echo.
+echo Next steps:
+echo 1. Install on device: adb install -r app\build\outputs\apk\release\app-release.apk
+echo 2. Or run: build-and-install.bat
+echo.
+
 pause

@@ -1,5 +1,9 @@
 package com.steamdeck.mobile.presentation.ui.home
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -13,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -31,9 +36,57 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     var showSearchBar by remember { mutableStateOf(false) }
+    var showAddGameDialog by remember { mutableStateOf(false) }
+
+    // ファイル選択状態
+    // Note: Storage Access FrameworkではURIをそのまま使用します
+    // ファイルパスに変換することは推奨されません（セキュリティ上の理由）
+    var executableUri by remember { mutableStateOf<Uri?>(null) }
+    var installFolderUri by remember { mutableStateOf<Uri?>(null) }
+
+    // 実行ファイル選択用のランチャー
+    val executableLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                // 永続的な読み取り権限を取得
+                // これにより、アプリ再起動後もファイルにアクセス可能
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                executableUri = uri
+            } catch (e: SecurityException) {
+                // 権限取得に失敗した場合でも、URIは一時的に使用可能
+                executableUri = uri
+                android.util.Log.w("HomeScreen", "Could not take persistable permission", e)
+            }
+        }
+    }
+
+    // インストールフォルダ選択用のランチャー
+    val folderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                // フォルダに対する永続的な読み書き権限を取得
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+                installFolderUri = uri
+            } catch (e: SecurityException) {
+                installFolderUri = uri
+                android.util.Log.w("HomeScreen", "Could not take persistable permission", e)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -64,7 +117,7 @@ fun HomeScreen(
             }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { /* TODO: ゲーム追加 */ }) {
+            FloatingActionButton(onClick = { showAddGameDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = "ゲーム追加")
             }
         }
@@ -92,6 +145,33 @@ fun HomeScreen(
                 )
             }
         }
+    }
+
+    // ゲーム追加ダイアログ
+    if (showAddGameDialog) {
+        AddGameDialog(
+            onDismiss = {
+                showAddGameDialog = false
+                executableUri = null
+                installFolderUri = null
+            },
+            onConfirm = { name, execPath, instPath ->
+                viewModel.addGame(name, execPath, instPath)
+                showAddGameDialog = false
+                executableUri = null
+                installFolderUri = null
+            },
+            onSelectExecutable = {
+                // 実行ファイル選択（全てのファイルタイプ）
+                executableLauncher.launch(arrayOf("*/*"))
+            },
+            onSelectInstallFolder = {
+                // フォルダ選択
+                folderLauncher.launch(null)
+            },
+            selectedExecutablePath = executableUri?.toString() ?: "",
+            selectedInstallPath = installFolderUri?.toString() ?: ""
+        )
     }
 }
 

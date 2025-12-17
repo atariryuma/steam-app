@@ -6,6 +6,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +18,7 @@ import coil.compose.AsyncImage
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.presentation.viewmodel.GameDetailUiState
 import com.steamdeck.mobile.presentation.viewmodel.GameDetailViewModel
+import com.steamdeck.mobile.presentation.viewmodel.LaunchState
 
 /**
  * ゲーム詳細画面
@@ -27,6 +29,7 @@ fun GameDetailScreen(
     gameId: Long,
     onNavigateBack: () -> Unit,
     onNavigateToImport: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     viewModel: GameDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -68,6 +71,9 @@ fun GameDetailScreen(
                 actions = {
                     when (val state = uiState) {
                         is GameDetailUiState.Success -> {
+                            IconButton(onClick = onNavigateToSettings) {
+                                Icon(Icons.Default.Settings, contentDescription = "ゲーム設定")
+                            }
                             IconButton(
                                 onClick = { viewModel.toggleFavorite(state.game.id, !state.game.isFavorite) }
                             ) {
@@ -119,8 +125,16 @@ fun GameDetailScreen(
                         onNavigateToImport = {
                             showDownloadDialog = false
                             onNavigateToImport()
+                        },
+                        onStartDownload = { appId ->
+                            viewModel.startDownload(appId)
                         }
                     )
+                }
+
+                // 起動中ダイアログ (Winlator初期化含む)
+                if (launchState is LaunchState.Launching) {
+                    LaunchingDialog()
                 }
 
                 // 起動エラーダイアログ
@@ -304,6 +318,22 @@ fun DeleteConfirmDialog(
                 Text("キャンセル")
             }
         }
+    )
+}
+
+@Composable
+fun LaunchingDialog() {
+    AlertDialog(
+        onDismissRequest = {}, // Non-dismissible
+        icon = { CircularProgressIndicator() },
+        title = { Text("ゲームを起動中...") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("初回起動時はWinlatorの初期化に2-3分かかる場合があります。")
+                Text("しばらくお待ちください。", style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {} // No button, non-dismissible
     )
 }
 

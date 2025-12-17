@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.winlator
 
 import android.util.Log
-import com.github.luben.zstd.ZstdInputStream
+// import com.github.luben.zstd.ZstdInputStream // Temporarily disabled - no Android ARM64 support
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
@@ -15,12 +15,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Utility for decompressing .tzst (tar + zstd) files.
+ * Utility for decompressing tar-based archives (.txz, .tzst).
  *
- * Uses zstd-jni library for Zstandard decompression.
- * Based on best practices from:
- * - https://github.com/luben/zstd-jni
- * - https://github.com/square/zstd-kmp
+ * Note: Zstandard (.tzst) support is temporarily disabled due to lack of
+ * Android ARM64 native library support in zstd-jni Maven distribution.
+ * Use .txz (XZ compression) instead for now.
  *
  * Reference: https://github.com/luben/zstd-jni
  */
@@ -45,47 +44,13 @@ class ZstdDecompressor @Inject constructor() {
         outputFile: File,
         progressCallback: ((Float) -> Unit)? = null
     ): Result<File> = withContext(Dispatchers.IO) {
-        try {
-            if (!inputFile.exists()) {
-                return@withContext Result.failure(
-                    IllegalArgumentException("Input file not found: ${inputFile.absolutePath}")
-                )
-            }
-
-            val fileSize = inputFile.length()
-            Log.i(TAG, "Decompressing ${inputFile.name} (${fileSize / 1024}KB)...")
-
-            outputFile.parentFile?.mkdirs()
-
-            var bytesRead = 0L
-            val buffer = ByteArray(BUFFER_SIZE)
-
-            FileInputStream(inputFile).use { fileInput ->
-                ZstdInputStream(fileInput).use { zstdInput ->
-                    FileOutputStream(outputFile).use { output ->
-                        var len: Int
-                        while (zstdInput.read(buffer).also { len = it } > 0) {
-                            output.write(buffer, 0, len)
-                            bytesRead += len
-
-                            // Report progress based on input file size
-                            // Note: This is approximate since compressed size != decompressed size
-                            val progress = (fileInput.channel.position().toFloat() / fileSize)
-                            progressCallback?.invoke(progress.coerceIn(0f, 1f))
-                        }
-                    }
-                }
-            }
-
-            Log.i(TAG, "Decompression complete: ${outputFile.name} (${outputFile.length() / 1024}KB)")
-            Result.success(outputFile)
-        } catch (e: Exception) {
-            Log.e(TAG, "Decompression failed", e)
-            if (outputFile.exists()) {
-                outputFile.delete() // Cleanup partial file
-            }
-            Result.failure(e)
-        }
+        Result.failure(
+            UnsupportedOperationException(
+                "Zstandard decompression is temporarily unavailable. " +
+                "Please use XZ-compressed archives (.txz) instead. " +
+                "See extractTxz() method."
+            )
+        )
     }
 
     /**
@@ -101,35 +66,13 @@ class ZstdDecompressor @Inject constructor() {
         targetDir: File,
         progressCallback: ((Float, String) -> Unit)? = null
     ): Result<File> = withContext(Dispatchers.IO) {
-        try {
-            // Step 1: Decompress .tzst to .tar (50% of progress)
-            progressCallback?.invoke(0.0f, "Decompressing ${tzstFile.name}...")
-
-            val tarFile = File(tzstFile.parentFile, tzstFile.nameWithoutExtension)
-
-            decompress(tzstFile, tarFile) { decompressProgress ->
-                progressCallback?.invoke(decompressProgress * 0.5f, "Decompressing...")
-            }.getOrElse { return@withContext Result.failure(it) }
-
-            // Step 2: Extract .tar archive (50% of progress)
-            progressCallback?.invoke(0.5f, "Extracting tar archive...")
-
-            val extractResult = extractTar(tarFile, targetDir) { extractProgress ->
-                progressCallback?.invoke(0.5f + extractProgress * 0.5f, "Extracting...")
-            }
-
-            // Cleanup temporary .tar file
-            if (tarFile.exists()) {
-                tarFile.delete()
-                Log.d(TAG, "Cleaned up temporary tar file: ${tarFile.name}")
-            }
-
-            progressCallback?.invoke(1.0f, "Extraction complete")
-            extractResult
-        } catch (e: Exception) {
-            Log.e(TAG, "Decompress and extract failed", e)
-            Result.failure(e)
-        }
+        Result.failure(
+            UnsupportedOperationException(
+                "Zstandard decompression is temporarily unavailable. " +
+                "Please use XZ-compressed archives (.txz) instead. " +
+                "See extractTxz() method."
+            )
+        )
     }
 
     /**
@@ -225,24 +168,8 @@ class ZstdDecompressor @Inject constructor() {
      * @return Estimated decompressed size in bytes, or null if cannot determine
      */
     fun getDecompressedSize(tzstFile: File): Long? {
-        return try {
-            FileInputStream(tzstFile).use { fileInput ->
-                ZstdInputStream(fileInput).use { zstdInput ->
-                    // Note: This reads the entire stream to calculate size
-                    // Not efficient for large files, but works for size estimation
-                    var size = 0L
-                    val buffer = ByteArray(BUFFER_SIZE)
-                    var len: Int
-                    while (zstdInput.read(buffer).also { len = it } > 0) {
-                        size += len
-                    }
-                    size
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to get decompressed size", e)
-            null
-        }
+        Log.w(TAG, "Zstandard decompression is temporarily unavailable")
+        return null
     }
 
     /**
@@ -348,16 +275,7 @@ class ZstdDecompressor @Inject constructor() {
      * @return true if valid zstd file
      */
     fun isValidZstd(file: File): Boolean {
-        return try {
-            FileInputStream(file).use { input ->
-                ZstdInputStream(input).use {
-                    // If we can create stream without exception, it's valid
-                    true
-                }
-            }
-        } catch (e: Exception) {
-            Log.d(TAG, "Not a valid zstd file: ${file.name}")
-            false
-        }
+        Log.w(TAG, "Zstandard validation is temporarily unavailable")
+        return false
     }
 }

@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
@@ -25,6 +26,11 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
+
+        // Embedded Steam Web API Key
+        // Best Practice: Obfuscated by ProGuard in release builds
+        // Domain: localhost
+        buildConfigField("String", "STEAM_API_KEY", "\"6621A4942208F9FF09A63B8075D1B8B1\"")
     }
 
     buildTypes {
@@ -89,13 +95,17 @@ android {
             // 重複リソースのマージ
             pickFirsts += setOf(
                 "META-INF/INDEX.LIST",
-                "META-INF/io.netty.versions.properties"
+                "META-INF/io.netty.versions.properties",
+                // zstd-jniのネイティブライブラリ（最初に見つかったものを使用）
+                "lib/arm64-v8a/libzstd-jni.so"
             )
         }
 
         // JNIライブラリの最適化
         jniLibs {
             useLegacyPackaging = false
+            // zstd-jniのネイティブライブラリを除外しない
+            keepDebugSymbols += listOf("**/libzstd-jni*.so")
         }
     }
 }
@@ -128,6 +138,7 @@ dependencies {
     // Retrofit & OkHttp
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
+    implementation(libs.retrofit.converter.kotlinx.serialization)
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging.interceptor)
 
@@ -155,7 +166,9 @@ dependencies {
     implementation(libs.androidx.hilt.work)
 
     // Compression (Wine/Box64 binaries)
-    implementation(libs.zstd.jni)
+    // Note: zstd-jni doesn't officially support Android ARM64 natively
+    // Temporarily disabled until we can bundle ARM64 native libs
+    // implementation(libs.zstd.jni)
     implementation(libs.commons.compress)
 
     // File Import
@@ -163,6 +176,12 @@ dependencies {
     // implementation(libs.libaums) // USB Mass Storage
     implementation(libs.jcifs.ng) // SMB/CIFS (SMB2/3 support)
     implementation(libs.commons.net) // FTP/FTPS
+
+    // Kotlinx Serialization (Steam API JSON)
+    implementation(libs.kotlinx.serialization.json)
+
+    // ZXing (QR Code Generation Only)
+    implementation(libs.zxing.core)
 
     // Testing
     testImplementation(libs.junit)

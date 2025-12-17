@@ -4,7 +4,9 @@ import android.content.Context
 import android.util.Log
 import com.steamdeck.mobile.domain.emulator.*
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -347,7 +349,7 @@ class WinlatorEmulator @Inject constructor(
             Log.i(TAG, "Process launched: PID=$pid, ProcessId=$processId")
 
             // 6. Monitor output in background (optional, for debugging)
-            kotlinx.coroutines.launch(Dispatchers.IO) {
+            CoroutineScope(Dispatchers.IO).launch {
                 try {
                     process.inputStream.bufferedReader().use { reader ->
                         reader.lineSequence().forEach { line ->

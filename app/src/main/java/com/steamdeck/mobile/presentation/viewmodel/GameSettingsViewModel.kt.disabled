@@ -1,0 +1,188 @@
+package com.steamdeck.mobile.presentation.viewmodel
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.steamdeck.mobile.domain.model.Box64Preset
+import com.steamdeck.mobile.domain.model.WinlatorContainer
+import com.steamdeck.mobile.domain.repository.GameRepository
+import com.steamdeck.mobile.domain.repository.WinlatorContainerRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+/**
+ * ゲーム設定ViewMode
+ *
+ * 機能:
+ * - ゲーム別のWinlatorコンテナ設定管理
+ * - Box64プリセット変更
+ * - Wine設定変更
+ * - DirectX Wrapper設定
+ * - FPS表示設定
+ */
+@HiltViewModel
+class GameSettingsViewModel @Inject constructor(
+    private val gameRepository: GameRepository,
+    private val containerRepository: WinlatorContainerRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow<GameSettingsUiState>(GameSettingsUiState.Loading)
+    val uiState: StateFlow<GameSettingsUiState> = _uiState.asStateFlow()
+
+    private var currentGameId: Long = 0
+    private var currentContainer: WinlatorContainer? = null
+    private var currentEnableFps: Boolean = false
+
+    /**
+     * ゲーム設定を読み込み
+     */
+    fun loadGameSettings(gameId: Long) {
+        currentGameId = gameId
+
+        viewModelScope.launch {
+            try {
+                val game = gameRepository.getGameById(gameId)
+                if (game == null) {
+                    _uiState.value = GameSettingsUiState.Error("ゲームが見つかりません")
+                    return@launch
+                }
+
+                // コンテナ設定を取得（なければデフォルト作成）
+                val container = if (game.winlatorContainerId != null) {
+                    containerRepository.getContainerById(game.winlatorContainerId!!)
+                        ?: WinlatorContainer.createDefault(game.name)
+                } else {
+                    WinlatorContainer.createDefault(game.name)
+                }
+
+                currentContainer = container
+                currentEnableFps = false // TODO: ゲーム設定から取得
+
+                _uiState.value = GameSettingsUiState.Loaded(
+                    container = container,
+                    enableFps = currentEnableFps
+                )
+            } catch (e: Exception) {
+                _uiState.value = GameSettingsUiState.Error(
+                    e.message ?: "設定の読み込みに失敗しました"
+                )
+            }
+        }
+    }
+
+    /**
+     * Box64プリセットを更新
+     */
+    fun updateBox64Preset(preset: Box64Preset) {
+        val current = currentContainer ?: return
+        currentContainer = current.copy(box64Preset = preset)
+        updateUiState()
+    }
+
+    /**
+     * Wineバージョンを更新
+     */
+    fun updateWineVersion(version: String) {
+        val current = currentContainer ?: return
+        currentContainer = current.copy(wineVersion = version)
+        updateUiState()
+    }
+
+    /**
+     * DXVK設定を更新
+     */
+    fun updateDxvk(enabled: Boolean) {
+        val current = currentContainer ?: return
+        currentContainer = current.copy(enableDXVK = enabled)
+        updateUiState()
+    }
+
+    /**
+     * 解像度を更新
+     */
+    fun updateResolution(resolution: String) {
+        val current = currentContainer ?: return
+        currentContainer = current.copy(screenResolution = resolution)
+        updateUiState()
+    }
+
+    /**
+     * FPS表示を更新
+     */
+    fun updateFpsDisplay(enabled: Boolean) {
+        currentEnableFps = enabled
+        updateUiState()
+    }
+
+    /**
+     * UI状態を更新
+     */
+    private fun updateUiState() {
+        val container = currentContainer ?: return
+        _uiState.value = GameSettingsUiState.Loaded(
+            container = container,
+            enableFps = currentEnableFps
+        )
+    }
+
+    /**
+     * 設定を保存
+     */
+    fun saveSettings() {
+        val container = currentContainer ?: return
+
+        viewModelScope.launch {
+            try {
+                // コンテナを保存
+                val savedContainer = if (container.id == 0L) {
+                    // 新規作成
+                    val newId = containerRepository.insertContainer(container)
+                    container.copy(id = newId)
+                } else {
+                    // 更新
+                    containerRepository.updateContainer(container)
+                    container
+                }
+
+                // ゲームにコンテナIDを紐付け
+                val game = gameRepository.getGameById(currentGameId)
+                if (game != null) {
+                    gameRepository.updateGame(
+                        game.copy(winlatorContainerId = savedContainer.id)
+                    )
+                }
+
+                // TODO: FPS設定も保存
+
+                _uiState.value = GameSettingsUiState.Loaded(
+                    container = savedContainer,
+                    enableFps = currentEnableFps
+                )
+            } catch (e: Exception) {
+                _uiState.value = GameSettingsUiState.Error(
+                    e.message ?: "設定の保存に失敗しました"
+                )
+            }
+        }
+    }
+}
+
+/**
+ * ゲーム設定UI状態
+ */
+sealed class GameSettingsUiState {
+    /** 読み込み中 */
+    object Loading : GameSettingsUiState()
+
+    /** 読み込み完了 */
+    data class Loaded(
+        val container: WinlatorContainer,
+        val enableFps: Boolean
+    ) : GameSettingsUiState()
+
+    /** エラー */
+    data class Error(val message: String) : GameSettingsUiState()
+}

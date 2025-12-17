@@ -2,12 +2,17 @@ package com.steamdeck.mobile.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.steamdeck.mobile.core.download.SteamDownloadManager
+import com.steamdeck.mobile.data.remote.steam.model.SteamDownloadProgress
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.usecase.DeleteGameUseCase
 import com.steamdeck.mobile.domain.usecase.GetGameByIdUseCase
 import com.steamdeck.mobile.domain.usecase.LaunchGameUseCase
 import com.steamdeck.mobile.domain.usecase.ToggleFavoriteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,13 +21,19 @@ import javax.inject.Inject
 
 /**
  * ゲーム詳細画面のViewModel
+ *
+ * ベストプラクティス適用:
+ * - 構造化された並行性（structured concurrency）
+ * - 適切なキャンセル処理
+ * - onCleared()でリソースクリーンアップ
  */
 @HiltViewModel
 class GameDetailViewModel @Inject constructor(
     private val getGameByIdUseCase: GetGameByIdUseCase,
     private val launchGameUseCase: LaunchGameUseCase,
     private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
-    private val deleteGameUseCase: DeleteGameUseCase
+    private val deleteGameUseCase: DeleteGameUseCase,
+    private val steamDownloadManager: SteamDownloadManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<GameDetailUiState>(GameDetailUiState.Loading)
@@ -30,6 +41,12 @@ class GameDetailViewModel @Inject constructor(
 
     private val _launchState = MutableStateFlow<LaunchState>(LaunchState.Idle)
     val launchState: StateFlow<LaunchState> = _launchState.asStateFlow()
+
+    private val _downloadProgress = MutableStateFlow<SteamDownloadProgress?>(null)
+    val downloadProgress: StateFlow<SteamDownloadProgress?> = _downloadProgress.asStateFlow()
+
+    // ダウンロードジョブを追跡（キャンセル用）
+    private var downloadJob: Job? = null
 
     /**
      * ゲーム詳細を読み込み
@@ -99,6 +116,88 @@ class GameDetailViewModel @Inject constructor(
                     _uiState.value = GameDetailUiState.Error(error.message ?: "削除エラー")
                 }
         }
+    }
+
+    /**
+     * Steamからゲームをダウンロード
+     *
+     * ベストプラクティス:
+     * - coroutineScope を使用して構造化された並行性を実現
+     * - 進捗監視とダウンロードを適切に協調させる
+     * - CancellationExceptionは再スローしてキャンセル処理を適切に行う
+     */
+    fun startDownload(appId: Long) {
+        // 既存のダウンロードをキャンセル
+        downloadJob?.cancel()
+
+        downloadJob = viewModelScope.launch {
+            try {
+                // 現在の状態からゲーム情報を取得
+                val currentState = _uiState.value
+                val installPath = if (currentState is GameDetailUiState.Success) {
+                    currentState.game.installPath
+                } else {
+                    // デフォルトパス
+                    "/sdcard/SteamDeck/games/$appId"
+                }
+
+                // coroutineScope を使用して構造化
+                // これにより、内部のコルーチンが全て完了するまで待機
+                coroutineScope {
+                    // 進捗監視（バックグラウンド）
+                    launch {
+                        steamDownloadManager.observeDownloadProgress(appId).collect { progress ->
+                            _downloadProgress.value = progress
+                        }
+                    }
+
+                    // ダウンロード実行（メイン処理）
+                    launch {
+                        val result = steamDownloadManager.downloadSteamGame(appId, installPath)
+
+                        result.onFailure { error ->
+                            _downloadProgress.value = SteamDownloadProgress.Error(
+                                "ダウンロードに失敗しました: ${error.message}",
+                                error
+                            )
+                        }
+                    }
+                }
+            } catch (e: CancellationException) {
+                // キャンセルは正常な終了なので再スロー
+                throw e
+            } catch (e: Exception) {
+                _downloadProgress.value = SteamDownloadProgress.Error(
+                    "ダウンロードの開始に失敗しました: ${e.message}",
+                    e
+                )
+            }
+        }
+    }
+
+    /**
+     * ダウンロードをキャンセル
+     */
+    fun cancelDownload(appId: Long) {
+        // ダウンロードジョブをキャンセル
+        downloadJob?.cancel()
+        downloadJob = null
+
+        viewModelScope.launch {
+            steamDownloadManager.cancelDownload(appId)
+            _downloadProgress.value = null
+        }
+    }
+
+    /**
+     * ViewModelがクリアされる時の処理
+     *
+     * ベストプラクティス: リソースをクリーンアップ
+     */
+    override fun onCleared() {
+        super.onCleared()
+        // 実行中のダウンロードをキャンセル
+        downloadJob?.cancel()
     }
 }
 

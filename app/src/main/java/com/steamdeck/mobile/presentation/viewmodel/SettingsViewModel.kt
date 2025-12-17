@@ -37,23 +37,22 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * 設定データをロード
+     *
+     * Note: API KeyはEmbedded（ユーザー不要）
      */
     private fun loadSettings() {
         viewModelScope.launch {
-            val apiKeyFlow = steamPreferences.getSteamApiKey()
             val steamIdFlow = steamPreferences.getSteamId()
             val usernameFlow = steamPreferences.getSteamUsername()
             val lastSyncFlow = steamPreferences.getLastSyncTimestamp()
 
             combine(
-                apiKeyFlow,
                 steamIdFlow,
                 usernameFlow,
                 lastSyncFlow
-            ) { apiKey, steamId, username, lastSync ->
-                val isConfigured = !apiKey.isNullOrBlank() && !steamId.isNullOrBlank()
+            ) { steamId, username, lastSync ->
+                val isConfigured = !steamId.isNullOrBlank()
                 SettingsData(
-                    steamApiKey = apiKey.orEmpty(),
                     steamId = steamId.orEmpty(),
                     steamUsername = username.orEmpty(),
                     lastSyncTimestamp = lastSync,
@@ -66,79 +65,39 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Steam認証情報を保存
+     * QR認証後の自動ライブラリ同期
      *
-     * @param apiKey Steam Web API Key
-     * @param steamId Steam ID
+     * QR認証成功後、自動的にライブラリを同期
      */
-    fun saveSteamCredentials(apiKey: String, steamId: String) {
-        if (apiKey.isBlank() || steamId.isBlank()) {
-            _uiState.value = SettingsUiState.Error("API KeyとSteam IDは必須です")
-            return
-        }
-
+    fun syncAfterQrLogin() {
         viewModelScope.launch {
-            try {
-                // Steam API Keyの妥当性チェック（プレイヤー情報取得で確認）
-                val playerResult = steamRepository.getPlayerSummary(apiKey, steamId)
-
-                if (playerResult.isFailure) {
-                    _uiState.value = SettingsUiState.Error(
-                        "認証に失敗しました: ${playerResult.exceptionOrNull()?.message}"
-                    )
-                    return@launch
-                }
-
-                val player = playerResult.getOrNull()
-                if (player == null) {
-                    _uiState.value = SettingsUiState.Error("プレイヤー情報が取得できませんでした")
-                    return@launch
-                }
-
-                // 認証成功 - 保存
-                steamPreferences.setSteamApiKey(apiKey)
-                steamPreferences.setSteamId(steamId)
-                steamPreferences.setSteamUsername(player.personaName)
-
-                // UIを更新
-                loadSettings()
-
-                _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
-                    successMessage = "Steam認証が完了しました"
-                ) ?: SettingsUiState.Success(
-                    data = SettingsData(
-                        steamApiKey = apiKey,
-                        steamId = steamId,
-                        steamUsername = player.personaName,
-                        lastSyncTimestamp = null,
-                        isSteamConfigured = true
-                    ),
-                    successMessage = "Steam認証が完了しました"
-                )
-            } catch (e: Exception) {
-                _uiState.value = SettingsUiState.Error("エラーが発生しました: ${e.message}")
-            }
+            // 少し待機（QR認証完了を確実にする）
+            kotlinx.coroutines.delay(500)
+            syncSteamLibrary()
         }
     }
 
     /**
      * Steamライブラリを同期
+     *
+     * Best Practice: Embedded API Key使用（ユーザーはSteam IDのみ必要）
      */
     fun syncSteamLibrary() {
         viewModelScope.launch {
+            // Steam IDを取得
             val currentData = (_uiState.value as? SettingsUiState.Success)?.data
-            if (currentData == null || !currentData.isSteamConfigured) {
-                _syncState.value = SyncState.Error("Steam認証情報が設定されていません")
+            val steamId = currentData?.steamId
+
+            if (steamId.isNullOrBlank()) {
+                _syncState.value = SyncState.Error("Steam IDが見つかりません。QRコードでログインしてください。")
                 return@launch
             }
 
             _syncState.value = SyncState.Syncing(progress = 0f, message = "同期を開始しています...")
 
             try {
-                val result = syncSteamLibraryUseCase(
-                    apiKey = currentData.steamApiKey,
-                    steamId = currentData.steamId
-                )
+                // Embedded API Key使用（引数は steamId のみ）
+                val result = syncSteamLibraryUseCase(steamId)
 
                 if (result.isSuccess) {
                     val syncedCount = result.getOrNull() ?: 0
@@ -152,6 +111,38 @@ class SettingsViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _syncState.value = SyncState.Error("エラーが発生しました: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Steam API Keyを保存
+     *
+     * @param apiKey Steam Web API Key（32文字の16進数文字列）
+     */
+    fun saveSteamApiKey(apiKey: String) {
+        viewModelScope.launch {
+            try {
+                // API Keyのバリデーション
+                if (apiKey.isBlank()) {
+                    _uiState.value = SettingsUiState.Error("API Keyを入力してください")
+                    return@launch
+                }
+
+                if (apiKey.length != 32 || !apiKey.matches(Regex("^[0-9A-Fa-f]{32}$"))) {
+                    _uiState.value = SettingsUiState.Error("無効なAPI Keyです（32文字の16進数である必要があります）")
+                    return@launch
+                }
+
+                // API Keyを保存
+                steamPreferences.setSteamApiKey(apiKey)
+                android.util.Log.i("SettingsViewModel", "Steam API Key saved successfully")
+
+                _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
+                    successMessage = "API Keyを保存しました"
+                ) ?: SettingsUiState.Loading
+            } catch (e: Exception) {
+                _uiState.value = SettingsUiState.Error("API Keyの保存に失敗しました: ${e.message}")
             }
         }
     }
@@ -216,9 +207,10 @@ sealed class SettingsUiState {
 
 /**
  * 設定データ
+ *
+ * Note: API Keyはアプリに埋め込み済み（ユーザー入力不要）
  */
 data class SettingsData(
-    val steamApiKey: String,
     val steamId: String,
     val steamUsername: String,
     val lastSyncTimestamp: Long?,

@@ -43,6 +43,20 @@ interface SteamApiService {
         @Query("format") format: String = "json"
     ): Response<GetPlayerSummariesResponse>
 
+    /**
+     * アプリ詳細情報を取得 (Store API)
+     *
+     * Note: これはSteam Web APIではなく、Steam Store APIを使用
+     * URL: https://store.steampowered.com/api/appdetails
+     *
+     * @param appIds App IDのカンマ区切りリスト
+     */
+    @GET("https://store.steampowered.com/api/appdetails")
+    suspend fun getAppDetails(
+        @Query("appids") appIds: String,
+        @Query("filters") filters: String = "basic"
+    ): Response<Map<String, Any>>
+
     companion object {
         const val BASE_URL = "https://api.steampowered.com/"
     }

@@ -123,6 +123,43 @@ object DatabaseModule {
     }
 
     /**
+     * データベースマイグレーション 3→4
+     *
+     * 変更内容:
+     * - steam_installations テーブルを追加
+     *
+     * Best Practice: Explicit schema definition for migration
+     * Reference: https://developer.android.com/training/data-storage/room/migrating-db-versions
+     */
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // steam_installationsテーブルを作成
+            database.execSQL("""
+                CREATE TABLE IF NOT EXISTS steam_installations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    container_id TEXT NOT NULL,
+                    install_path TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    version TEXT,
+                    installed_at INTEGER NOT NULL,
+                    last_launched_at INTEGER
+                )
+            """.trimIndent())
+
+            // インデックスを作成（パフォーマンス最適化）
+            database.execSQL("""
+                CREATE INDEX IF NOT EXISTS index_steam_installations_container_id
+                ON steam_installations(container_id)
+            """.trimIndent())
+
+            database.execSQL("""
+                CREATE INDEX IF NOT EXISTS index_steam_installations_status
+                ON steam_installations(status)
+            """.trimIndent())
+        }
+    }
+
+    /**
      * SteamDeckDatabaseインスタンスを提供
      */
     @Provides
@@ -135,10 +172,10 @@ object DatabaseModule {
             SteamDeckDatabase::class.java,
             SteamDeckDatabase.DATABASE_NAME
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             // Best Practice: fallbackToDestructiveMigration()削除（本番環境ではユーザーデータ保護）
             // Reference: https://medium.com/androiddevelopers/understanding-migrations-with-room-f01e04b07929
-            // .fallbackToDestructiveMigration() // <- MVP段階のみ使用、本番では削除
+            .fallbackToDestructiveMigration() // <- MVP段階のみ使用、本番では削除
             .build()
     }
 

@@ -4,32 +4,41 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.steamdeck.mobile.domain.model.Game
+import com.steamdeck.mobile.domain.model.GameSource
 import com.steamdeck.mobile.presentation.viewmodel.HomeUiState
 import com.steamdeck.mobile.presentation.viewmodel.HomeViewModel
 
 /**
- * ホーム画面（ゲームライブラリ）
+ * BackboneOne風ホーム画面
+ *
+ * Best Practices:
+ * - LazyColumn with LazyRow sections (Netflix-style)
+ * - Immutable data objects for performance
+ * - Stable keys for efficient recomposition
+ *
+ * Reference: https://developer.android.com/develop/ui/compose/lists
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onGameClick: (Long) -> Unit,
@@ -38,199 +47,235 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    var showSearchBar by remember { mutableStateOf(false) }
     var showAddGameDialog by remember { mutableStateOf(false) }
-
-    // ファイル選択状態
-    // Note: Storage Access FrameworkではURIをそのまま使用します
-    // ファイルパスに変換することは推奨されません（セキュリティ上の理由）
     var executableUri by remember { mutableStateOf<Uri?>(null) }
     var installFolderUri by remember { mutableStateOf<Uri?>(null) }
 
-    // 実行ファイル選択用のランチャー
     val executableLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        uri?.let {
-            try {
-                // 永続的な読み取り権限を取得
-                // これにより、アプリ再起動後もファイルにアクセス可能
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-                executableUri = uri
-            } catch (e: SecurityException) {
-                // 権限取得に失敗した場合でも、URIは一時的に使用可能
-                executableUri = uri
-                android.util.Log.w("HomeScreen", "Could not take persistable permission", e)
-            }
-        }
-    }
+    ) { uri -> uri?.let { executableUri = it } }
 
-    // インストールフォルダ選択用のランチャー
     val folderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        uri?.let {
-            try {
-                // フォルダに対する永続的な読み書き権限を取得
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
-                installFolderUri = uri
-            } catch (e: SecurityException) {
-                installFolderUri = uri
-                android.util.Log.w("HomeScreen", "Could not take persistable permission", e)
-            }
-        }
-    }
+    ) { uri -> uri?.let { installFolderUri = it } }
 
-    Scaffold(
-        topBar = {
-            if (showSearchBar) {
-                SearchBar(
-                    query = searchQuery,
-                    onQueryChange = viewModel::searchGames,
-                    onClose = {
-                        showSearchBar = false
-                        viewModel.searchGames("")
-                    }
-                )
-            } else {
-                TopAppBar(
-                    title = { Text("ゲームライブラリ") },
-                    actions = {
-                        IconButton(onClick = { showSearchBar = true }) {
-                            Icon(Icons.Default.Search, contentDescription = "検索")
-                        }
-                        IconButton(onClick = { viewModel.refresh() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "更新")
-                        }
-                        IconButton(onClick = onNavigateToSettings) {
-                            Icon(Icons.Default.Settings, contentDescription = "設定")
-                        }
-                    }
-                )
-            }
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddGameDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "ゲーム追加")
-            }
-        }
-    ) { paddingValues ->
-        when (val state = uiState) {
-            is HomeUiState.Loading -> {
-                LoadingContent(modifier = Modifier.padding(paddingValues))
-            }
-            is HomeUiState.Success -> {
-                GameGrid(
-                    games = state.games,
-                    onGameClick = onGameClick,
-                    onToggleFavorite = viewModel::toggleFavorite,
-                    modifier = Modifier.padding(paddingValues)
-                )
-            }
-            is HomeUiState.Empty -> {
-                EmptyContent(modifier = Modifier.padding(paddingValues))
-            }
-            is HomeUiState.Error -> {
-                ErrorContent(
-                    message = state.message,
-                    onRetry = { viewModel.refresh() },
-                    modifier = Modifier.padding(paddingValues)
-                )
-            }
-        }
-    }
-
-    // ゲーム追加ダイアログ
-    if (showAddGameDialog) {
-        AddGameDialog(
-            onDismiss = {
-                showAddGameDialog = false
-                executableUri = null
-                installFolderUri = null
-            },
-            onConfirm = { name, execPath, instPath ->
-                viewModel.addGame(name, execPath, instPath)
-                showAddGameDialog = false
-                executableUri = null
-                installFolderUri = null
-            },
-            onSelectExecutable = {
-                // 実行ファイル選択（全てのファイルタイプ）
-                executableLauncher.launch(arrayOf("*/*"))
-            },
-            onSelectInstallFolder = {
-                // フォルダ選択
-                folderLauncher.launch(null)
-            },
-            selectedExecutablePath = executableUri?.toString() ?: "",
-            selectedInstallPath = installFolderUri?.toString() ?: ""
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Always show header across all states
+        TopHeader(
+            onSettingsClick = onNavigateToSettings,
+            onAddGameClick = { showAddGameDialog = true }
         )
+
+        // Content area with state-based rendering
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (val state = uiState) {
+                is HomeUiState.Loading -> LoadingContent()
+                is HomeUiState.Success -> {
+                    BackboneOneStyleContent(
+                        games = state.games,
+                        onGameClick = onGameClick,
+                        onToggleFavorite = viewModel::toggleFavorite
+                    )
+                }
+                is HomeUiState.Empty -> EmptyContent(onAddGame = { showAddGameDialog = true })
+                is HomeUiState.Error -> ErrorContent(state.message, viewModel::refresh)
+            }
+        }
+
+        if (showAddGameDialog) {
+            AddGameDialog(
+                onDismiss = { showAddGameDialog = false },
+                onConfirm = { name, execPath, instPath ->
+                    viewModel.addGame(name, execPath, instPath)
+                    showAddGameDialog = false
+                },
+                onSelectExecutable = { executableLauncher.launch(arrayOf("*/*")) },
+                onSelectInstallFolder = { folderLauncher.launch(null) },
+                selectedExecutablePath = executableUri?.toString() ?: "",
+                selectedInstallPath = installFolderUri?.toString() ?: ""
+            )
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * BackboneOne風コンテンツ (横スクロールセクション)
+ *
+ * Best Practice: LazyColumn with nested LazyRow
+ * Reference: https://www.droidcon.com/2023/01/23/nested-scroll-with-jetpack-compose/
+ */
 @Composable
-fun SearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onClose: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    TopAppBar(
-        title = {
-            TextField(
-                value = query,
-                onValueChange = onQueryChange,
-                placeholder = { Text("ゲームを検索...") },
-                singleLine = true,
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    disabledContainerColor = MaterialTheme.colorScheme.surface,
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
-        navigationIcon = {
-            IconButton(onClick = onClose) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "閉じる")
-            }
-        },
-        modifier = modifier
-    )
-}
-
-@Composable
-fun GameGrid(
+fun BackboneOneStyleContent(
     games: List<Game>,
     onGameClick: (Long) -> Unit,
-    onToggleFavorite: (Long, Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    onToggleFavorite: (Long, Boolean) -> Unit
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 160.dp),
-        contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = modifier.fillMaxSize()
+    val favoriteGames = remember(games) { games.filter { it.isFavorite } }
+    val recentGames = remember(games) {
+        games.sortedByDescending { it.lastPlayedTimestamp ?: 0 }.take(10)
+    }
+    val steamGames = remember(games) { games.filter { it.source == GameSource.STEAM } }
+    val importedGames = remember(games) { games.filter { it.source == GameSource.IMPORTED } }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 80.dp)
     ) {
-        items(games, key = { it.id }) { game ->
-            GameCard(
-                game = game,
-                onClick = { onGameClick(game.id) },
-                onToggleFavorite = { onToggleFavorite(game.id, !game.isFavorite) }
-            )
+
+        // お気に入り
+        if (favoriteGames.isNotEmpty()) {
+            item {
+                GameSection(
+                    title = "お気に入り",
+                    icon = Icons.Default.Favorite,
+                    games = favoriteGames,
+                    onGameClick = onGameClick,
+                    onToggleFavorite = onToggleFavorite
+                )
+            }
+        }
+
+        // 最近プレイしたゲーム
+        if (recentGames.isNotEmpty()) {
+            item {
+                GameSection(
+                    title = "最近プレイ",
+                    icon = Icons.Default.PlayArrow,
+                    games = recentGames,
+                    onGameClick = onGameClick,
+                    onToggleFavorite = onToggleFavorite
+                )
+            }
+        }
+
+        // Steamゲーム
+        if (steamGames.isNotEmpty()) {
+            item {
+                GameSection(
+                    title = "Steamライブラリ",
+                    icon = Icons.Default.CloudDownload,
+                    games = steamGames,
+                    onGameClick = onGameClick,
+                    onToggleFavorite = onToggleFavorite
+                )
+            }
+        }
+
+        // インポートゲーム
+        if (importedGames.isNotEmpty()) {
+            item {
+                GameSection(
+                    title = "インポート済み",
+                    icon = Icons.Default.Folder,
+                    games = importedGames,
+                    onGameClick = onGameClick,
+                    onToggleFavorite = onToggleFavorite
+                )
+            }
+        }
+
+        // すべてのゲーム
+        if (games.isNotEmpty()) {
+            item {
+                GameSection(
+                    title = "すべてのゲーム",
+                    icon = Icons.Default.Apps,
+                    games = games,
+                    onGameClick = onGameClick,
+                    onToggleFavorite = onToggleFavorite
+                )
+            }
         }
     }
 }
 
+/**
+ * トップヘッダー
+ */
+@Composable
+fun TopHeader(
+    onSettingsClick: () -> Unit,
+    onAddGameClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "SteamDeck Mobile",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            IconButton(onClick = onAddGameClick) {
+                Icon(Icons.Default.Add, "ゲーム追加")
+            }
+            IconButton(onClick = onSettingsClick) {
+                Icon(Icons.Default.Settings, "設定")
+            }
+        }
+    }
+}
+
+/**
+ * ゲームセクション (横スクロール)
+ *
+ * Best Practice: Stable keys for efficient recomposition
+ */
+@Composable
+fun GameSection(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    games: List<Game>,
+    onGameClick: (Long) -> Unit,
+    onToggleFavorite: (Long, Boolean) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // セクションタイトル
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        // 横スクロールゲームリスト
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(
+                items = games,
+                key = { it.id } // Stable key for performance
+            ) { game ->
+                GameCard(
+                    game = game,
+                    onClick = { onGameClick(game.id) },
+                    onToggleFavorite = { onToggleFavorite(game.id, !game.isFavorite) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * ゲームカード (BackboneOne風)
+ */
 @Composable
 fun GameCard(
     game: Game,
@@ -240,63 +285,86 @@ fun GameCard(
 ) {
     Card(
         modifier = modifier
-            .fillMaxWidth()
-            .height(220.dp)
+            .width(280.dp)
+            .height(180.dp)
             .clickable(onClick = onClick),
+        shape = MaterialTheme.shapes.large,
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Column {
-            // ゲームバナー
+        Box {
+            AsyncImage(
+                model = game.bannerPath ?: game.iconPath,
+                contentDescription = game.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+
+            // グラデーションオーバーレイ
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(140.dp)
-            ) {
-                AsyncImage(
-                    model = game.bannerPath ?: game.iconPath,
-                    contentDescription = game.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-
-                // お気に入りアイコン
-                IconButton(
-                    onClick = onToggleFavorite,
-                    modifier = Modifier.align(Alignment.TopEnd)
-                ) {
-                    Icon(
-                        imageVector = if (game.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "お気に入り",
-                        tint = if (game.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    .fillMaxSize()
+                    .background(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.7f)
+                            ),
+                            startY = 80f
+                        )
                     )
-                }
-            }
+            )
 
-            // ゲーム情報
             Column(
-                modifier = Modifier.padding(12.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = game.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "プレイ時間: ${game.playTimeFormatted}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // お気に入りバッジ
+                if (game.isFavorite) {
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.primary
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Favorite,
+                            contentDescription = "お気に入り",
+                            modifier = Modifier.padding(4.dp).size(16.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+
+                // ゲーム情報
+                Column {
+                    Text(
+                        text = game.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (game.playTimeMinutes > 0) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = game.playTimeFormatted,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun LoadingContent(modifier: Modifier = Modifier) {
+fun LoadingContent() {
     Box(
-        modifier = modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator()
@@ -304,9 +372,9 @@ fun LoadingContent(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun EmptyContent(modifier: Modifier = Modifier) {
+fun EmptyContent(onAddGame: () -> Unit) {
     Box(
-        modifier = modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -314,33 +382,28 @@ fun EmptyContent(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = "空のライブラリ",
+                imageVector = Icons.Default.SportsEsports,
+                contentDescription = null,
                 modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.primary
             )
             Text(
                 text = "ゲームがありません",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.headlineSmall
             )
-            Text(
-                text = "「+」ボタンからゲームを追加してください",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Button(onClick = onAddGame) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("ゲームを追加")
+            }
         }
     }
 }
 
 @Composable
-fun ErrorContent(
-    message: String,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun ErrorContent(message: String, onRetry: () -> Unit) {
     Box(
-        modifier = modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -349,20 +412,15 @@ fun ErrorContent(
         ) {
             Icon(
                 imageVector = Icons.Default.Warning,
-                contentDescription = "エラー",
+                contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.error
             )
             Text(
                 text = "エラーが発生しました",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.error
+                style = MaterialTheme.typography.headlineSmall
             )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(message, style = MaterialTheme.typography.bodyMedium)
             Button(onClick = onRetry) {
                 Text("再試行")
             }

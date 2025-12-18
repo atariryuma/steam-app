@@ -47,10 +47,17 @@ object EmulatorModule {
      */
     @Provides
     @Singleton
+    fun provideProcessMonitor(): com.steamdeck.mobile.core.winlator.ProcessMonitor {
+        return com.steamdeck.mobile.core.winlator.ProcessMonitor()
+    }
+
+    @Provides
+    @Singleton
     fun provideWindowsEmulator(
         @ApplicationContext context: Context,
-        zstdDecompressor: ZstdDecompressor
+        zstdDecompressor: ZstdDecompressor,
+        processMonitor: com.steamdeck.mobile.core.winlator.ProcessMonitor
     ): WindowsEmulator {
-        return WinlatorEmulator(context, zstdDecompressor)
+        return WinlatorEmulator(context, zstdDecompressor, processMonitor)
     }
 }

@@ -27,7 +27,8 @@ import javax.inject.Singleton
 @Singleton
 class WinlatorEmulator @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val zstdDecompressor: ZstdDecompressor
+    private val zstdDecompressor: ZstdDecompressor,
+    private val processMonitor: ProcessMonitor
 ) : WindowsEmulator {
 
     override val name: String = "Winlator"
@@ -39,8 +40,13 @@ class WinlatorEmulator @Inject constructor(
     private val wineDir = File(rootfsDir, "opt/wine")
     private val containersDir = File(dataDir, "containers")
 
-    // Active processes map (processId -> Process)
-    private val activeProcesses = mutableMapOf<String, Process>()
+    // Active processes map (processId -> ProcessInfo)
+    private val activeProcesses = mutableMapOf<String, ProcessInfo>()
+
+    private data class ProcessInfo(
+        val process: Process,
+        val startTime: Long
+    )
 
     companion object {
         private const val TAG = "WinlatorEmulator"
@@ -212,8 +218,12 @@ class WinlatorEmulator @Inject constructor(
             File(driveC, "Program Files (x86)").mkdirs()
             File(driveC, "users/Public").mkdirs()
 
-            // TODO: Run wineboot --init to initialize Wine prefix
-            // Requires Wine binaries to be available
+            // Initialize Wine prefix with wineboot
+            val initResult = initializeWinePrefix(containerDir)
+            if (initResult.isFailure) {
+                Log.w(TAG, "Wine prefix initialization failed: ${initResult.exceptionOrNull()?.message}")
+                // Continue anyway - some games might work without full prefix initialization
+            }
 
             val container = EmulatorContainer(
                 id = containerId,
@@ -270,7 +280,7 @@ class WinlatorEmulator @Inject constructor(
             val containerDir = File(containersDir, containerId)
             if (!containerDir.exists()) {
                 return@withContext Result.failure(
-                    EmulatorException("Container not found: $containerId")
+                    ContainerNotFoundException(containerId)
                 )
             }
 
@@ -305,13 +315,13 @@ class WinlatorEmulator @Inject constructor(
 
             if (!box64Binary.exists()) {
                 return@withContext Result.failure(
-                    EmulatorException("Box64 not initialized. Please run initialize() first.")
+                    Box64BinaryNotFoundException()
                 )
             }
 
             if (!wine64Binary.exists()) {
                 return@withContext Result.failure(
-                    EmulatorException("Wine not initialized. Please run initialize() first.")
+                    WineBinaryNotFoundException()
                 )
             }
 
@@ -370,12 +380,15 @@ class WinlatorEmulator @Inject constructor(
             )
 
             // Store process reference for status checking
-            activeProcesses[processId] = process
+            activeProcesses[processId] = ProcessInfo(
+                process = process,
+                startTime = System.currentTimeMillis()
+            )
 
             Result.success(emulatorProcess)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to launch executable", e)
-            Result.failure(EmulatorException("Failed to launch executable: ${e.message}", e))
+            Result.failure(ProcessLaunchException("Failed to launch executable: ${e.message}", e))
         }
     }
 
@@ -390,21 +403,34 @@ class WinlatorEmulator @Inject constructor(
 
     override suspend fun getProcessStatus(processId: String): Result<EmulatorProcessStatus> = withContext(Dispatchers.IO) {
         try {
-            val process = activeProcesses[processId]
+            val processInfo = activeProcesses[processId]
                 ?: return@withContext Result.failure(
-                    EmulatorException("Process not found: $processId")
+                    ProcessNotFoundException(processId)
                 )
 
-            val isRunning = process.isAlive
-            val exitCode = if (!isRunning) process.exitValue() else null
+            val isRunning = processInfo.process.isAlive
+            val exitCode = if (!isRunning) processInfo.process.exitValue() else null
+
+            // Get real-time process metrics
+            val pid = getPid(processInfo.process)
+            val metrics = if (isRunning && pid > 0) {
+                try {
+                    readProcessMetricsOnce(pid, processInfo.startTime)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to read process metrics", e)
+                    null
+                }
+            } else {
+                null
+            }
 
             val status = EmulatorProcessStatus(
                 processId = processId,
                 isRunning = isRunning,
                 exitCode = exitCode,
-                cpuUsage = 0f, // TODO: Implement CPU monitoring
-                memoryUsageMB = 0, // TODO: Implement memory monitoring
-                uptime = 0 // TODO: Calculate uptime
+                cpuUsage = metrics?.cpuPercent ?: 0f,
+                memoryUsageMB = metrics?.memoryMB?.toLong() ?: 0L,
+                uptime = if (isRunning) System.currentTimeMillis() - processInfo.startTime else 0L
             )
 
             Result.success(status)
@@ -416,24 +442,24 @@ class WinlatorEmulator @Inject constructor(
 
     override suspend fun killProcess(processId: String, force: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val process = activeProcesses[processId]
+            val processInfo = activeProcesses[processId]
                 ?: return@withContext Result.failure(
-                    EmulatorException("Process not found: $processId")
+                    ProcessNotFoundException(processId)
                 )
 
             Log.i(TAG, "Killing process: $processId (force=$force)")
 
             if (force) {
                 // SIGKILL
-                process.destroyForcibly()
+                processInfo.process.destroyForcibly()
                 Log.d(TAG, "Process forcibly destroyed: $processId")
             } else {
                 // SIGTERM - graceful shutdown
-                process.destroy()
+                processInfo.process.destroy()
 
                 // Wait up to 10 seconds for graceful shutdown
                 val exited = kotlinx.coroutines.withTimeoutOrNull(10_000) {
-                    while (process.isAlive) {
+                    while (processInfo.process.isAlive) {
                         kotlinx.coroutines.delay(100)
                     }
                     true
@@ -441,12 +467,12 @@ class WinlatorEmulator @Inject constructor(
 
                 if (exited == null) {
                     Log.w(TAG, "Process did not exit gracefully, force killing")
-                    process.destroyForcibly()
+                    processInfo.process.destroyForcibly()
                 }
             }
 
             // Wait for exit
-            process.waitFor()
+            processInfo.process.waitFor()
 
             // Remove from active processes
             activeProcesses.remove(processId)
@@ -509,6 +535,135 @@ class WinlatorEmulator @Inject constructor(
     }
 
     // Helper functions
+
+    /**
+     * Initializes Wine prefix by running `wineboot --init`.
+     *
+     * This creates the necessary registry files and directory structure
+     * for Wine to function properly.
+     *
+     * @param containerDir Container root directory
+     * @return Result indicating success or failure
+     */
+    private suspend fun initializeWinePrefix(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val box64Binary = File(box64Dir, "box64")
+            val winebootBinary = File(wineDir, "bin/wineboot")
+
+            if (!box64Binary.exists()) {
+                return@withContext Result.failure(Box64BinaryNotFoundException())
+            }
+
+            if (!winebootBinary.exists()) {
+                return@withContext Result.failure(WineBinaryNotFoundException())
+            }
+
+            Log.i(TAG, "Initializing Wine prefix: ${containerDir.absolutePath}")
+
+            val command = listOf(
+                box64Binary.absolutePath,
+                winebootBinary.absolutePath,
+                "--init"
+            )
+
+            val environmentVars = mapOf(
+                "WINEPREFIX" to containerDir.absolutePath,
+                "WINEDEBUG" to "-all",
+                "WINEARCH" to "win64",
+                "PATH" to "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}",
+                "LD_LIBRARY_PATH" to "${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu"
+            )
+
+            val processBuilder = ProcessBuilder(command)
+            processBuilder.environment().putAll(environmentVars)
+            processBuilder.redirectErrorStream(true)
+
+            Log.d(TAG, "Running: ${command.joinToString(" ")}")
+
+            val process = processBuilder.start()
+
+            // Monitor output for debugging
+            val output = StringBuilder()
+            process.inputStream.bufferedReader().use { reader ->
+                reader.lineSequence().forEach { line ->
+                    Log.d(TAG, "[wineboot] $line")
+                    output.appendLine(line)
+                }
+            }
+
+            // Wait for completion with timeout (60 seconds)
+            val completed = kotlinx.coroutines.withTimeoutOrNull(60_000) {
+                process.waitFor()
+                true
+            }
+
+            if (completed == null) {
+                Log.w(TAG, "wineboot initialization timed out after 60 seconds")
+                process.destroyForcibly()
+                return@withContext Result.failure(
+                    WinePrefixException("Wine prefix initialization timed out")
+                )
+            }
+
+            val exitCode = process.exitValue()
+            if (exitCode != 0) {
+                Log.w(TAG, "wineboot exited with code $exitCode")
+                Log.d(TAG, "wineboot output: $output")
+                // Don't fail - some games might work without full init
+                return@withContext Result.failure(
+                    WinePrefixException("wineboot exited with code $exitCode")
+                )
+            }
+
+            Log.i(TAG, "Wine prefix initialized successfully")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Wine prefix initialization failed", e)
+            Result.failure(WinePrefixException("Failed to initialize Wine prefix: ${e.message}", e))
+        }
+    }
+
+    /**
+     * Reads process metrics once (synchronously) for status checking.
+     *
+     * @param pid Process ID
+     * @param startTime Process start time
+     * @return ProcessMetrics or null if unavailable
+     */
+    private fun readProcessMetricsOnce(pid: Int, startTime: Long): ProcessMetrics? {
+        val statFile = File("/proc/$pid/stat")
+        val statusFile = File("/proc/$pid/status")
+
+        if (!statFile.exists() || !statusFile.exists()) {
+            return null
+        }
+
+        try {
+            // Read memory from /proc/[pid]/status
+            val statusContent = statusFile.readText()
+            val vmRssLine = statusContent.lines().find { it.startsWith("VmRSS:") }
+            val memoryMB = if (vmRssLine != null) {
+                val parts = vmRssLine.split(Regex("\\s+"))
+                val memoryKB = parts.getOrNull(1)?.toLongOrNull() ?: 0L
+                (memoryKB / 1024).toInt()
+            } else {
+                0
+            }
+
+            val uptimeMs = System.currentTimeMillis() - startTime
+
+            // CPU calculation would require previous sample, so we return 0 for single read
+            return ProcessMetrics(
+                pid = pid,
+                cpuPercent = 0f, // Cannot calculate from single sample
+                memoryMB = memoryMB,
+                uptimeMs = uptimeMs
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to read process metrics for PID $pid", e)
+            return null
+        }
+    }
 
     /**
      * Builds environment variables for Wine process execution.

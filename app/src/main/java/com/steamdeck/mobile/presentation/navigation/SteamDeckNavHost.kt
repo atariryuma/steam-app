@@ -149,21 +149,6 @@ fun SteamDeckNavHost(
                 qrCodeBitmap = qrCodeBitmap,
                 isLoading = uiState is com.steamdeck.mobile.presentation.viewmodel.SteamLoginUiState.Loading,
                 errorMessage = (uiState as? com.steamdeck.mobile.presentation.viewmodel.SteamLoginUiState.Error)?.message,
-                onLogin = { email, password, rememberMe ->
-                    loginViewModel.loginWithCredentials(email, password, rememberMe)
-                },
-                onQrCodeLogin = {
-                    // 手動でQRコード表示をリクエストした場合
-                    // （通常は自動的に開始されるため不要）
-                },
-                onForgotPassword = {
-                    // TODO: パスワード忘れ実装（ブラウザで開く）
-                    // val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://help.steampowered.com/"))
-                    // context.startActivity(intent)
-                },
-                onRegenerateQrCode = {
-                    loginViewModel.regenerateQrCode()
-                },
                 onNavigateBack = { navController.popBackStack() },
                 onErrorDismiss = {
                     loginViewModel.clearError()

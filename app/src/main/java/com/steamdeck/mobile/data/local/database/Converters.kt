@@ -4,6 +4,7 @@ import androidx.room.TypeConverter
 import com.steamdeck.mobile.data.local.database.entity.Box64Preset
 import com.steamdeck.mobile.data.local.database.entity.DownloadStatus
 import com.steamdeck.mobile.data.local.database.entity.GameSource
+import com.steamdeck.mobile.data.local.database.entity.SteamInstallStatus
 
 /**
  * Room用の型変換クラス
@@ -30,4 +31,11 @@ class Converters {
 
     @TypeConverter
     fun toDownloadStatus(value: String): DownloadStatus = DownloadStatus.valueOf(value)
+
+    // SteamInstallStatus converters
+    @TypeConverter
+    fun fromSteamInstallStatus(value: SteamInstallStatus): String = value.name
+
+    @TypeConverter
+    fun toSteamInstallStatus(value: String): SteamInstallStatus = SteamInstallStatus.valueOf(value)
 }

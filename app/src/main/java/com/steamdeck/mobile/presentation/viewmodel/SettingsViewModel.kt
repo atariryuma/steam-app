@@ -1,7 +1,10 @@
 package com.steamdeck.mobile.presentation.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.steamdeck.mobile.core.steam.SteamLauncher
+import com.steamdeck.mobile.core.steam.SteamSetupManager
 import com.steamdeck.mobile.data.local.preferences.SecureSteamPreferences
 import com.steamdeck.mobile.data.remote.steam.SteamRepository
 import com.steamdeck.mobile.domain.usecase.SyncSteamLibraryUseCase
@@ -22,8 +25,14 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val steamPreferences: SecureSteamPreferences,
     private val steamRepository: SteamRepository,
-    private val syncSteamLibraryUseCase: SyncSteamLibraryUseCase
+    private val syncSteamLibraryUseCase: SyncSteamLibraryUseCase,
+    private val steamLauncher: SteamLauncher,
+    private val steamSetupManager: SteamSetupManager
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "SettingsViewModel"
+    }
 
     private val _uiState = MutableStateFlow<SettingsUiState>(SettingsUiState.Loading)
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -31,8 +40,12 @@ class SettingsViewModel @Inject constructor(
     private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
     val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
 
+    private val _steamInstallState = MutableStateFlow<SteamInstallState>(SteamInstallState.Idle)
+    val steamInstallState: StateFlow<SteamInstallState> = _steamInstallState.asStateFlow()
+
     init {
         loadSettings()
+        checkSteamInstallation()
     }
 
     /**
@@ -165,6 +178,156 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
+     * Steamインストール状態をチェック
+     */
+    fun checkSteamInstallation() {
+        viewModelScope.launch {
+            try {
+                _steamInstallState.value = SteamInstallState.Checking
+                val isInstalled = steamSetupManager.isSteamInstalled()
+
+                _steamInstallState.value = if (isInstalled) {
+                    SteamInstallState.Installed("C:\\Program Files (x86)\\Steam")
+                } else {
+                    SteamInstallState.NotInstalled("Steam Clientはインストールされていません")
+                }
+
+                Log.d(TAG, "Steam installation check: isInstalled=$isInstalled")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to check Steam installation", e)
+                _steamInstallState.value = SteamInstallState.Error(
+                    "インストール状態の確認に失敗しました: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Steam Clientをインストール
+     *
+     * @param containerId Winlatorコンテナ ID
+     */
+    fun installSteamClient(containerId: Long) {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "Starting Steam Client installation for container: $containerId")
+
+                val result = steamSetupManager.installSteam(
+                    containerId = containerId,
+                    progressCallback = { progress, message ->
+                        _steamInstallState.value = SteamInstallState.Installing(progress, message)
+                        Log.d(TAG, "Install progress: $progress - $message")
+                    }
+                )
+
+                result
+                    .onSuccess { installResult ->
+                        when (installResult) {
+                            is SteamSetupManager.SteamInstallResult.Success -> {
+                                _steamInstallState.value = SteamInstallState.Installed(
+                                    installResult.installPath
+                                )
+                                Log.i(TAG, "Steam Client installed successfully: ${installResult.installPath}")
+                            }
+                            is SteamSetupManager.SteamInstallResult.Error -> {
+                                _steamInstallState.value = SteamInstallState.Error(
+                                    installResult.message
+                                )
+                                Log.e(TAG, "Steam installation error: ${installResult.message}")
+                            }
+                            is SteamSetupManager.SteamInstallResult.Progress -> {
+                                // Progress updates handled by callback
+                            }
+                        }
+                    }
+                    .onFailure { error ->
+                        _steamInstallState.value = SteamInstallState.Error(
+                            "インストールに失敗しました: ${error.message}"
+                        )
+                        Log.e(TAG, "Failed to install Steam Client", error)
+                    }
+
+            } catch (e: Exception) {
+                _steamInstallState.value = SteamInstallState.Error(
+                    "予期しないエラーが発生しました: ${e.message}"
+                )
+                Log.e(TAG, "Exception during Steam installation", e)
+            }
+        }
+    }
+
+    /**
+     * Steam Clientを開く
+     *
+     * @param containerId Winlatorコンテナ ID
+     */
+    fun openSteamClient(containerId: Long) {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "Opening Steam Client for container: $containerId")
+
+                val result = steamLauncher.launchSteamClient(containerId)
+
+                result
+                    .onSuccess {
+                        Log.i(TAG, "Steam Client opened successfully")
+                        // Steam Clientが起動したことをユーザーに通知
+                        _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
+                            successMessage = "Steam Clientを起動しました"
+                        ) ?: SettingsUiState.Loading
+                    }
+                    .onFailure { error ->
+                        _steamInstallState.value = SteamInstallState.Error(
+                            "Steam Clientの起動に失敗しました: ${error.message}"
+                        )
+                        Log.e(TAG, "Failed to open Steam Client", error)
+                    }
+
+            } catch (e: Exception) {
+                _steamInstallState.value = SteamInstallState.Error(
+                    "Steam Client起動中に予期しないエラーが発生しました: ${e.message}"
+                )
+                Log.e(TAG, "Exception while opening Steam Client", e)
+            }
+        }
+    }
+
+    /**
+     * Steam Clientをアンインストール
+     *
+     * @param containerId Winlatorコンテナ ID
+     */
+    fun uninstallSteamClient(containerId: Long) {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "Uninstalling Steam Client for container: $containerId")
+
+                // 将来的には実際のアンインストール処理を実装
+                // 現時点ではデータベースの状態をクリア
+                _steamInstallState.value = SteamInstallState.NotInstalled(
+                    "Steam Clientはアンインストールされました"
+                )
+
+                Log.i(TAG, "Steam Client uninstalled (placeholder)")
+
+            } catch (e: Exception) {
+                _steamInstallState.value = SteamInstallState.Error(
+                    "アンインストールに失敗しました: ${e.message}"
+                )
+                Log.e(TAG, "Exception during Steam uninstallation", e)
+            }
+        }
+    }
+
+    /**
+     * Steam Install状態をリセット
+     */
+    fun resetSteamInstallState() {
+        _steamInstallState.value = SteamInstallState.Idle
+    }
+
+    /**
      * エラーメッセージをクリア
      */
     fun clearError() {
@@ -248,4 +411,30 @@ sealed class SyncState {
     data class Success(val syncedGamesCount: Int) : SyncState()
 
     data class Error(val message: String) : SyncState()
+}
+
+/**
+ * Steam Clientインストール状態
+ */
+sealed class SteamInstallState {
+    /** アイドル状態 */
+    object Idle : SteamInstallState()
+
+    /** インストール状態確認中 */
+    object Checking : SteamInstallState()
+
+    /** 未インストール */
+    data class NotInstalled(val message: String) : SteamInstallState()
+
+    /** インストール済み */
+    data class Installed(val installPath: String) : SteamInstallState()
+
+    /** インストール中 */
+    data class Installing(
+        val progress: Float,
+        val message: String
+    ) : SteamInstallState()
+
+    /** エラー */
+    data class Error(val message: String) : SteamInstallState()
 }

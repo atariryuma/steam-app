@@ -1,29 +1,43 @@
 package com.steamdeck.mobile.presentation.ui.game
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.presentation.viewmodel.GameDetailUiState
 import com.steamdeck.mobile.presentation.viewmodel.GameDetailViewModel
 import com.steamdeck.mobile.presentation.viewmodel.LaunchState
+import com.steamdeck.mobile.presentation.viewmodel.SteamLaunchState
 
 /**
- * ゲーム詳細画面
+ * ゲーム詳細画面 - BackboneOne風デザイン
+ *
+ * Best Practices:
+ * - No TopAppBar for immersive full-screen experience
+ * - Large banner image with gradient overlay
+ * - Steam color scheme with Material3
+ * - Card elevation: 2dp
+ * - Padding: 24dp (sections), 20dp (cards)
+ *
+ * References:
+ * - https://m3.material.io/develop/android/jetpack-compose
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GameDetailScreen(
     gameId: Long,
@@ -34,10 +48,14 @@ fun GameDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val launchState by viewModel.launchState.collectAsState()
+    val steamLaunchState by viewModel.steamLaunchState.collectAsState()
+    val isSteamInstalled by viewModel.isSteamInstalled.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showLaunchErrorDialog by remember { mutableStateOf(false) }
+    var showSteamLaunchErrorDialog by remember { mutableStateOf(false) }
     var showDownloadDialog by remember { mutableStateOf(false) }
     var launchErrorMessage by remember { mutableStateOf("") }
+    var steamLaunchErrorMessage by remember { mutableStateOf("") }
 
     // ゲーム詳細を読み込み
     LaunchedEffect(gameId) {
@@ -53,56 +71,37 @@ fun GameDetailScreen(
 
     // 起動エラーを監視
     LaunchedEffect(launchState) {
-        if (launchState is com.steamdeck.mobile.presentation.viewmodel.LaunchState.Error) {
-            launchErrorMessage = (launchState as com.steamdeck.mobile.presentation.viewmodel.LaunchState.Error).message
+        if (launchState is LaunchState.Error) {
+            launchErrorMessage = (launchState as LaunchState.Error).message
             showLaunchErrorDialog = true
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("ゲーム詳細") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "戻る")
-                    }
-                },
-                actions = {
-                    when (val state = uiState) {
-                        is GameDetailUiState.Success -> {
-                            IconButton(onClick = onNavigateToSettings) {
-                                Icon(Icons.Default.Settings, contentDescription = "ゲーム設定")
-                            }
-                            IconButton(
-                                onClick = { viewModel.toggleFavorite(state.game.id, !state.game.isFavorite) }
-                            ) {
-                                Icon(
-                                    imageVector = if (state.game.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                    contentDescription = "お気に入り",
-                                    tint = if (state.game.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            IconButton(onClick = { showDeleteDialog = true }) {
-                                Icon(Icons.Default.Delete, contentDescription = "削除")
-                            }
-                        }
-                        else -> {}
-                    }
-                }
-            )
+    // Steam起動エラーを監視
+    LaunchedEffect(steamLaunchState) {
+        if (steamLaunchState is SteamLaunchState.Error) {
+            steamLaunchErrorMessage = (steamLaunchState as SteamLaunchState.Error).message
+            showSteamLaunchErrorDialog = true
         }
-    ) { paddingValues ->
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
         when (val state = uiState) {
             is GameDetailUiState.Loading -> {
-                LoadingContent(modifier = Modifier.padding(paddingValues))
+                LoadingContent()
             }
             is GameDetailUiState.Success -> {
                 GameDetailContent(
                     game = state.game,
+                    isSteamInstalled = isSteamInstalled,
                     onLaunchGame = { viewModel.launchGame(gameId) },
+                    onLaunchViaSteam = { viewModel.launchGameViaSteam(gameId) },
+                    onOpenSteamClient = { viewModel.openSteamClient(gameId) },
+                    onNavigateBack = onNavigateBack,
+                    onNavigateToSettings = onNavigateToSettings,
                     onDownloadGame = { showDownloadDialog = true },
-                    modifier = Modifier.padding(paddingValues)
+                    onToggleFavorite = { viewModel.toggleFavorite(state.game.id, !state.game.isFavorite) },
+                    onDeleteGame = { showDeleteDialog = true }
                 )
 
                 // 削除確認ダイアログ
@@ -144,12 +143,26 @@ fun GameDetailScreen(
                         onDismiss = { showLaunchErrorDialog = false }
                     )
                 }
+
+                // Steam起動エラーダイアログ
+                if (showSteamLaunchErrorDialog) {
+                    SteamLaunchErrorDialog(
+                        message = steamLaunchErrorMessage,
+                        onDismiss = {
+                            showSteamLaunchErrorDialog = false
+                            viewModel.resetSteamLaunchState()
+                        },
+                        onNavigateToSettings = {
+                            showSteamLaunchErrorDialog = false
+                            onNavigateToSettings()
+                        }
+                    )
+                }
             }
             is GameDetailUiState.Error -> {
                 ErrorContent(
                     message = state.message,
-                    onNavigateBack = onNavigateBack,
-                    modifier = Modifier.padding(paddingValues)
+                    onNavigateBack = onNavigateBack
                 )
             }
             is GameDetailUiState.Deleted -> {
@@ -162,8 +175,15 @@ fun GameDetailScreen(
 @Composable
 fun GameDetailContent(
     game: Game,
+    isSteamInstalled: Boolean,
     onLaunchGame: () -> Unit,
+    onLaunchViaSteam: () -> Unit,
+    onOpenSteamClient: () -> Unit,
+    onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     onDownloadGame: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onDeleteGame: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -171,26 +191,103 @@ fun GameDetailContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // ゲームバナー
-        AsyncImage(
-            model = game.bannerPath ?: game.iconPath,
-            contentDescription = game.name,
+        // BackboneOne風 大画面バナー with オーバーレイヘッダー
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp),
-            contentScale = ContentScale.Crop
-        )
-
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .height(300.dp)
         ) {
-            // ゲームタイトル
-            Text(
-                text = game.name,
-                style = MaterialTheme.typography.headlineMedium
+            // バナー画像
+            AsyncImage(
+                model = game.bannerPath ?: game.iconPath,
+                contentDescription = game.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
 
+            // グラデーションオーバーレイ
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.3f),
+                                Color.Black.copy(alpha = 0.7f)
+                            ),
+                            startY = 0f
+                        )
+                    )
+            )
+
+            // 上部ヘッダー（戻るボタン + アクション）
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "戻る",
+                        tint = Color.White
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "ゲーム設定",
+                            tint = Color.White
+                        )
+                    }
+                    IconButton(onClick = onToggleFavorite) {
+                        Icon(
+                            imageVector = if (game.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "お気に入り",
+                            tint = if (game.isFavorite) MaterialTheme.colorScheme.primary else Color.White
+                        )
+                    }
+                    IconButton(onClick = onDeleteGame) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "削除",
+                            tint = Color.White
+                        )
+                    }
+                }
+            }
+
+            // 下部ゲームタイトル
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(24.dp)
+            ) {
+                Text(
+                    text = game.name,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                if (game.playTimeMinutes > 0) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = game.playTimeFormatted,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier.padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
             // ダウンロードボタン（Steamゲーム & 未ダウンロードの場合のみ表示）
             if (game.source == com.steamdeck.mobile.domain.model.GameSource.STEAM &&
                 game.executablePath.isBlank()
@@ -208,21 +305,19 @@ fun GameDetailContent(
                 }
             }
 
-            // 起動ボタン
-            Button(
-                onClick = onLaunchGame,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = game.executablePath.isNotBlank() // 実行ファイルがある場合のみ有効
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "起動")
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("ゲームを起動")
-            }
+            // スプリット起動ボタン
+            SplitLaunchButton(
+                game = game,
+                isSteamInstalled = isSteamInstalled,
+                onDirectLaunch = onLaunchGame,
+                onSteamLaunch = onLaunchViaSteam,
+                onOpenSteamClient = onOpenSteamClient,
+                onNavigateToSettings = onNavigateToSettings,
+                modifier = Modifier.fillMaxWidth()
+            )
 
-            HorizontalDivider()
-
-            // ゲーム情報
-            InfoSection(
+            // ゲーム情報カード
+            InfoCard(
                 title = "ゲーム情報",
                 items = listOf(
                     "プレイ時間" to game.playTimeFormatted,
@@ -234,10 +329,8 @@ fun GameDetailContent(
                 )
             )
 
-            HorizontalDivider()
-
-            // ファイルパス
-            InfoSection(
+            // ファイルパスカード
+            InfoCard(
                 title = "ファイルパス",
                 items = listOf(
                     "実行ファイル" to game.executablePath,
@@ -246,8 +339,7 @@ fun GameDetailContent(
             )
 
             if (game.steamAppId != null) {
-                HorizontalDivider()
-                InfoSection(
+                InfoCard(
                     title = "Steam情報",
                     items = listOf(
                         "Steam App ID" to game.steamAppId.toString()
@@ -258,35 +350,51 @@ fun GameDetailContent(
     }
 }
 
+/**
+ * 情報カード - BackboneOne風デザイン
+ */
 @Composable
-fun InfoSection(
+fun InfoCard(
     title: String,
     items: List<Pair<String, String>>,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        shape = MaterialTheme.shapes.large,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-        items.forEach { (label, value) ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            items.forEach { (label, value) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -361,7 +469,17 @@ fun LoadingContent(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator()
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CircularProgressIndicator()
+            Text(
+                text = "読み込み中...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -377,7 +495,8 @@ fun ErrorContent(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(24.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Warning,
@@ -388,6 +507,7 @@ fun ErrorContent(
             Text(
                 text = "エラーが発生しました",
                 style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.error
             )
             Text(
@@ -400,4 +520,230 @@ fun ErrorContent(
             }
         }
     }
+}
+
+/**
+ * スプリット起動ボタン
+ *
+ * Steam-first ロジック: Steamがインストールされていて、ゲームがSteam App IDを持つ場合は Steam 経由で起動
+ */
+@Composable
+fun SplitLaunchButton(
+    game: Game,
+    isSteamInstalled: Boolean,
+    onDirectLaunch: () -> Unit,
+    onSteamLaunch: () -> Unit,
+    onOpenSteamClient: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showDropdownMenu by remember { mutableStateOf(false) }
+    val isEnabled = game.executablePath.isNotBlank()
+
+    // Steam-first ロジック: Steamインストール済み & Steam App ID がある場合はSteam優先
+    val shouldUseSteam = isSteamInstalled && game.steamAppId != null
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        // プライマリボタン (80%)
+        Button(
+            onClick = {
+                if (shouldUseSteam) {
+                    onSteamLaunch()
+                } else {
+                    onDirectLaunch()
+                }
+            },
+            modifier = Modifier.weight(0.8f),
+            enabled = isEnabled,
+            shape = RoundedCornerShape(
+                topStart = 20.dp,
+                bottomStart = 20.dp,
+                topEnd = 0.dp,
+                bottomEnd = 0.dp
+            )
+        ) {
+            Icon(
+                imageVector = if (shouldUseSteam) Icons.Default.SportsEsports else Icons.Default.PlayArrow,
+                contentDescription = if (shouldUseSteam) "Steam起動" else "直接起動"
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(if (shouldUseSteam) "Steamで起動" else "ゲームを起動")
+        }
+
+        // ドロップダウンメニューボタン (20%)
+        Button(
+            onClick = { showDropdownMenu = true },
+            modifier = Modifier.weight(0.2f),
+            enabled = isEnabled,
+            shape = RoundedCornerShape(
+                topStart = 0.dp,
+                bottomStart = 0.dp,
+                topEnd = 20.dp,
+                bottomEnd = 20.dp
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowDropDown,
+                contentDescription = "起動オプション"
+            )
+        }
+
+    }
+
+    // ドロップダウンメニュー（Row の外側に配置）
+    Box {
+        DropdownMenu(
+            expanded = showDropdownMenu,
+            onDismissRequest = { showDropdownMenu = false }
+        ) {
+                // 直接起動 (Winlator)
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text("直接起動 (Winlator)")
+                        }
+                    },
+                    onClick = {
+                        showDropdownMenu = false
+                        onDirectLaunch()
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "直接起動")
+                    },
+                    enabled = isEnabled
+                )
+
+                HorizontalDivider()
+
+                // Steam経由で起動
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text("Steam経由で起動")
+                            if (!isSteamInstalled) {
+                                Text(
+                                    text = "(未インストール)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            } else if (game.steamAppId == null) {
+                                Text(
+                                    text = "(Steam App ID未設定)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    },
+                    onClick = {
+                        showDropdownMenu = false
+                        if (isSteamInstalled && game.steamAppId != null) {
+                            onSteamLaunch()
+                        } else {
+                            onNavigateToSettings()
+                        }
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.SportsEsports, contentDescription = "Steam起動")
+                    },
+                    enabled = isSteamInstalled && game.steamAppId != null && isEnabled
+                )
+
+                // Steam Clientを開く
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text("Steam Clientを開く")
+                            if (!isSteamInstalled) {
+                                Text(
+                                    text = "(未インストール)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    },
+                    onClick = {
+                        showDropdownMenu = false
+                        if (isSteamInstalled) {
+                            onOpenSteamClient()
+                        } else {
+                            onNavigateToSettings()
+                        }
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.SportsEsports, contentDescription = "Steam Client")
+                    },
+                    enabled = isSteamInstalled && isEnabled
+                )
+
+                HorizontalDivider()
+
+            // 設定を開く
+            DropdownMenuItem(
+                text = { Text("設定を開く") },
+                onClick = {
+                    showDropdownMenu = false
+                    onNavigateToSettings()
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Settings, contentDescription = "設定")
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Steam起動エラーダイアログ
+ */
+@Composable
+fun SteamLaunchErrorDialog(
+    message: String,
+    onDismiss: () -> Unit,
+    onNavigateToSettings: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = "エラー",
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = {
+            Text("Steam起動エラー")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(message)
+
+                if (message.contains("インストール") || message.contains("コンテナ")) {
+                    Text(
+                        text = "\n💡 設定画面からSteam Clientをインストールするか、Winlatorコンテナを設定してください。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (message.contains("インストール") || message.contains("コンテナ")) {
+                FilledTonalButton(onClick = onNavigateToSettings) {
+                    Text("設定を開く")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("閉じる")
+            }
+        }
+    )
 }

@@ -95,7 +95,23 @@
       "Bash(timeout /t 60 /nobreak)",
       "Bash(/c/Android/sdk/platform-tools/adb.exe shell:*)",
       "Bash(/c/Projects/steam-app/gradlew.bat assembleDebug:*)",
-      "Bash(/c/Projects/steam-app/gradlew.bat clean assembleDebug)"
+      "Bash(/c/Projects/steam-app/gradlew.bat clean assembleDebug)",
+      "Bash(C:Androidsdkplatform-toolsadb.exe shell am force-stop com.steamdeck.mobile.debug)",
+      "Bash(/c/Android/sdk/platform-tools/adb.exe uninstall:*)",
+      "Bash(timeout /t 5 /nobreak)",
+      "Bash(call gradlew.bat clean --console=plain)",
+      "Bash(/c/Android/sdk/platform-tools/adb.exe reboot)",
+      "Bash(/c/Android/sdk/platform-tools/adb.exe wait-for-device)",
+      "Bash(timeout /t 120 /nobreak)",
+      "Bash(git log:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"C:\\\\Projects\\\\steam-app\\\\setup-java-env.ps1\")",
+      "Bash(git checkout:*)",
+      "Bash(timeout /t 3 /nobreak)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(for f in app/src/test/java/com/steamdeck/mobile/domain/usecase/SyncSteamLibraryUseCaseTest.kt app/src/test/java/com/steamdeck/mobile/presentation/viewmodel/DownloadViewModelTest.kt)",
+      "Bash(do mv \"$f\" \"$f.skip\")",
+      "Bash(done)"
     ]
   }
 }

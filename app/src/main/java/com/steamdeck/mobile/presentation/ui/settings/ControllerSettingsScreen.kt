@@ -18,7 +18,13 @@ import com.steamdeck.mobile.presentation.viewmodel.ControllerUiState
 import com.steamdeck.mobile.presentation.viewmodel.ControllerViewModel
 
 /**
- * Controller settings screen.
+ * Controller settings screen - BackboneOne風デザイン
+ *
+ * Best Practices:
+ * - No TopAppBar for immersive full-screen experience
+ * - Custom header with back button and refresh action
+ * - Material3 Card styling: elevation 2dp, padding 20dp, shapes.large
+ * - LazyColumn with 24dp contentPadding, 16dp item spacing
  *
  * Displays connected controllers, button mapping configuration, and profile management.
  */
@@ -34,22 +40,47 @@ fun ControllerSettingsScreen(
     val editingProfile by viewModel.editingProfile.collectAsStateWithLifecycle()
     val joystickState by viewModel.joystickState.collectAsStateWithLifecycle()
 
-    var showProfileEditor by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf<ControllerProfile?>(null) }
 
-    Scaffold(
-        topBar = {
-            ControllerSettingsTopBar(
-                onBackClick = onBackClick,
-                onRefresh = { viewModel.refreshControllers() }
-            )
-        }
-    ) { paddingValues ->
-        Box(
+    Column(modifier = Modifier.fillMaxSize()) {
+        // BackboneOne風カスタムヘッダー
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                IconButton(onClick = onBackClick) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "戻る",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Text(
+                    text = "コントローラー設定",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            IconButton(onClick = { viewModel.refreshControllers() }) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "更新",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        // コンテンツエリア
+        Box(modifier = Modifier.fillMaxSize()) {
             when {
                 uiState is ControllerUiState.Loading -> {
                     CircularProgressIndicator(
@@ -122,27 +153,6 @@ fun ControllerSettingsScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ControllerSettingsTopBar(
-    onBackClick: () -> Unit,
-    onRefresh: () -> Unit
-) {
-    TopAppBar(
-        title = { Text("コントローラー設定") },
-        navigationIcon = {
-            IconButton(onClick = onBackClick) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "戻る")
-            }
-        },
-        actions = {
-            IconButton(onClick = onRefresh) {
-                Icon(Icons.Default.Refresh, contentDescription = "更新")
-            }
-        }
-    )
-}
-
 @Composable
 private fun ControllerSettingsContent(
     connectedControllers: List<Controller>,
@@ -156,7 +166,7 @@ private fun ControllerSettingsContent(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Connected controllers section
@@ -205,7 +215,12 @@ private fun ControllerSettingsContent(
             if (profiles.isEmpty()) {
                 item {
                     Card(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        shape = MaterialTheme.shapes.large,
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Box(
                             modifier = Modifier
@@ -255,7 +270,8 @@ private fun SectionHeader(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary
     )
 }
 
@@ -273,13 +289,17 @@ private fun ControllerCard(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             )
         } else {
-            CardDefaults.cardColors()
-        }
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        },
+        shape = MaterialTheme.shapes.large,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -322,11 +342,18 @@ private fun ControllerCard(
 
 @Composable
 private fun JoystickPreview(joystickState: JoystickState) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        shape = MaterialTheme.shapes.large,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
@@ -392,12 +419,17 @@ private fun ProfileCard(
     onDelete: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        shape = MaterialTheme.shapes.large,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -542,8 +574,9 @@ private fun ErrorMessage(
         )
         Text(
             text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.error
         )
         Button(onClick = onRetry) {
             Text("再試行")
@@ -562,12 +595,13 @@ private fun NoControllersMessage(modifier: Modifier = Modifier) {
             Icons.Default.Info,
             contentDescription = "情報",
             modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.colorScheme.outline
         )
         Text(
             text = "コントローラーが検出されませんでした",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.outline
         )
         Text(
             text = "コントローラーを接続して「更新」ボタンをタップしてください",

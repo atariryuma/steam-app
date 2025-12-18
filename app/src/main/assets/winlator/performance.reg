@@ -1,0 +1,104 @@
+REGEDIT4
+
+; Wine Performance Optimizations for SteamDeck Mobile
+; Research-based registry settings (2025)
+; Apply with: wine regedit performance.reg
+
+; ============================================================
+; Direct3D Performance Settings
+; ============================================================
+
+[HKEY_CURRENT_USER\Software\Wine\Direct3D]
+
+; Video Memory Size in MB (adjust to device VRAM)
+; Snapdragon 8 Gen 1: 6144, Gen 2: 8192, Gen 3: 12288
+"VideoMemorySize"="8192"
+
+; Offscreen Rendering Mode
+; FBO = Framebuffer Objects (best performance)
+"OffscreenRenderingMode"="FBO"
+
+; Backend Renderer
+; "gl" = OpenGL (default, best compatibility)
+"Renderer"="gl"
+
+; Command Stream Multithreading (CSMT)
+; 0x01 = Enabled (improves performance, default since Wine 3.2)
+; 0x00 = Disabled (if performance degrades for specific games)
+"csmt"=dword:00000001
+
+; Multisampling Textures
+; 0x01 = Enabled (better quality, slight performance cost)
+; 0x00 = Disabled (better performance)
+"MultisampleTextures"=dword:00000001
+
+; ============================================================
+; Shader Settings (Deprecated in Wine 9.0+, kept for compatibility)
+; ============================================================
+
+"PixelShaderMode"="enabled"
+"VertexShaderMode"="hardware"
+"UseGLSL"="enabled"
+
+; ============================================================
+; OpenGL Settings
+; ============================================================
+
+[HKEY_CURRENT_USER\Software\Wine\OpenGL]
+
+; Disable VSync (lower latency, higher FPS)
+; "0" = VSync off, "1" = VSync on
+"VSync"="0"
+
+; ============================================================
+; Audio Settings (Reduce Latency)
+; ============================================================
+
+[HKEY_CURRENT_USER\Software\Wine\Drivers]
+
+; Audio driver (pulseaudio recommended for Android)
+"Audio"="pulseaudio"
+
+; ============================================================
+; Windows Version Compatibility
+; ============================================================
+
+[HKEY_CURRENT_USER\Software\Wine]
+
+; Windows version (win10 recommended for modern games)
+; Options: winxp, win7, win8, win10, win11
+"Version"="win10"
+
+; ============================================================
+; Game-Specific Workarounds (Examples)
+; ============================================================
+
+; Far Cry 3/4: Disable Service Control Manager
+; [HKEY_LOCAL_MACHINE\Software\Wine]
+; "WINE_DO_NOT_OPEN_SC_MANAGER"="1"
+
+; Metal Gear Solid V: Force continue on exceptions
+; [HKEY_CURRENT_USER\Software\Wine]
+; "WINEFORCENTCONTINUE"="1"
+
+; ============================================================
+; Performance Monitoring (Optional)
+; ============================================================
+
+; Enable FPS counter (requires DXVK_HUD environment variable)
+; DXVK_HUD=fps wine game.exe
+
+; ============================================================
+; Notes
+; ============================================================
+
+; After applying this registry file:
+; 1. Restart Wine prefix: wineboot -r
+; 2. Verify settings: wine regedit
+; 3. Test performance with target games
+; 4. Adjust VideoMemorySize based on device RAM
+
+; For best performance, also configure:
+; - Box64 environment variables (see env_vars.json)
+; - DXVK configuration (see dxvk.conf)
+; - VKD3D-Proton settings (for DirectX 12 games)

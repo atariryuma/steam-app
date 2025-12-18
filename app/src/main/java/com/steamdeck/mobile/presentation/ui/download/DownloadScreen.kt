@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -17,20 +18,19 @@ import com.steamdeck.mobile.data.local.database.entity.DownloadStatus
 import com.steamdeck.mobile.presentation.viewmodel.DownloadViewModel
 
 /**
- * ダウンロード管理画面
+ * ダウンロード管理画面 - BackboneOne風デザイン
  *
  * Best Practices:
+ * - No TopAppBar for immersive full-screen experience
  * - Material3 LinearProgressIndicator for determinate progress
  * - LazyColumn for efficient list rendering
- * - Real-time updates via WorkManager + Flow
- * - Error handling with user-friendly messages
+ * - Card elevation: 2dp, padding: 20dp
+ * - Steam color scheme with Material3
  *
  * References:
  * - https://developer.android.com/develop/ui/compose/lists
- * - https://proandroiddev.com/real-time-lifecycle-aware-updates-in-jetpack-compose-be2e80e613c2
  * - https://m3.material.io/develop/android/jetpack-compose
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadScreen(
     viewModel: DownloadViewModel = hiltViewModel(),
@@ -39,34 +39,50 @@ fun DownloadScreen(
     val downloads by viewModel.downloads.collectAsState()
     val activeDownloads by viewModel.activeDownloads.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("ダウンロード管理") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "戻る")
-                    }
-                },
-                actions = {
-                    // 全ダウンロードクリア
-                    IconButton(
-                        onClick = { viewModel.clearCompleted() },
-                        enabled = downloads.any { it.status == DownloadStatus.COMPLETED }
-                    ) {
-                        Icon(Icons.Default.Clear, contentDescription = "完了済みをクリア")
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Column(
+    Column(modifier = Modifier.fillMaxSize()) {
+        // BackboneOne風カスタムヘッダー
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 進行中ダウンロード数表示
-            if (activeDownloads > 0) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "戻る",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Text(
+                    text = "ダウンロード管理",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // 完了済みクリアボタン
+            IconButton(
+                onClick = { viewModel.clearCompleted() },
+                enabled = downloads.any { it.status == DownloadStatus.COMPLETED }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Clear,
+                    contentDescription = "完了済みをクリア",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        // 進行中ダウンロード数表示
+        if (activeDownloads > 0) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -74,31 +90,31 @@ fun DownloadScreen(
                     text = "進行中: $activeDownloads 件",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
                 )
             }
+        }
 
-            // ダウンロードリスト
-            if (downloads.isEmpty()) {
-                EmptyDownloadsPlaceholder()
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(
-                        items = downloads,
-                        key = { it.id }
-                    ) { download ->
-                        DownloadItem(
-                            download = download,
-                            onPause = { viewModel.pauseDownload(download.id) },
-                            onResume = { viewModel.resumeDownload(download.id) },
-                            onCancel = { viewModel.cancelDownload(download.id) },
-                            onRetry = { viewModel.retryDownload(download.id) }
-                        )
-                    }
+        // ダウンロードリスト
+        if (downloads.isEmpty()) {
+            EmptyDownloadsPlaceholder()
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(
+                    items = downloads,
+                    key = { it.id }
+                ) { download ->
+                    DownloadItem(
+                        download = download,
+                        onPause = { viewModel.pauseDownload(download.id) },
+                        onResume = { viewModel.resumeDownload(download.id) },
+                        onCancel = { viewModel.cancelDownload(download.id) },
+                        onRetry = { viewModel.retryDownload(download.id) }
+                    )
                 }
             }
         }
@@ -113,7 +129,7 @@ private fun EmptyDownloadsPlaceholder() {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Info,
@@ -123,7 +139,8 @@ private fun EmptyDownloadsPlaceholder() {
             )
             Text(
                 text = "ダウンロード履歴なし",
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.outline
             )
         }
@@ -131,15 +148,8 @@ private fun EmptyDownloadsPlaceholder() {
 }
 
 /**
- * ダウンロードアイテム
- *
- * Material3 Best Practices:
- * - LinearProgressIndicator with determinate progress (47% faster than legacy)
- * - Proper NaN validation for progress values
- * - Card elevation for depth
- * - IconButton for actions
+ * ダウンロードアイテム - BackboneOne風カード
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DownloadItem(
     download: DownloadEntity,
@@ -150,12 +160,17 @@ private fun DownloadItem(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        shape = MaterialTheme.shapes.large,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // ファイル名とステータス
             Row(
@@ -167,12 +182,14 @@ private fun DownloadItem(
                     Text(
                         text = download.fileName,
                         style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = formatDownloadSize(download.downloadedBytes, download.totalBytes),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -181,9 +198,7 @@ private fun DownloadItem(
                 DownloadStatusIcon(download.status)
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // プログレスバー（Material3 LinearProgressIndicator）
+            // プログレスバー
             when (download.status) {
                 DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED -> {
                     val progress = if (download.totalBytes > 0) {
@@ -192,7 +207,6 @@ private fun DownloadItem(
                         0f
                     }
 
-                    // NaN validation (Material3 best practice)
                     if (!progress.isNaN()) {
                         LinearProgressIndicator(
                             progress = { progress },
@@ -205,13 +219,14 @@ private fun DownloadItem(
                         ) {
                             Text(
                                 text = "${(progress * 100).toInt()}%",
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             if (download.status == DownloadStatus.DOWNLOADING) {
                                 Text(
                                     text = formatSpeed(download.speedBytesPerSecond),
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -229,8 +244,6 @@ private fun DownloadItem(
                     // COMPLETED, FAILED, CANCELLED - no progress bar
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
 
             // アクションボタン
             Row(
@@ -280,7 +293,6 @@ private fun DownloadItem(
                     }
 
                     else -> {
-                        // PENDING, QUEUED, CANCELLED
                         IconButton(onClick = onCancel) {
                             Icon(Icons.Default.Delete, contentDescription = "削除")
                         }
@@ -290,7 +302,6 @@ private fun DownloadItem(
 
             // エラーメッセージ
             if (download.status == DownloadStatus.FAILED && download.errorMessage != null) {
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "エラー: ${download.errorMessage}",
                     style = MaterialTheme.typography.bodySmall,
@@ -342,9 +353,6 @@ private fun DownloadStatusIcon(status: DownloadStatus) {
     }
 }
 
-/**
- * ファイルサイズフォーマット
- */
 private fun formatDownloadSize(downloaded: Long, total: Long): String {
     return "${formatBytes(downloaded)} / ${formatBytes(total)}"
 }
@@ -358,9 +366,6 @@ private fun formatBytes(bytes: Long): String {
     }
 }
 
-/**
- * 速度フォーマット
- */
 private fun formatSpeed(bytesPerSecond: Long): String {
     return when {
         bytesPerSecond < 1024 -> "$bytesPerSecond B/s"

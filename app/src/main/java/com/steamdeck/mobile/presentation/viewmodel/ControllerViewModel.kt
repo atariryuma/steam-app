@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.steamdeck.mobile.core.controller.ControllerManager
+import com.steamdeck.mobile.core.input.GameControllerManager
 import com.steamdeck.mobile.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -14,10 +15,12 @@ import javax.inject.Inject
  * ViewModel for controller settings and configuration UI.
  *
  * Manages controller detection, profile management, and button mapping customization.
+ * Integrates both legacy ControllerManager and new GameControllerManager.
  */
 @HiltViewModel
 class ControllerViewModel @Inject constructor(
-    private val controllerManager: ControllerManager
+    private val controllerManager: ControllerManager,
+    private val gameControllerManager: GameControllerManager
 ) : ViewModel() {
 
     companion object {
@@ -28,7 +31,7 @@ class ControllerViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<ControllerUiState>(ControllerUiState.Loading)
     val uiState: StateFlow<ControllerUiState> = _uiState.asStateFlow()
 
-    // Connected controllers from ControllerManager
+    // Connected controllers from ControllerManager (legacy)
     val connectedControllers: StateFlow<List<Controller>> = controllerManager.connectedControllers
 
     // Active controller
@@ -39,6 +42,9 @@ class ControllerViewModel @Inject constructor(
 
     // Button events (for button mapping)
     val buttonEvents: SharedFlow<com.steamdeck.mobile.core.controller.ButtonEvent> = controllerManager.buttonEvents
+
+    // NEW: Real-time controller state from GameControllerManager
+    val controllerStates = gameControllerManager.controllerState
 
     // Profiles for active controller
     private val _profiles = MutableStateFlow<List<ControllerProfile>>(emptyList())

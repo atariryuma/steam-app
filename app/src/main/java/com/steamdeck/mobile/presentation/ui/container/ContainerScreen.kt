@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -18,20 +19,20 @@ import com.steamdeck.mobile.presentation.viewmodel.ContainerUiState
 import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
 
 /**
- * Winlatorコンテナ管理画面
+ * Winlatorコンテナ管理画面 - BackboneOne風デザイン
+ *
+ * Best Practices:
+ * - No TopAppBar for immersive full-screen experience
+ * - Custom header with back button and add button
+ * - Material3 Card styling: elevation 2dp, padding 20dp, shapes.large
+ * - LazyColumn with 24dp contentPadding, 16dp item spacing
  *
  * 機能:
  * - コンテナ一覧表示
  * - 新規コンテナ作成
  * - コンテナ編集
  * - コンテナ削除
- *
- * Material3 Best Practices:
- * - LazyColumn for list rendering
- * - Card for container items
- * - FloatingActionButton for create action
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContainerScreen(
     onNavigateBack: () -> Unit,
@@ -47,31 +48,48 @@ fun ContainerScreen(
         viewModel.loadContainers()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("コンテナ管理") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, "戻る")
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showCreateDialog = true }
+    Column(modifier = Modifier.fillMaxSize()) {
+        // BackboneOne風カスタムヘッダー
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(Icons.Default.Add, "新規作成")
+                IconButton(onClick = onNavigateBack) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "戻る",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Text(
+                    text = "コンテナ管理",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            IconButton(onClick = { showCreateDialog = true }) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "新規作成",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
         }
-    ) { paddingValues ->
+
+        // コンテンツエリア
         when (val state = uiState) {
             is ContainerUiState.Loading -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
@@ -82,17 +100,13 @@ fun ContainerScreen(
                 if (state.containers.isEmpty()) {
                     EmptyContainersPlaceholder(
                         onCreateClick = { showCreateDialog = true },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues)
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(
                             items = state.containers,
@@ -113,14 +127,13 @@ fun ContainerScreen(
 
             is ContainerUiState.Error -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
+                        modifier = Modifier.padding(32.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Error,
@@ -130,11 +143,13 @@ fun ContainerScreen(
                         )
                         Text(
                             text = "エラーが発生しました",
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
                         )
                         Text(
                             text = state.message,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error
                         )
                         Button(onClick = { viewModel.loadContainers() }) {
@@ -195,13 +210,14 @@ private fun EmptyContainersPlaceholder(
             )
             Text(
                 text = "コンテナがありません",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.outline
             )
             Text(
                 text = "コンテナを作成してゲームを実行できます",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Button(onClick = onCreateClick) {
                 Icon(Icons.Default.Add, "作成")
@@ -212,7 +228,6 @@ private fun EmptyContainersPlaceholder(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ContainerItem(
     container: EmulatorContainer,
@@ -223,12 +238,16 @@ private fun ContainerItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        shape = MaterialTheme.shapes.large,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(20.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -239,6 +258,7 @@ private fun ContainerItem(
                 Text(
                     text = container.name,
                     style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

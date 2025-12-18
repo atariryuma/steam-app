@@ -120,14 +120,32 @@ class HomeViewModel @Inject constructor(
                     return@launch
                 }
 
-                // 2. URIの検証（content://スキームであることを確認）
-                // Storage Access Framework経由で取得したURIのみを許可
-                if (!executablePath.startsWith("content://")) {
-                    android.util.Log.w("HomeViewModel", "Executable path is not a content URI: $executablePath")
-                    // Note: 下位互換性のため警告のみ（実際のファイルアクセスでエラーになる）
+                // 2. URIの検証（content://スキームまたは絶対パスを確認）
+                // Storage Access Framework経由で取得したURIを推奨
+                val isValidExecutablePath = executablePath.startsWith("content://") ||
+                                           executablePath.startsWith("/")
+                val isValidInstallPath = installPath.startsWith("content://") ||
+                                        installPath.startsWith("/")
+
+                if (!isValidExecutablePath) {
+                    _uiState.value = HomeUiState.Error("実行ファイルのパスが無効です")
+                    return@launch
                 }
-                if (!installPath.startsWith("content://")) {
-                    android.util.Log.w("HomeViewModel", "Install path is not a content URI: $installPath")
+                if (!isValidInstallPath) {
+                    _uiState.value = HomeUiState.Error("インストールフォルダのパスが無効です")
+                    return@launch
+                }
+
+                // Android 10 (API 29) 以降では、content:// URIを推奨（Scoped Storage）
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    if (!executablePath.startsWith("content://")) {
+                        android.util.Log.w("HomeViewModel",
+                            "Executable path should use content:// URI on Android 10+: $executablePath")
+                    }
+                    if (!installPath.startsWith("content://")) {
+                        android.util.Log.w("HomeViewModel",
+                            "Install path should use content:// URI on Android 10+: $installPath")
+                    }
                 }
 
                 // 3. 重複チェック（同じ名前 or 同じ実行パス）
@@ -188,13 +206,13 @@ class HomeViewModel @Inject constructor(
  */
 sealed class HomeUiState {
     /** 読み込み中 */
-    object Loading : HomeUiState()
+    data object Loading : HomeUiState()
 
     /** 成功 */
     data class Success(val games: List<Game>) : HomeUiState()
 
     /** 空 */
-    object Empty : HomeUiState()
+    data object Empty : HomeUiState()
 
     /** エラー */
     data class Error(val message: String) : HomeUiState()

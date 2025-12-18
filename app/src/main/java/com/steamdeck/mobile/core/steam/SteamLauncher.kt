@@ -29,7 +29,7 @@ class SteamLauncher @Inject constructor(
      * Steam 経由でゲームを起動
      */
     suspend fun launchGameViaSteam(
-        containerId: Long,
+        containerId: String,
         appId: Long
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
@@ -90,7 +90,7 @@ class SteamLauncher @Inject constructor(
     /**
      * Steam Client を起動
      */
-    suspend fun launchSteamClient(containerId: Long): Result<Unit> =
+    suspend fun launchSteamClient(containerId: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
                 Log.i(TAG, "Launching Steam Client for container: $containerId")
@@ -143,13 +143,9 @@ class SteamLauncher @Inject constructor(
     /**
      * Winlator EmulatorContainer を取得
      */
-    private suspend fun getEmulatorContainer(containerId: Long): Result<com.steamdeck.mobile.domain.emulator.EmulatorContainer> =
+    private suspend fun getEmulatorContainer(containerId: String): Result<com.steamdeck.mobile.domain.emulator.EmulatorContainer> =
         withContext(Dispatchers.IO) {
             try {
-                // データベースからコンテナ情報を取得
-                val containerEntity = database.winlatorContainerDao().getContainerById(containerId)
-                    ?: return@withContext Result.failure(Exception("Container not found in database"))
-
                 // Winlatorからコンテナリストを取得
                 val containersResult = winlatorEmulator.listContainers()
                 if (containersResult.isFailure) {
@@ -160,8 +156,8 @@ class SteamLauncher @Inject constructor(
 
                 val containers = containersResult.getOrNull() ?: emptyList()
 
-                // コンテナIDでマッチング
-                val container = containers.firstOrNull { it.id == containerId.toString() }
+                // コンテナIDでマッチング（String型のIDで直接比較）
+                val container = containers.firstOrNull { it.id == containerId }
                     ?: return@withContext Result.failure(
                         Exception("Container not found in Winlator: $containerId")
                     )

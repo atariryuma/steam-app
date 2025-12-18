@@ -35,7 +35,12 @@ class LaunchGameUseCase @Inject constructor(
                 is LaunchResult.Success -> {
                     // プレイ開始時刻を記録（今後プレイ時間計測に使用）
                     val startTimestamp = System.currentTimeMillis()
-                    gameRepository.updatePlayTime(gameId, 0, startTimestamp)
+                    try {
+                        gameRepository.updatePlayTime(gameId, 0, startTimestamp)
+                    } catch (e: Exception) {
+                        // プレイ時間の記録失敗はゲーム起動を妨げない
+                        android.util.Log.w("LaunchGameUseCase", "Failed to update play time", e)
+                    }
 
                     Result.success(result.processId)
                 }

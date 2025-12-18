@@ -10,4 +10,21 @@
             \"include\": \"https://steamcommunity.com/.well-known/assetlinks.json\"
         }]
     </string>
+
+    <!-- Legal / Disclaimer -->
+    <string name="disclaimer_title">Important Legal Notice</string>
+    <string name="disclaimer_message">
+        This application is NOT affiliated with, endorsed, or approved by Valve Corporation.\n\n
+        Steam®, the Steam logo, Steam Deck™, and related marks are trademarks and/or registered trademarks of Valve Corporation in the U.S. and/or other countries.\n\n
+        By using this app, you acknowledge:\n
+        • This is an unofficial third-party application\n
+        • Use may violate Steam Subscriber Agreement\n
+        • Your Steam account may be suspended or banned\n
+        • All risks are assumed by you\n\n
+        This app is provided AS-IS without any warranties.
+    </string>
+    <string name="disclaimer_accept">I Understand and Accept the Risks</string>
+    <string name="disclaimer_decline">Decline</string>
+
+    <string name="trademark_notice">This app is not affiliated with Valve Corporation.\nSteam and the Steam logo are trademarks of Valve Corporation.</string>
 </resources>

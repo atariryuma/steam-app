@@ -80,6 +80,8 @@ class SteamInstallerService @Inject constructor(
 
     /**
      * Steam インストール情報を保存
+     *
+     * 既存のインストール情報がある場合は更新、なければ新規作成 (UPSERT)
      */
     suspend fun saveInstallation(
         containerId: String,
@@ -87,14 +89,30 @@ class SteamInstallerService @Inject constructor(
         status: SteamInstallStatus
     ): Result<Long> = withContext(Dispatchers.IO) {
         try {
-            val entity = SteamInstallEntity(
-                containerId = containerId,
-                installPath = installPath,
-                status = status
-            )
+            // 既存のインストール情報を確認
+            val existing = database.steamInstallDao().getInstallationByContainerId(containerId)
 
-            val id = database.steamInstallDao().insert(entity)
-            Result.success(id)
+            if (existing != null) {
+                // 既存レコードを更新
+                val updatedEntity = existing.copy(
+                    installPath = installPath,
+                    status = status,
+                    installedAt = System.currentTimeMillis()
+                )
+                database.steamInstallDao().update(updatedEntity)
+                Log.i(TAG, "Updated existing installation for container: $containerId")
+                Result.success(existing.id)
+            } else {
+                // 新規レコードを作成
+                val entity = SteamInstallEntity(
+                    containerId = containerId,
+                    installPath = installPath,
+                    status = status
+                )
+                val id = database.steamInstallDao().insert(entity)
+                Log.i(TAG, "Created new installation record for container: $containerId")
+                Result.success(id)
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save installation", e)

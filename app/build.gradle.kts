@@ -14,7 +14,7 @@ android {
     defaultConfig {
         applicationId = "com.steamdeck.mobile"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 28  // Android 9.0 (SELinux workaround for binary execution on Android 10+)
         versionCode = 1
         versionName = "0.1.0-alpha"
 
@@ -166,10 +166,9 @@ dependencies {
     implementation(libs.androidx.hilt.work)
 
     // Compression (Wine/Box64 binaries)
-    // Note: zstd-jni doesn't officially support Android ARM64 natively
-    // Temporarily disabled until we can bundle ARM64 native libs
-    // implementation(libs.zstd.jni)
+    implementation(libs.zstd.jni) // Zstandard with JNI (includes Android ARM64 libs)
     implementation(libs.commons.compress)
+    implementation(libs.xz) // XZ-Java for .txz decompression
 
     // File Import
     // TODO: Re-enable when libaums v0.10.0 migration is complete

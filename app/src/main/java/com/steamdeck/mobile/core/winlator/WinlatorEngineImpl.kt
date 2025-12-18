@@ -46,18 +46,26 @@ class WinlatorEngineImpl @Inject constructor(
                 }
             }
 
-            // 1. Winlatorの初期化確認
+            // 1. Winlatorの初期化確認と自動初期化
             val available = winlatorEmulator.isAvailable().getOrNull() ?: false
             if (!available) {
-                Log.w(TAG, "Winlator not initialized, attempting initialization...")
+                Log.i(TAG, "Winlator not initialized, starting automatic initialization...")
                 val initResult = winlatorEmulator.initialize { progress, status ->
-                    Log.d(TAG, "Initialization: $status ($progress)")
+                    Log.d(TAG, "Initialization progress: ${(progress * 100).toInt()}% - $status")
                 }
                 if (initResult.isFailure) {
+                    val error = initResult.exceptionOrNull()
+                    Log.e(TAG, "Winlator initialization failed", error)
                     return LaunchResult.Error(
-                        "Winlatorの初期化に失敗しました:\n${initResult.exceptionOrNull()?.message}"
+                        "Winlator環境の初期化に失敗しました。\n\n" +
+                        "エラー: ${error?.message}\n\n" +
+                        "解決方法:\n" +
+                        "• ストレージ空き容量を確認（最低500MB必要）\n" +
+                        "• アプリを再起動してください\n" +
+                        "• 端末を再起動してください"
                     )
                 }
+                Log.i(TAG, "Winlator initialization completed successfully")
             }
 
             // 2. 実行ファイルの存在確認

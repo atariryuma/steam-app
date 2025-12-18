@@ -476,9 +476,17 @@ class SteamDownloadManager @Inject constructor(
     ): DepotManifest? {
         return try {
             // TODO: Protobufパーサーを実装
-            // 現時点では、実際のゲームダウンロードに必要な場合に実装
+            // 完全なSteam Depot Manifestパースには以下が必要:
+            // 1. SteamKit protobuf定義のインポート
+            // 2. Protobuf Kotlin生成
+            // 3. LZ圧縮/解凍ライブラリ
+            // 4. VZip展開ロジック
+            //
+            // 現時点では、ImportedゲームとSteamインストール済みゲームの起動に集中。
+            // ダイレクトダウンロードは Phase 6以降で実装予定。
 
-            Log.w(TAG, "Manifest parsing not implemented, returning null")
+            Log.w(TAG, "⚠️ Manifest parsing not implemented yet (Phase 6+ feature)")
+            Log.i(TAG, "📌 Workaround: Use Steam client to download games, then import via file manager")
             null
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse manifest", e)

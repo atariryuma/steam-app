@@ -2,6 +2,7 @@ package com.steamdeck.mobile.data.local.database.entity
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
@@ -10,7 +11,13 @@ import androidx.room.PrimaryKey
  * Best Practice: Room entity with @ColumnInfo for explicit column naming
  * Reference: https://developer.android.com/training/data-storage/room/defining-data
  */
-@Entity(tableName = "steam_installations")
+@Entity(
+    tableName = "steam_installations",
+    indices = [
+        Index(value = ["container_id"]),
+        Index(value = ["status"])
+    ]
+)
 data class SteamInstallEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

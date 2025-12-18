@@ -10,6 +10,7 @@ import androidx.navigation.navArgument
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.steamdeck.mobile.presentation.ui.auth.SteamLoginScreen
 import com.steamdeck.mobile.presentation.ui.download.DownloadScreen
@@ -76,9 +77,6 @@ fun SteamDeckNavHost(
                 },
                 onNavigateToControllerSettings = {
                     navController.navigate(Screen.ControllerSettings.route)
-                },
-                onNavigateToSteamLogin = {
-                    navController.navigate(Screen.SteamLogin.route)
                 }
             )
         }
@@ -131,42 +129,30 @@ fun SteamDeckNavHost(
             )
         }
 
-        // 設定サブ画面：Steam ログイン（新UI）
+        // 設定サブ画面：Steam ログイン（OpenID認証）
         composable(Screen.SteamLogin.route) {
             val loginViewModel: SteamLoginViewModel = hiltViewModel()
-            val settingsViewModel: com.steamdeck.mobile.presentation.viewmodel.SettingsViewModel = hiltViewModel()
             val uiState by loginViewModel.uiState.collectAsState()
-            val qrCodeBitmap by loginViewModel.qrCodeBitmap.collectAsState()
 
-            // 画面表示時に一度だけQRコードログインを開始
-            LaunchedEffect(Unit) {
-                if (uiState is com.steamdeck.mobile.presentation.viewmodel.SteamLoginUiState.Initial) {
-                    loginViewModel.startQrCodeLogin()
-                }
-            }
+            // 認証URLを生成
+            val (authUrl, _) = remember { loginViewModel.startOpenIdLogin() }
 
-            com.steamdeck.mobile.presentation.ui.auth.SteamStyleLoginScreen(
-                qrCodeBitmap = qrCodeBitmap,
-                isLoading = uiState is com.steamdeck.mobile.presentation.viewmodel.SteamLoginUiState.Loading,
-                errorMessage = (uiState as? com.steamdeck.mobile.presentation.viewmodel.SteamLoginUiState.Error)?.message,
-                onNavigateBack = { navController.popBackStack() },
-                onErrorDismiss = {
-                    loginViewModel.clearError()
-                }
+            // Steam OpenID ログイン画面
+            com.steamdeck.mobile.presentation.ui.auth.SteamOpenIdLoginScreen(
+                authUrl = authUrl,
+                callbackScheme = "steamdeckmobile",
+                onAuthCallback = { callbackUrl -> loginViewModel.handleCallback(callbackUrl) },
+                onError = { errorMessage -> android.util.Log.e("Navigation", "OpenID error: $errorMessage") }
             )
 
-            // 認証成功時の処理（トークンは既にViewModelで保存済み）
-            // 🔥 修正: uiStateがdata object Successの場合、同じインスタンスなので
-            // Boolean値に変換してLaunchedEffectのキーにする
+            // 認証成功時の処理
             val isSuccess = uiState is com.steamdeck.mobile.presentation.viewmodel.SteamLoginUiState.Success
             LaunchedEffect(isSuccess) {
                 if (isSuccess) {
                     android.util.Log.i(
                         "SteamDeckNavHost",
-                        "✅ Steam authentication success detected! Triggering auto-sync and navigation..."
+                        "✅ Steam authentication success! Navigating back to settings..."
                     )
-                    // 自動ライブラリ同期をトリガー
-                    settingsViewModel.syncAfterQrLogin()
                     navController.popBackStack()
                 }
             }

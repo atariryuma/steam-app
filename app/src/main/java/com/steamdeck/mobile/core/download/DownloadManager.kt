@@ -198,7 +198,11 @@ class DownloadWorker @AssistedInject constructor(
         const val KEY_FILENAME = "filename"
         private const val TAG = "DownloadWorker"
         private const val CHUNK_SIZE = 8 * 1024 * 1024L // 8MB
+        private const val SPEED_SAMPLE_INTERVAL_MS = 1000L // 1秒ごとに速度を計算
     }
+
+    private var lastSpeedUpdateTime = 0L
+    private var lastDownloadedBytes = 0L
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val downloadId = inputData.getLong(KEY_DOWNLOAD_ID, -1)
@@ -248,7 +252,22 @@ class DownloadWorker @AssistedInject constructor(
             )
             Result.success()
         } catch (e: Exception) {
+            // 詳細なエラーロギング
             Log.e(TAG, "Download failed for ID: $downloadId", e)
+            Log.e(TAG, "  URL: $url")
+            Log.e(TAG, "  Destination: $destination/$fileName")
+            Log.e(TAG, "  Error type: ${e.javaClass.simpleName}")
+            Log.e(TAG, "  Error message: ${e.message}")
+
+            // ネットワークエラーの詳細
+            if (e is java.net.UnknownHostException) {
+                Log.e(TAG, "  Network error: Cannot resolve host")
+            } else if (e is java.net.SocketTimeoutException) {
+                Log.e(TAG, "  Network error: Connection timeout")
+            } else if (e is java.io.IOException) {
+                Log.e(TAG, "  I/O error: ${e.message}")
+            }
+
             database.downloadDao().markDownloadError(
                 downloadId = downloadId,
                 status = DownloadStatus.FAILED,
@@ -279,6 +298,10 @@ class DownloadWorker @AssistedInject constructor(
         var currentByte = startByte
         val buffer = ByteArray(8192)
         var lastUpdateMB = currentByte / (1024 * 1024)
+
+        // 速度計算用の変数初期化
+        lastSpeedUpdateTime = System.currentTimeMillis()
+        lastDownloadedBytes = currentByte
 
         while (currentByte < totalSize) {
             val endByte = min(currentByte + CHUNK_SIZE - 1, totalSize - 1)
@@ -313,6 +336,20 @@ class DownloadWorker @AssistedInject constructor(
                             val currentMB = currentByte / (1024 * 1024)
                             if (currentMB > lastUpdateMB) {
                                 lastUpdateMB = currentMB
+
+                                // 速度計算
+                                val currentTime = System.currentTimeMillis()
+                                val elapsedTime = currentTime - lastSpeedUpdateTime
+                                val speed = if (elapsedTime >= SPEED_SAMPLE_INTERVAL_MS) {
+                                    val bytesTransferred = currentByte - lastDownloadedBytes
+                                    val speedBytesPerSec = (bytesTransferred * 1000) / elapsedTime
+                                    lastSpeedUpdateTime = currentTime
+                                    lastDownloadedBytes = currentByte
+                                    speedBytesPerSec
+                                } else {
+                                    0L // 時間が経過していない場合は0
+                                }
+
                                 val progressPercent = if (totalSize > 0) {
                                     ((currentByte * 100) / totalSize).toInt()
                                 } else {
@@ -325,7 +362,8 @@ class DownloadWorker @AssistedInject constructor(
                                 )
                                 setProgress(
                                     workDataOf(
-                                        "progress" to progressPercent
+                                        "progress" to progressPercent,
+                                        "speed" to speed
                                     )
                                 )
                             }

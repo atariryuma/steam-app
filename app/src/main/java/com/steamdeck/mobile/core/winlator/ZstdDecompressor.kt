@@ -1,12 +1,12 @@
 package com.steamdeck.mobile.core.winlator
 
 import android.util.Log
-// import com.github.luben.zstd.ZstdInputStream // Temporarily disabled - no Android ARM64 support
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
+import org.apache.commons.compress.compressors.zstandard.ZstdCompressorInputStream
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
@@ -17,11 +17,9 @@ import javax.inject.Singleton
 /**
  * Utility for decompressing tar-based archives (.txz, .tzst).
  *
- * Note: Zstandard (.tzst) support is temporarily disabled due to lack of
- * Android ARM64 native library support in zstd-jni Maven distribution.
- * Use .txz (XZ compression) instead for now.
+ * Zstandard (.tzst) support is provided by Apache Commons Compress with zstd-jni.
  *
- * Reference: https://github.com/luben/zstd-jni
+ * Reference: https://commons.apache.org/proper/commons-compress/
  */
 @Singleton
 class ZstdDecompressor @Inject constructor() {
@@ -56,6 +54,8 @@ class ZstdDecompressor @Inject constructor() {
     /**
      * Decompresses and extracts a .tzst archive in one step.
      *
+     * Uses Apache Commons Compress with zstd-jni for Zstandard decompression.
+     *
      * @param tzstFile .tzst compressed archive
      * @param targetDir Directory to extract to
      * @param progressCallback Optional progress callback (0.0 to 1.0)
@@ -66,13 +66,85 @@ class ZstdDecompressor @Inject constructor() {
         targetDir: File,
         progressCallback: ((Float, String) -> Unit)? = null
     ): Result<File> = withContext(Dispatchers.IO) {
-        Result.failure(
-            UnsupportedOperationException(
-                "Zstandard decompression is temporarily unavailable. " +
-                "Please use XZ-compressed archives (.txz) instead. " +
-                "See extractTxz() method."
-            )
-        )
+        try {
+            if (!tzstFile.exists()) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("Input file not found: ${tzstFile.absolutePath}")
+                )
+            }
+
+            targetDir.mkdirs()
+
+            val tzstFileSize = tzstFile.length()
+            var bytesProcessed = 0L
+
+            Log.i(TAG, "Extracting tzst archive: ${tzstFile.name} (${tzstFileSize / 1024}KB)")
+            progressCallback?.invoke(0.0f, "Extracting ${tzstFile.name}...")
+
+            BufferedInputStream(FileInputStream(tzstFile)).use { bufferedInput ->
+                ZstdCompressorInputStream(bufferedInput).use { zstdInput ->
+                    TarArchiveInputStream(zstdInput).use { tarInput ->
+                        var entry: TarArchiveEntry? = tarInput.nextEntry as TarArchiveEntry?
+
+                        while (entry != null) {
+                            val outputFile = File(targetDir, entry.name)
+
+                            // Security: Prevent path traversal attacks
+                            if (!outputFile.canonicalPath.startsWith(targetDir.canonicalPath)) {
+                                Log.w(TAG, "Skipping suspicious entry: ${entry.name}")
+                                entry = tarInput.nextEntry as TarArchiveEntry?
+                                continue
+                            }
+
+                            if (entry.isDirectory) {
+                                // Create directory
+                                outputFile.mkdirs()
+                                Log.d(TAG, "Created directory: ${entry.name}")
+                            } else if (entry.isSymbolicLink) {
+                                // Skip symlinks (not supported on Android)
+                                Log.d(TAG, "Skipping symlink: ${entry.name} -> ${entry.linkName}")
+                            } else {
+                                // Extract file
+                                outputFile.parentFile?.mkdirs()
+
+                                FileOutputStream(outputFile).use { output ->
+                                    val buffer = ByteArray(BUFFER_SIZE)
+                                    var len: Int
+                                    while (tarInput.read(buffer).also { len = it } > 0) {
+                                        output.write(buffer, 0, len)
+                                        bytesProcessed += len
+                                    }
+                                }
+
+                                // Set executable permissions if present
+                                val mode = entry.mode
+                                val isExecutable = (mode and 0x49) != 0 // Check execute bits
+
+                                if (isExecutable) {
+                                    outputFile.setExecutable(true, false)
+                                    Log.d(TAG, "Set executable: ${entry.name} (mode: ${mode.toString(8)})")
+                                }
+
+                                Log.d(TAG, "Extracted: ${entry.name} (${entry.size} bytes)")
+                            }
+
+                            // Report progress (estimate 10x compression ratio)
+                            val progress = (bytesProcessed.toFloat() / (tzstFileSize * 10)).coerceIn(0f, 0.95f)
+                            progressCallback?.invoke(progress, "Extracting...")
+
+                            entry = tarInput.nextEntry as TarArchiveEntry?
+                        }
+                    }
+                }
+            }
+
+            Log.i(TAG, "Tzst extraction complete: ${targetDir.absolutePath}")
+            progressCallback?.invoke(1.0f, "Extraction complete")
+            Result.success(targetDir)
+        } catch (e: Exception) {
+            Log.e(TAG, "Tzst extraction failed", e)
+            Result.failure(e)
+        }
     }
 
     /**

@@ -258,7 +258,7 @@ class GameDetailViewModel @Inject constructor(
 
                 // Steam Client経由で起動
                 val result = steamLauncher.launchGameViaSteam(
-                    containerId = game.winlatorContainerId,
+                    containerId = game.winlatorContainerId.toString(),
                     appId = game.steamAppId
                 )
 
@@ -309,7 +309,7 @@ class GameDetailViewModel @Inject constructor(
                 }
 
                 // Steam Clientを起動
-                val result = steamLauncher.launchSteamClient(game.winlatorContainerId)
+                val result = steamLauncher.launchSteamClient(game.winlatorContainerId.toString())
 
                 result
                     .onSuccess {

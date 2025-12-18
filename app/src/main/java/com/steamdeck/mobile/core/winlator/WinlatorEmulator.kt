@@ -2,6 +2,7 @@ package com.steamdeck.mobile.core.winlator
 
 import android.content.Context
 import android.util.Log
+import com.steamdeck.mobile.core.util.ElfPatcher
 import com.steamdeck.mobile.domain.emulator.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -36,9 +37,17 @@ class WinlatorEmulator @Inject constructor(
 
     private val dataDir = File(context.filesDir, "winlator")
     private val box64Dir = File(dataDir, "box64")
+    private val prootDir = File(dataDir, "proot")
     private val rootfsDir = File(dataDir, "rootfs")
     private val wineDir = File(rootfsDir, "opt/wine")
     private val containersDir = File(dataDir, "containers")
+
+    // Binary paths (extracted from assets at runtime)
+    private val prootBinary = File(prootDir, "proot")
+    private val box64Binary = File(box64Dir, "box64")
+    private val wineBinary = File(wineDir, "bin/wine")
+    private val winebootBinary = File(wineDir, "bin/wineboot")
+    private val wineserverBinary = File(wineDir, "bin/wineserver")
 
     // Active processes map (processId -> ProcessInfo)
     private val activeProcesses = mutableMapOf<String, ProcessInfo>()
@@ -52,35 +61,33 @@ class WinlatorEmulator @Inject constructor(
         private const val TAG = "WinlatorEmulator"
 
         // Box64 assets
-        private const val BOX64_ASSET = "winlator/box64-0.3.6.tzst"
+        private const val BOX64_ASSET = "winlator/box64-0.3.6.txz"
         private const val BOX64_RC_ASSET = "winlator/default.box64rc"
         private const val ENV_VARS_ASSET = "winlator/env_vars.json"
 
         // Rootfs assets (contains Wine 9.0+)
         private const val ROOTFS_ASSET = "winlator/rootfs.txz"
+
+        // PRoot asset for SELinux compatibility
+        private const val PROOT_ASSET = "winlator/proot-v5.3.0-aarch64.txz"
     }
 
     override suspend fun isAvailable(): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
-            // Check if Box64 binary exists
-            val box64Binary = File(box64Dir, "box64")
-            val wineBinary = File(wineDir, "bin/wine")
-            val isExtracted = box64Binary.exists() && wineBinary.exists()
+            // Check if binaries exist (extracted from assets during initialization)
+            val binariesExist = prootBinary.exists() &&
+                               box64Binary.exists() &&
+                               wineBinary.exists() &&
+                               winebootBinary.exists() &&
+                               wineserverBinary.exists()
 
-            // Check if assets are available
-            val hasAssets = try {
-                context.assets.open(BOX64_ASSET).use { true }
-            } catch (e: Exception) {
-                false
-            }
+            // Check if rootfs is extracted (Wine support files)
+            val rootfsExtracted = File(wineDir, "bin").exists()
 
-            val hasRootfs = try {
-                context.assets.open(ROOTFS_ASSET).use { true }
-            } catch (e: Exception) {
-                false
-            }
+            val isAvailable = binariesExist && rootfsExtracted
 
-            Result.success(isExtracted || (hasAssets && hasRootfs))
+            Log.d(TAG, "Winlator availability: binaries=$binariesExist, rootfs=$rootfsExtracted")
+            Result.success(isAvailable)
         } catch (e: Exception) {
             Log.e(TAG, "Error checking availability", e)
             Result.failure(EmulatorException("Failed to check Winlator availability", e))
@@ -97,52 +104,196 @@ class WinlatorEmulator @Inject constructor(
             // Create directories
             dataDir.mkdirs()
             box64Dir.mkdirs()
+            prootDir.mkdirs()
             rootfsDir.mkdirs()
             containersDir.mkdirs()
 
-            // Step 1: Extract Box64 (0.0 - 0.3)
-            progressCallback?.invoke(0.0f, "Extracting Box64 binary...")
+            // Step 1: Extract PRoot binary (0.0 - 0.15)
+            if (!prootBinary.exists()) {
+                progressCallback?.invoke(0.0f, "Extracting PRoot binary...")
 
-            val box64Binary = File(box64Dir, "box64")
+                // Extract proot.txz from assets
+                val prootTxzFile = File(prootDir, "proot-v5.3.0-aarch64.txz")
+                if (!prootTxzFile.exists()) {
+                    extractAsset(PROOT_ASSET, prootTxzFile)
+                    progressCallback?.invoke(0.025f, "PRoot asset copied")
+                }
+
+                if (prootTxzFile.exists()) {
+                    // Extract .txz to prootDir
+                    val extractResult = zstdDecompressor.extractTxz(
+                        txzFile = prootTxzFile,
+                        targetDir = prootDir
+                    ) { extractProgress, status ->
+                        progressCallback?.invoke(0.05f + extractProgress * 0.1f, status)
+                    }
+
+                    if (extractResult.isFailure) {
+                        Log.e(TAG, "Failed to extract PRoot", extractResult.exceptionOrNull())
+                        return@withContext Result.failure(
+                            EmulatorException("Failed to extract PRoot: ${extractResult.exceptionOrNull()?.message}")
+                        )
+                    }
+
+                    // PRoot binary is extracted, need to find and move it
+                    val extractedProot = File(prootDir, "proot")
+                    if (!extractedProot.exists()) {
+                        // Try alternate path (might be in subdir)
+                        val altProot = File(prootDir, "usr/local/bin/proot")
+                        if (altProot.exists()) {
+                            altProot.copyTo(extractedProot, overwrite = true)
+                            File(prootDir, "usr").deleteRecursively()
+                        }
+                    }
+
+                    // Verify binary exists
+                    if (!prootBinary.exists()) {
+                        return@withContext Result.failure(
+                            EmulatorException("PRoot binary not found after extraction: ${prootBinary.absolutePath}")
+                        )
+                    }
+
+                    // Make sure it's executable
+                    prootBinary.setExecutable(true, false)
+                    Log.i(TAG, "PRoot extracted and set executable: ${prootBinary.absolutePath}")
+
+                    // Patch PRoot to PIE format (ET_DYN) for Android 5.0+ compatibility
+                    val patchResult = ElfPatcher.patchToPie(prootBinary)
+                    if (patchResult.isFailure) {
+                        Log.w(TAG, "Failed to patch PRoot to PIE: ${patchResult.exceptionOrNull()?.message}")
+                        // Continue anyway - binary might already be PIE
+                    }
+
+                    // Patch TLS alignment for Android 12+ (requires 64-byte alignment)
+                    val tlsPatchResult = ElfPatcher.patchTlsAlignment(prootBinary, 64)
+                    if (tlsPatchResult.isFailure) {
+                        Log.w(TAG, "Failed to patch PRoot TLS alignment: ${tlsPatchResult.exceptionOrNull()?.message}")
+                        // Continue anyway - might already be aligned
+                    }
+
+                    progressCallback?.invoke(0.15f, "PRoot ready")
+                } else {
+                    Log.e(TAG, "PRoot .txz file not found: ${prootTxzFile.absolutePath}")
+                    return@withContext Result.failure(
+                        EmulatorException("PRoot asset file not found")
+                    )
+                }
+            } else {
+                progressCallback?.invoke(0.15f, "PRoot already extracted")
+            }
+
+            // Step 2: Extract Box64 binary (0.15 - 0.3)
             if (!box64Binary.exists()) {
-                // Extract Box64 assets
-                extractAsset(BOX64_ASSET, File(box64Dir, "box64-0.3.6.tzst"))
-                extractAsset(BOX64_RC_ASSET, File(box64Dir, "default.box64rc"))
-                extractAsset(ENV_VARS_ASSET, File(box64Dir, "env_vars.json"))
+                progressCallback?.invoke(0.15f, "Extracting Box64 binary...")
 
-                progressCallback?.invoke(0.1f, "Decompressing Box64 binary...")
+                // Extract box64.txz from assets
+                val box64TxzFile = File(box64Dir, "box64-0.3.6.txz")
+                if (!box64TxzFile.exists()) {
+                    extractAsset(BOX64_ASSET, box64TxzFile)
+                    progressCallback?.invoke(0.17f, "Box64 asset copied")
+                }
 
-                // Decompress and extract Box64 .tzst archive
-                val box64TzstFile = File(box64Dir, "box64-0.3.6.tzst")
-
-                if (box64TzstFile.exists()) {
-                    zstdDecompressor.decompressAndExtract(
-                        tzstFile = box64TzstFile,
+                if (box64TxzFile.exists()) {
+                    // Extract .txz to box64Dir
+                    val extractResult = zstdDecompressor.extractTxz(
+                        txzFile = box64TxzFile,
                         targetDir = box64Dir
                     ) { extractProgress, status ->
-                        progressCallback?.invoke(0.1f + extractProgress * 0.2f, status)
-                    }.onSuccess {
-                        Log.i(TAG, "Box64 extraction successful")
-
-                        // Verify box64 binary exists and is executable
-                        if (box64Binary.exists()) {
-                            box64Binary.setExecutable(true, false)
-                            Log.i(TAG, "Box64 binary ready: ${box64Binary.absolutePath}")
-                        } else {
-                            Log.w(TAG, "Box64 binary not found after extraction")
-                        }
-                    }.onFailure { error ->
-                        Log.w(TAG, "Box64 extraction failed: ${error.message}")
+                        progressCallback?.invoke(0.18f + extractProgress * 0.12f, status)
                     }
+
+                    if (extractResult.isFailure) {
+                        Log.e(TAG, "Failed to extract Box64", extractResult.exceptionOrNull())
+                        return@withContext Result.failure(
+                            Box64BinaryNotFoundException(
+                                "Failed to extract Box64: ${extractResult.exceptionOrNull()?.message}"
+                            )
+                        )
+                    }
+
+                    // Box64 binary is extracted to usr/local/bin/box64, need to move it
+                    val extractedBox64 = File(box64Dir, "usr/local/bin/box64")
+                    if (extractedBox64.exists() && !box64Binary.exists()) {
+                        // Move binary to expected location
+                        extractedBox64.copyTo(box64Binary, overwrite = true)
+                        box64Binary.setExecutable(true, false)
+                        Log.i(TAG, "Box64 binary moved from ${extractedBox64.absolutePath} to ${box64Binary.absolutePath}")
+
+                        // Clean up extracted directory structure
+                        File(box64Dir, "usr").deleteRecursively()
+                    }
+
+                    // Verify binary exists
+                    if (!box64Binary.exists()) {
+                        return@withContext Result.failure(
+                            Box64BinaryNotFoundException(
+                                "Box64 binary not found after extraction: ${box64Binary.absolutePath}"
+                            )
+                        )
+                    }
+
+                    // Make sure it's executable
+                    box64Binary.setExecutable(true, false)
+                    Log.i(TAG, "Box64 extracted and set executable: ${box64Binary.absolutePath}")
+
+                    // Patch Box64 to PIE format (ET_DYN) for Android 5.0+ compatibility
+                    val patchResult = ElfPatcher.patchToPie(box64Binary)
+                    if (patchResult.isFailure) {
+                        Log.w(TAG, "Failed to patch Box64 to PIE: ${patchResult.exceptionOrNull()?.message}")
+                        // Continue anyway - binary might already be PIE
+                    }
+
+                    // Patch TLS alignment for Android 12+ (requires 64-byte alignment)
+                    val tlsPatchResult = ElfPatcher.patchTlsAlignment(box64Binary, 64)
+                    if (tlsPatchResult.isFailure) {
+                        Log.w(TAG, "Failed to patch Box64 TLS alignment: ${tlsPatchResult.exceptionOrNull()?.message}")
+                        // Continue anyway - might not have PT_TLS segment
+                    }
+
+                    progressCallback?.invoke(0.3f, "Box64 ready")
+                } else {
+                    Log.e(TAG, "Box64 .txz file not found: ${box64TxzFile.absolutePath}")
+                    return@withContext Result.failure(
+                        Box64BinaryNotFoundException("Box64 asset file not found")
+                    )
+                }
+            } else {
+                progressCallback?.invoke(0.3f, "Box64 already extracted")
+            }
+
+            // Ensure Box64 patches are always applied (even if already extracted)
+            if (box64Binary.exists()) {
+                // Verify and patch PIE if needed
+                val patchPieResult = ElfPatcher.patchToPie(box64Binary)
+                if (patchPieResult.isFailure) {
+                    Log.w(TAG, "Box64 PIE patch check failed: ${patchPieResult.exceptionOrNull()?.message}")
+                }
+
+                // Verify and patch TLS if needed
+                val patchTlsResult = ElfPatcher.patchTlsAlignment(box64Binary, 64)
+                if (patchTlsResult.isFailure) {
+                    Log.w(TAG, "Box64 TLS patch check failed: ${patchTlsResult.exceptionOrNull()?.message}")
                 }
             }
 
-            progressCallback?.invoke(0.3f, "Box64 ready")
+            // Step 2: Extract configuration files (0.3 - 0.4)
+            progressCallback?.invoke(0.3f, "Extracting configuration files...")
 
-            // Step 2: Extract Rootfs/Wine (0.3 - 1.0)
-            val wineBinary = File(wineDir, "bin/wine")
-            if (!wineBinary.exists()) {
-                progressCallback?.invoke(0.3f, "Extracting Wine rootfs (53MB)...")
+            val box64RcFile = File(box64Dir, "default.box64rc")
+            if (!box64RcFile.exists()) {
+                extractAsset(BOX64_RC_ASSET, box64RcFile)
+            }
+
+            val envVarsFile = File(box64Dir, "env_vars.json")
+            if (!envVarsFile.exists()) {
+                extractAsset(ENV_VARS_ASSET, envVarsFile)
+            }
+
+            progressCallback?.invoke(0.4f, "Configuration files ready")
+
+            // Step 3: Extract Rootfs/Wine support files (0.4 - 1.0)
+            if (!File(wineDir, "bin").exists()) {
+                progressCallback?.invoke(0.4f, "Extracting Wine rootfs (53MB)...")
 
                 // Extract rootfs.txz from assets
                 val rootfsTxzFile = File(dataDir, "rootfs.txz")
@@ -182,6 +333,9 @@ class WinlatorEmulator @Inject constructor(
                             rootfsTxzFile.delete()
                             Log.d(TAG, "Cleaned up temporary rootfs.txz file")
                         }
+
+                        // Setup hardcoded linker path now that rootfs is extracted
+                        setupHardcodedLinkerPath()
                     }.onFailure { error ->
                         Log.e(TAG, "Rootfs extraction failed: ${error.message}", error)
                         return@withContext Result.failure(
@@ -191,6 +345,8 @@ class WinlatorEmulator @Inject constructor(
                 }
             } else {
                 Log.i(TAG, "Wine already extracted, skipping")
+                // Ensure linker is setup even if rootfs was already extracted
+                setupHardcodedLinkerPath()
                 progressCallback?.invoke(1.0f, "Wine already ready")
             }
 
@@ -309,17 +465,16 @@ class WinlatorEmulator @Inject constructor(
                 )
             }
 
-            // 2. Verify Wine and Box64 are initialized
-            val box64Binary = File(box64Dir, "box64")
-            val wine64Binary = File(wineDir, "bin/wine64")
+            // 2. Get Box64 binary (prefer rootfs copy)
+            val box64ToUse = getBox64Binary()
 
-            if (!box64Binary.exists()) {
+            if (!box64ToUse.exists()) {
                 return@withContext Result.failure(
                     Box64BinaryNotFoundException()
                 )
             }
 
-            if (!wine64Binary.exists()) {
+            if (!wineBinary.exists()) {
                 return@withContext Result.failure(
                     WineBinaryNotFoundException()
                 )
@@ -328,10 +483,10 @@ class WinlatorEmulator @Inject constructor(
             // 3. Build environment variables
             val environmentVars = buildEnvironmentVariables(container)
 
-            // 4. Build command
+            // 4. Build command - direct execution with proper library paths
             val command = buildList {
-                add(box64Binary.absolutePath)
-                add(wine64Binary.absolutePath)
+                add(box64ToUse.absolutePath)
+                add(wineBinary.absolutePath)
                 add(executable.absolutePath)
                 addAll(arguments)
             }
@@ -547,10 +702,10 @@ class WinlatorEmulator @Inject constructor(
      */
     private suspend fun initializeWinePrefix(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val box64Binary = File(box64Dir, "box64")
-            val winebootBinary = File(wineDir, "bin/wineboot")
+            // Get the Box64 binary (prefer rootfs copy)
+            val box64ToUse = getBox64Binary()
 
-            if (!box64Binary.exists()) {
+            if (!box64ToUse.exists()) {
                 return@withContext Result.failure(Box64BinaryNotFoundException())
             }
 
@@ -559,9 +714,12 @@ class WinlatorEmulator @Inject constructor(
             }
 
             Log.i(TAG, "Initializing Wine prefix: ${containerDir.absolutePath}")
+            Log.i(TAG, "Using box64: ${box64ToUse.absolutePath}")
+            Log.i(TAG, "Using wineboot: ${winebootBinary.absolutePath}")
 
+            // Build command - direct execution with proper library paths
             val command = listOf(
-                box64Binary.absolutePath,
+                box64ToUse.absolutePath,
                 winebootBinary.absolutePath,
                 "--init"
             )
@@ -571,7 +729,7 @@ class WinlatorEmulator @Inject constructor(
                 "WINEDEBUG" to "-all",
                 "WINEARCH" to "win64",
                 "PATH" to "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}",
-                "LD_LIBRARY_PATH" to "${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu"
+                "LD_LIBRARY_PATH" to "${rootfsDir.absolutePath}/lib:${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu"
             )
 
             val processBuilder = ProcessBuilder(command)
@@ -746,7 +904,9 @@ class WinlatorEmulator @Inject constructor(
             // Add system paths
             val existingPath = System.getenv("PATH") ?: ""
             put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:$existingPath")
-            put("LD_LIBRARY_PATH", "${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu")
+
+            // Set LD_LIBRARY_PATH to rootfs libraries for Box64
+            put("LD_LIBRARY_PATH", "${rootfsDir.absolutePath}/lib:${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu")
         }
     }
 
@@ -762,6 +922,64 @@ class WinlatorEmulator @Inject constructor(
         } catch (e: Exception) {
             Log.w(TAG, "Failed to get PID via reflection, using fallback", e)
             -1 // Fallback PID
+        }
+    }
+
+    /**
+     * Get the Box64 binary to use for execution.
+     * Prefers the rootfs copy if it exists, otherwise falls back to the extracted binary.
+     */
+    private fun getBox64Binary(): File {
+        val rootfsBox64 = File(rootfsDir, "usr/local/bin/box64")
+        return if (rootfsBox64.exists()) {
+            rootfsBox64
+        } else {
+            box64Binary
+        }
+    }
+
+    /**
+     * Setup hardcoded linker path for Box64.
+     * Box64 has hardcoded interpreter: /data/data/com.winlator/files/rootfs/lib/ld-linux-aarch64.so.1
+     *
+     * Since we can't write to /data/data/com.winlator/, we copy Box64 into rootfs
+     * and patch it to use a relative path within rootfs.
+     */
+    private fun setupHardcodedLinkerPath() {
+        // The linker is at usr/lib/ld-linux-aarch64.so.1 in the rootfs
+        val actualLinker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
+
+        if (!actualLinker.exists()) {
+            Log.w(TAG, "Rootfs linker not found: ${actualLinker.absolutePath}")
+            return
+        }
+
+        // Create a bin directory in rootfs for Box64
+        val rootfsBinDir = File(rootfsDir, "usr/local/bin")
+        rootfsBinDir.mkdirs()
+
+        val rootfsBox64 = File(rootfsBinDir, "box64")
+
+        try {
+            // Copy Box64 to rootfs if not already there
+            if (!rootfsBox64.exists() && box64Binary.exists()) {
+                box64Binary.copyTo(rootfsBox64, overwrite = true)
+                rootfsBox64.setExecutable(true, false)
+                Log.i(TAG, "Copied Box64 to rootfs: ${rootfsBox64.absolutePath}")
+
+                // Patch the copied Box64's interpreter path to use rootfs linker
+                val rootfsLinkerPath = "${rootfsDir.absolutePath}/usr/lib/ld-linux-aarch64.so.1"
+                val patchResult = ElfPatcher.patchInterpreterPath(rootfsBox64, rootfsLinkerPath)
+                if (patchResult.isSuccess) {
+                    Log.i(TAG, "Patched rootfs Box64 interpreter to: $rootfsLinkerPath")
+                } else {
+                    Log.w(TAG, "Failed to patch rootfs Box64 interpreter: ${patchResult.exceptionOrNull()?.message}")
+                }
+            } else if (rootfsBox64.exists()) {
+                Log.d(TAG, "Box64 already exists in rootfs: ${rootfsBox64.absolutePath}")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not setup Box64 in rootfs: ${e.message}")
         }
     }
 

@@ -4,7 +4,9 @@ import android.content.Context
 import android.util.Log
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
+import com.steamdeck.mobile.data.local.database.entity.Box64Preset
 import com.steamdeck.mobile.data.local.database.entity.SteamInstallStatus
+import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -32,23 +34,66 @@ class SteamSetupManager @Inject constructor(
      * Steam インストール結果
      */
     sealed class SteamInstallResult {
-        data class Success(val installPath: String) : SteamInstallResult()
+        data class Success(
+            val installPath: String,
+            val containerId: String
+        ) : SteamInstallResult()
         data class Error(val message: String) : SteamInstallResult()
         data class Progress(val progress: Float, val message: String) : SteamInstallResult()
     }
 
     /**
      * Steam Client をインストール
+     *
+     * @param containerId Winlatorコンテナ ID (String型)
+     * @param progressCallback インストール進捗コールバック
      */
     suspend fun installSteam(
-        containerId: Long,
+        containerId: String,
         progressCallback: ((Float, String) -> Unit)? = null
     ): Result<SteamInstallResult> = withContext(Dispatchers.IO) {
         try {
-            progressCallback?.invoke(0.1f, "Downloading Steam installer...")
             Log.i(TAG, "Starting Steam installation for container: $containerId")
 
+            // 0. Winlatorエミュレータを初期化（Box64/Wine展開）
+            progressCallback?.invoke(0.0f, "Checking Winlator initialization...")
+            val available = winlatorEmulator.isAvailable().getOrNull() ?: false
+
+            if (!available) {
+                Log.w(TAG, "Winlator not initialized - starting initialization (this may take 2-3 minutes)...")
+
+                // Winlatorを初期化（Box64/Wineバイナリを展開）
+                // 進捗: 0.0 ~ 0.4 (40%)
+                val initResult = winlatorEmulator.initialize { progress, message ->
+                    // Map 0.0-1.0 progress to 0.0-0.4 range
+                    progressCallback?.invoke(progress * 0.4f, message)
+                }
+
+                if (initResult.isFailure) {
+                    val error = initResult.exceptionOrNull()
+                    Log.e(TAG, "Winlator initialization failed", error)
+                    return@withContext Result.success(
+                        SteamInstallResult.Error(
+                            "Winlator環境の初期化に失敗しました。\n\n" +
+                            "エラー: ${error?.message}\n\n" +
+                            "解決方法:\n" +
+                            "• ストレージ空き容量を確認（最低500MB必要）\n" +
+                            "• アプリを再起動してください\n" +
+                            "• 端末を再起動してください"
+                        )
+                    )
+                }
+
+                Log.i(TAG, "Winlator initialization completed successfully")
+            } else {
+                Log.i(TAG, "Winlator already initialized, skipping initialization")
+            }
+
+            // 進捗: 0.4 ~ 0.5 (10%)
+            progressCallback?.invoke(0.4f, "Downloading Steam installer...")
+
             // 1. Steam インストーラーをダウンロード
+            // 進捗: 0.4 ~ 0.5 (10%)
             val installerResult = steamInstallerService.downloadInstaller()
             if (installerResult.isFailure) {
                 return@withContext Result.success(
@@ -59,7 +104,8 @@ class SteamSetupManager @Inject constructor(
             val installerFile = installerResult.getOrNull()!!
             Log.i(TAG, "Installer downloaded: ${installerFile.absolutePath}")
 
-            progressCallback?.invoke(0.3f, "Preparing container...")
+            // 進捗: 0.5 ~ 0.6 (10%)
+            progressCallback?.invoke(0.5f, "Preparing container...")
 
             // 2. コンテナを取得または作成
             val containerResult = getOrCreateContainer(containerId)
@@ -72,7 +118,8 @@ class SteamSetupManager @Inject constructor(
             val container = containerResult.getOrNull()!!
             Log.i(TAG, "Using container: ${container.name} (${container.id})")
 
-            progressCallback?.invoke(0.5f, "Installing Steam in Wine...")
+            // 進捗: 0.6 ~ 0.65 (5%)
+            progressCallback?.invoke(0.6f, "Copying installer to container...")
 
             // 3. インストーラーをコンテナにコピー
             val containerInstallerPath = copyInstallerToContainer(container, installerFile)
@@ -85,21 +132,30 @@ class SteamSetupManager @Inject constructor(
             val containerInstaller = containerInstallerPath.getOrNull()!!
             Log.i(TAG, "Installer copied to container: ${containerInstaller.absolutePath}")
 
-            progressCallback?.invoke(0.7f, "Running Steam installer...")
+            // 進捗: 0.65 ~ 0.95 (30%)
+            progressCallback?.invoke(0.65f, "Running Steam installer (this may take a few minutes)...")
 
             // 4. Wine 経由で Steam インストーラーを実行
-            val installResult = runSteamInstaller(container, containerInstaller)
+            val installResult = runSteamInstaller(
+                container = container,
+                installerFile = containerInstaller,
+                progressCallback = { installProgress ->
+                    // Map installer progress (0.0-1.0) to 0.65-0.95 range
+                    progressCallback?.invoke(0.65f + installProgress * 0.3f, "Installing Steam Client...")
+                }
+            )
             if (installResult.isFailure) {
                 return@withContext Result.success(
                     SteamInstallResult.Error("Failed to run installer: ${installResult.exceptionOrNull()?.message}")
                 )
             }
 
-            progressCallback?.invoke(0.9f, "Finalizing installation...")
+            // 進捗: 0.95 ~ 1.0 (5%)
+            progressCallback?.invoke(0.95f, "Finalizing installation...")
 
-            // 5. インストール情報を保存
+            // 5. インストール情報を保存 (container.id は既にString型)
             steamInstallerService.saveInstallation(
-                containerId = containerId.toString(),
+                containerId = container.id,
                 installPath = DEFAULT_STEAM_PATH,
                 status = SteamInstallStatus.INSTALLED
             )
@@ -107,7 +163,10 @@ class SteamSetupManager @Inject constructor(
             progressCallback?.invoke(1.0f, "Installation complete")
             Log.i(TAG, "Steam installation completed successfully")
 
-            Result.success(SteamInstallResult.Success(DEFAULT_STEAM_PATH))
+            Result.success(SteamInstallResult.Success(
+                installPath = DEFAULT_STEAM_PATH,
+                containerId = container.id
+            ))
 
         } catch (e: Exception) {
             Log.e(TAG, "Steam installation failed", e)
@@ -117,13 +176,39 @@ class SteamSetupManager @Inject constructor(
 
     /**
      * コンテナを取得または作成
+     *
+     * @param containerId Winlatorコンテナ ID (String型)
      */
-    private suspend fun getOrCreateContainer(containerId: Long): Result<com.steamdeck.mobile.domain.emulator.EmulatorContainer> =
+    private suspend fun getOrCreateContainer(containerId: String): Result<com.steamdeck.mobile.domain.emulator.EmulatorContainer> =
         withContext(Dispatchers.IO) {
             try {
-                // データベースからコンテナ情報を取得
-                val containerEntity = database.winlatorContainerDao().getContainerById(containerId)
-                    ?: return@withContext Result.failure(Exception("Container not found in database"))
+                // コンテナIDをLongに変換してデータベース検索（データベースは既存のLong型を維持）
+                val containerIdLong = containerId.toLongOrNull()
+                var containerEntity = if (containerIdLong != null) {
+                    database.winlatorContainerDao().getContainerById(containerIdLong)
+                } else {
+                    null
+                }
+
+                // コンテナが存在しない場合はデータベースに新規作成
+                if (containerEntity == null) {
+                    Log.w(TAG, "Container $containerId not found in database, creating default container...")
+                    val newEntity = WinlatorContainerEntity(
+                        id = containerIdLong ?: 0, // Long型で保存、0の場合はauto-generate
+                        name = "Steam Client",
+                        box64Preset = Box64Preset.STABILITY, // Steamには安定性重視
+                        wineVersion = "9.0+"
+                    )
+
+                    try {
+                        val newId = database.winlatorContainerDao().insertContainer(newEntity)
+                        Log.i(TAG, "Created default container entity with ID: $newId")
+                        containerEntity = newEntity.copy(id = newId)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to create default container entity", e)
+                        return@withContext Result.failure(Exception("Failed to create container in database: ${e.message}"))
+                    }
+                }
 
                 // Winlatorからコンテナリストを取得
                 val containersResult = winlatorEmulator.listContainers()
@@ -135,8 +220,8 @@ class SteamSetupManager @Inject constructor(
 
                 val containers = containersResult.getOrNull() ?: emptyList()
 
-                // コンテナIDでマッチングを試みる
-                val container = containers.firstOrNull { it.id == containerId.toString() }
+                // コンテナIDでマッチングを試みる (String型で比較)
+                val container = containers.firstOrNull { it.id == containerId }
 
                 if (container != null) {
                     return@withContext Result.success(container)
@@ -192,10 +277,16 @@ class SteamSetupManager @Inject constructor(
 
     /**
      * Wine 経由で Steam インストーラーを実行
+     *
+     * インストール完了検証を強化:
+     * 1. プロセス終了を待機
+     * 2. steam.exe の存在確認 (最大3回リトライ)
+     * 3. タイムアウト時はエラーを返す
      */
     private suspend fun runSteamInstaller(
         container: com.steamdeck.mobile.domain.emulator.EmulatorContainer,
-        installerFile: File
+        installerFile: File,
+        progressCallback: ((Float) -> Unit)? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             // Steam インストーラーをサイレントモードで実行
@@ -227,25 +318,64 @@ class SteamSetupManager @Inject constructor(
             var waitTime = 0L
             val maxWaitTime = 5 * 60 * 1000L // 5 minutes
             val checkInterval = 2000L // 2 seconds
+            var processCompleted = false
 
             while (waitTime < maxWaitTime) {
                 val statusResult = winlatorEmulator.getProcessStatus(process.id)
                 val isRunning = statusResult.getOrNull()?.isRunning ?: false
                 if (!isRunning) {
-                    Log.i(TAG, "Steam installer completed")
+                    Log.i(TAG, "Steam installer process completed")
+                    processCompleted = true
+                    progressCallback?.invoke(0.9f)
                     break
                 }
+
+                // Update progress based on elapsed time
+                val progress = (waitTime.toFloat() / maxWaitTime.toFloat()).coerceIn(0f, 0.85f)
+                progressCallback?.invoke(progress)
 
                 kotlinx.coroutines.delay(checkInterval)
                 waitTime += checkInterval
             }
 
-            if (waitTime >= maxWaitTime) {
-                Log.w(TAG, "Steam installer timeout after 5 minutes")
-                // タイムアウトでも成功として扱う（バックグラウンドで完了する可能性）
+            if (!processCompleted) {
+                Log.e(TAG, "Steam installer timeout after 5 minutes")
+                return@withContext Result.failure(
+                    Exception(
+                        "Steam インストーラーがタイムアウトしました (5分)。\n" +
+                        "端末のストレージ容量を確認してください。"
+                    )
+                )
             }
 
-            Result.success(Unit)
+            // インストール完了を検証: steam.exe の存在確認 (最大3回リトライ)
+            val steamExe = File(container.rootPath, "drive_c/Program Files (x86)/Steam/steam.exe")
+            var retryCount = 0
+            val maxRetries = 3
+            val retryDelay = 2000L // 2 seconds
+
+            while (retryCount < maxRetries) {
+                if (steamExe.exists()) {
+                    Log.i(TAG, "Steam installation verified: ${steamExe.absolutePath}")
+                    progressCallback?.invoke(1.0f)
+                    return@withContext Result.success(Unit)
+                }
+
+                retryCount++
+                Log.w(TAG, "steam.exe not found, retry $retryCount/$maxRetries")
+                progressCallback?.invoke(0.9f + (retryCount.toFloat() / maxRetries.toFloat()) * 0.1f)
+                kotlinx.coroutines.delay(retryDelay)
+            }
+
+            // 検証失敗
+            Log.e(TAG, "Steam installation verification failed: steam.exe not found at ${steamExe.absolutePath}")
+            return@withContext Result.failure(
+                Exception(
+                    "Steam インストールの検証に失敗しました。\n" +
+                    "steam.exe が見つかりません: ${steamExe.absolutePath}\n\n" +
+                    "再試行してください。"
+                )
+            )
 
         } catch (e: Exception) {
             Log.e(TAG, "Failed to run Steam installer", e)
@@ -259,5 +389,12 @@ class SteamSetupManager @Inject constructor(
     suspend fun isSteamInstalled(): Boolean = withContext(Dispatchers.IO) {
         val installation = steamInstallerService.getInstallation()
         installation?.status == SteamInstallStatus.INSTALLED
+    }
+
+    /**
+     * Steam インストール情報を取得
+     */
+    suspend fun getSteamInstallation() = withContext(Dispatchers.IO) {
+        steamInstallerService.getInstallation()
     }
 }

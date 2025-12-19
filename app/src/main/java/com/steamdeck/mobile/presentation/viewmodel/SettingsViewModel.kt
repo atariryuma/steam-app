@@ -247,7 +247,7 @@ class SettingsViewModel @Inject constructor(
       containerId = installation.containerId
      )
     } else {
-     SteamInstallState.NotInstalled("Steam Client installationされていません")
+     SteamInstallState.NotInstalled("Steam Client is not installed")
     }
 
     AppLogger.d(TAG, "Steam installation check: installed=${installation != null}, containerId=${installation?.containerId}")

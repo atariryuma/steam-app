@@ -44,17 +44,17 @@
     <string name="error_invalid_input">Invalid input</string>
 
     <!-- Steam API Key Related -->
-    <string name="error_steam_api_key_not_configured">Steam Web API Key is not configured. Please register your API Key in Settings.\nGet it here: https://steamcommunity.com/dev/apikey</string>
-    <string name="error_steam_api_key_invalid">Invalid API Key (must be 32 hexadecimal characters)</string>
+    <string name="error_steam_api_key_not_configured">Steam Web API Key is not configured. Please add your API Key in Settings.\n\nGet your key at: https://steamcommunity.com/dev/apikey</string>
+    <string name="error_steam_api_key_invalid">Invalid API Key format (must be exactly 32 hexadecimal characters)</string>
     <string name="settings_steam_api_key_hint">Steam Web API Key (32 characters)</string>
     <string name="settings_steam_api_key_save">Save API Key</string>
     <string name="settings_steam_api_key_saved">API Key saved successfully</string>
-    <string name="settings_steam_api_key_info">To get your Steam Web API Key:\n1. Visit https://steamcommunity.com/dev/apikey\n2. Log in with your Steam account\n3. Enter any domain name (e.g., localhost)\n4. Copy the generated 32-character key</string>
+    <string name="settings_steam_api_key_info">How to get your Steam Web API Key:\n\n1. Visit https://steamcommunity.com/dev/apikey\n2. Sign in with your Steam account\n3. Enter any domain name (e.g., localhost)\n4. Copy the 32-character key that is generated</string>
 
     <!-- Steam Sync Errors -->
-    <string name="error_steam_profile_private">Your Steam profile is private. Please set your profile to public in Steam settings.</string>
-    <string name="error_steam_auth_failed">Steam API authentication error. Your Steam profile may be private. Please make \"Game details\" public in Steam settings.</string>
-    <string name="error_steam_network_timeout">Network timeout. Please check your connection.</string>
+    <string name="error_steam_profile_private">Your Steam profile is set to private. Please change it to public in your Steam privacy settings.</string>
+    <string name="error_steam_auth_failed">Steam API authentication failed. Your profile may be private - please set \"Game details\" to public in your Steam privacy settings.</string>
+    <string name="error_steam_network_timeout">Network request timed out. Please check your internet connection.</string>
     <string name="error_steam_api">Steam API error: %1$s</string>
 
     <!-- ViewModel Error Messages -->
@@ -86,28 +86,28 @@
     <string name="error_download_failed">Download failed: %1$s</string>
     <string name="error_download_start_failed">Failed to start download: %1$s</string>
     <string name="error_game_info_load_failed">Failed to load game information</string>
-    <string name="error_container_not_configured">Container not configured. Please create a container in Settings.</string>
-    <string name="error_steam_app_id_not_set">Steam App ID not set</string>
-    <string name="error_steam_launch_failed">Failed to launch via Steam</string>
-    <string name="error_steam_launch_unexpected">Unexpected error occurred during Steam launch</string>
+    <string name="error_container_not_configured">Winlator container is not configured. Please create a container in Settings.</string>
+    <string name="error_steam_app_id_not_set">This game has no Steam App ID</string>
+    <string name="error_steam_launch_failed">Failed to launch game via Steam</string>
+    <string name="error_steam_launch_unexpected">An unexpected error occurred while launching the game</string>
     <string name="error_steam_client_launch_failed">Failed to launch Steam Client</string>
-    <string name="error_steam_client_unexpected">Unexpected error occurred during Steam Client launch</string>
+    <string name="error_steam_client_unexpected">An unexpected error occurred while launching Steam Client</string>
 
     <!-- SettingsViewModel -->
-    <string name="error_steam_id_not_found">Steam ID not found. Please log in via QR code.</string>
-    <string name="error_api_key_required">Please enter an API Key</string>
+    <string name="error_steam_id_not_found">Steam ID not found. Please sign in to Steam first.</string>
+    <string name="error_api_key_required">Please enter a Steam Web API Key</string>
     <string name="error_api_key_save_failed">Failed to save API Key: %1$s</string>
-    <string name="error_clear_failed">Failed to clear: %1$s</string>
-    <string name="error_install_status_check_failed">Failed to check installation status: %1$s</string>
-    <string name="error_install_failed">Installation failed: %1$s</string>
+    <string name="error_clear_failed">Failed to clear settings: %1$s</string>
+    <string name="error_install_status_check_failed">Failed to check Steam installation status: %1$s</string>
+    <string name="error_install_failed">Steam Client installation failed: %1$s</string>
     <string name="error_unexpected_error">An unexpected error occurred: %1$s</string>
     <string name="error_steam_launch_failed_detail">Failed to launch Steam Client: %1$s</string>
-    <string name="error_steam_client_launch_unexpected">Unexpected error during Steam Client launch: %1$s</string>
-    <string name="error_uninstall_failed">Uninstallation failed: %1$s</string>
+    <string name="error_steam_client_launch_unexpected">An unexpected error occurred while launching Steam Client: %1$s</string>
+    <string name="error_uninstall_failed">Steam Client uninstallation failed: %1$s</string>
 
     <!-- SteamLoginViewModel -->
-    <string name="error_auth_session_invalid">Authentication session is invalid. Please log in again.</string>
-    <string name="error_auth_steamid_failed">Authentication failed. Could not retrieve SteamID.</string>
+    <string name="error_auth_session_invalid">Your authentication session has expired. Please sign in again.</string>
+    <string name="error_auth_steamid_failed">Authentication failed. Unable to retrieve Steam ID from your account.</string>
 
     <!-- WinlatorInitViewModel -->
     <string name="error_init_failed">Initialization failed</string>
@@ -140,8 +140,8 @@
     <string name="content_desc_error">Error</string>
     <string name="dialog_delete_game_title">Delete \"%1$s\"?</string>
     <string name="dialog_delete_game_message">This will remove the game from your library. Game files will not be deleted.</string>
-    <string name="dialog_steam_launch_error_title">Steam Launch Error</string>
-    <string name="dialog_steam_launch_error_hint">Tip: Install Steam Client from Settings or configure a Winlator container.</string>
+    <string name="dialog_steam_launch_error_title">Failed to Launch Game</string>
+    <string name="dialog_steam_launch_error_hint">To play Steam games, you need to either install Steam Client via Settings or set up a Winlator container.</string>
     <string name="button_delete">Delete</string>
     <string name="button_cancel">Cancel</string>
     <string name="button_open_settings">Open Settings</string>

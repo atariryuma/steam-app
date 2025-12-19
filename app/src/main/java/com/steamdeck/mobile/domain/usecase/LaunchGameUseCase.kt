@@ -161,7 +161,7 @@ class LaunchGameUseCase @Inject constructor(
  private fun validateGameInstallation(game: com.steamdeck.mobile.domain.model.Game): String? {
   // 1. executionfilepath 空白 ないかconfirmation
   if (game.executablePath.isBlank()) {
-   return "executionfile configurationされていません。\ngameinstallationしてfromlaunchplease。"
+   return "Executable file is not configured.\nPlease install the game before launching."
   }
 
   // 2. executionfile existdoかconfirmation

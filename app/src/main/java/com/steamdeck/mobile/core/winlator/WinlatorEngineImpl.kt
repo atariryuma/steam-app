@@ -53,9 +53,8 @@ class WinlatorEngineImpl @Inject constructor(
     if (game.executablePath.isBlank()) {
      Log.w(TAG, "Steam game not downloaded: ${game.name} (AppID: ${game.steamAppId})")
      return LaunchResult.Error(
-      "こ game まだdownloadされていません。\n\n" +
-      "今後 アップデート 、Steamgame \n" +
-      "downloadfeatureadd予定 す。"
+      "This game has not been downloaded yet.\n\n" +
+      "Steam game download functionality will be added in a future update."
      )
     }
    }
@@ -71,12 +70,12 @@ class WinlatorEngineImpl @Inject constructor(
      val error = initResult.exceptionOrNull()
      Log.e(TAG, "Winlator initialization failed", error)
      return LaunchResult.Error(
-      "Winlatorenvironment initialization failuredid。\n\n" +
-      "error: ${error?.message}\n\n" +
-      "解決方法:\n" +
-      "• ストレージ空き容量confirmation（最低500MB必要）\n" +
-      "• アプリ再launchplease\n" +
-      "• 端末再launchplease"
+      "Failed to initialize Winlator environment.\n\n" +
+      "Error: ${error?.message}\n\n" +
+      "Try the following:\n" +
+      "• Check free storage space (minimum 500MB required)\n" +
+      "• Restart the app\n" +
+      "• Restart your device"
      )
     }
     Log.i(TAG, "Winlator initialization completed successfully")
@@ -84,7 +83,7 @@ class WinlatorEngineImpl @Inject constructor(
 
    // 2. executionfile existconfirmation
    if (game.executablePath.isBlank()) {
-    return LaunchResult.Error("executionfile configurationされていません")
+    return LaunchResult.Error("Executable file is not configured")
    }
 
    val execFile = File(game.executablePath)

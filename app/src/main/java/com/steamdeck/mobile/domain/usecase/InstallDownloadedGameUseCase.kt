@@ -44,7 +44,7 @@ class InstallDownloadedGameUseCase @Inject constructor(
    // 2. gameinformationretrieve
    val gameId = download.gameId
     ?: return@withContext DataResult.Error(
-     AppError.Unknown(Exception("download gameID configurationされていません"))
+     AppError.Unknown(Exception("Download has no associated game ID"))
     )
 
    val game = gameRepository.getGameById(gameId)

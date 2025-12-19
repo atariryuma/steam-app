@@ -182,14 +182,14 @@ class GameDetailViewModel @Inject constructor(
     // ContainerID Steam App IDcheck
     if (game.winlatorContainerId == null) {
      _steamLaunchState.value = SteamLaunchState.Error(
-      "Container settingsされていません。settings画面 Containercreateplease。"
+      "Winlator container is not configured. Please create a container in Settings."
      )
      return@launch
     }
 
     if (game.steamAppId == null) {
      _steamLaunchState.value = SteamLaunchState.Error(
-      "Steam App ID settingsされていません"
+      "This game has no Steam App ID"
      )
      return@launch
     }
@@ -241,7 +241,7 @@ class GameDetailViewModel @Inject constructor(
     // ContainerIDcheck
     if (game.winlatorContainerId == null) {
      _steamLaunchState.value = SteamLaunchState.Error(
-      "Container settingsされていません。settings画面 Containercreateplease。"
+      "Winlator container is not configured. Please create a container in Settings."
      )
      return@launch
     }

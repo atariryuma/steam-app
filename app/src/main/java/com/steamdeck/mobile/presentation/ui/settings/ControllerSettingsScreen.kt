@@ -60,7 +60,7 @@ fun ControllerSettingsScreen(
     IconButton(onClick = onBackClick) {
      Icon(
       imageVector = Icons.Default.ArrowBack,
-      contentDescription = "return",
+      contentDescription = "Back",
       tint = MaterialTheme.colorScheme.primary
      )
     }
@@ -492,7 +492,7 @@ private fun ProfileEditorDialog(
 
     item {
      FilledTonalButton(onClick = onResetToDefault) {
-      Text("default 戻す")
+      Text("Reset to default")
      }
     }
 

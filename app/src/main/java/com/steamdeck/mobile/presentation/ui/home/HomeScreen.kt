@@ -131,7 +131,7 @@ fun BackboneOneStyleContent(
   if (favoriteGames.isNotEmpty()) {
    item {
     GameSection(
-     title = "favorite",
+     title = "Favorites",
      icon = Icons.Default.Favorite,
      games = favoriteGames,
      onGameClick = onGameClick,
@@ -144,7 +144,7 @@ fun BackboneOneStyleContent(
   if (recentGames.isNotEmpty()) {
    item {
     GameSection(
-     title = "最近プレイ",
+     title = "Recently Played",
      icon = Icons.Default.PlayArrow,
      games = recentGames,
      onGameClick = onGameClick,
@@ -157,7 +157,7 @@ fun BackboneOneStyleContent(
   if (steamGames.isNotEmpty()) {
    item {
     GameSection(
-     title = "Steamlibrary",
+     title = "Steam Library",
      icon = Icons.Default.CloudDownload,
      games = steamGames,
      onGameClick = onGameClick,
@@ -170,7 +170,7 @@ fun BackboneOneStyleContent(
   if (importedGames.isNotEmpty()) {
    item {
     GameSection(
-     title = "Import済み",
+     title = "Imported",
      icon = Icons.Default.Folder,
      games = importedGames,
      onGameClick = onGameClick,
@@ -183,7 +183,7 @@ fun BackboneOneStyleContent(
   if (games.isNotEmpty()) {
    item {
     GameSection(
-     title = "all game",
+     title = "All Games",
      icon = Icons.Default.Apps,
      games = games,
      onGameClick = onGameClick,
@@ -217,10 +217,10 @@ fun TopHeader(
   )
   Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
    IconButton(onClick = onAddGameClick) {
-    Icon(Icons.Default.Add, "gameadd")
+    Icon(Icons.Default.Add, "Add Game")
    }
    IconButton(onClick = onSettingsClick) {
-    Icon(Icons.Default.Settings, "settings")
+    Icon(Icons.Default.Settings, "Settings")
    }
   }
  }
@@ -333,7 +333,7 @@ fun GameCard(
      ) {
       Icon(
        imageVector = Icons.Default.Favorite,
-       contentDescription = "favorite",
+       contentDescription = "Favorite",
        modifier = Modifier.padding(4.dp).size(16.dp),
        tint = MaterialTheme.colorScheme.onPrimary
       )
@@ -393,13 +393,13 @@ fun EmptyContent(onAddGame: () -> Unit) {
     tint = MaterialTheme.colorScheme.primary
    )
    Text(
-    text = "game ありません",
+    text = "No games",
     style = MaterialTheme.typography.headlineSmall
    )
    Button(onClick = onAddGame) {
     Icon(Icons.Default.Add, contentDescription = null)
     Spacer(modifier = Modifier.width(8.dp))
-    Text("gameadd")
+    Text("Add Game")
    }
   }
  }
@@ -422,12 +422,12 @@ fun ErrorContent(message: String, onRetry: () -> Unit) {
     tint = MaterialTheme.colorScheme.error
    )
    Text(
-    text = "Error 発生しました",
+    text = "An error occurred",
     style = MaterialTheme.typography.headlineSmall
    )
    Text(message, style = MaterialTheme.typography.bodyMedium)
    Button(onClick = onRetry) {
-    Text("retry")
+    Text("Retry")
    }
   }
  }

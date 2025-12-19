@@ -223,7 +223,7 @@ private fun SettingsNavigationRail(
    ) {
     Icon(
      imageVector = Icons.Default.ArrowBack,
-     contentDescription = "return",
+     contentDescription = "Back",
      tint = MaterialTheme.colorScheme.primary
     )
    }
@@ -238,10 +238,10 @@ private fun SettingsNavigationRail(
    icon = {
     Icon(
      imageVector = Icons.Default.Security,
-     contentDescription = "Steamauthentication"
+     contentDescription = "Steam Auth"
     )
    },
-   label = { Text("authentication") }
+   label = { Text("Auth") }
   )
 
   // Steam Client
@@ -280,7 +280,7 @@ private fun SettingsNavigationRail(
      contentDescription = "controller"
     )
    },
-   label = { Text("操作") }
+   label = { Text("Control") }
   )
 
   // Wine/Winlator
@@ -303,10 +303,10 @@ private fun SettingsNavigationRail(
    icon = {
     Icon(
      imageVector = Icons.Default.Info,
-     contentDescription = "アプリ"
+     contentDescription = "App"
     )
    },
-   label = { Text("アプリ") }
+   label = { Text("App") }
   )
  }
 }
@@ -362,10 +362,10 @@ private fun SettingsContent(
     Text(
      text = when (selectedSection) {
       1 -> "Steam Client"
-      2 -> "library sync"
-      3 -> "controllersettings"
-      4 -> "Wine/Winlatorintegration"
-      5 -> "アプリsettings"
+      2 -> "Library Sync"
+      3 -> "Controller Settings"
+      4 -> "Wine/Winlator"
+      5 -> "App Settings"
       else -> ""
      },
      style = MaterialTheme.typography.headlineMedium,
@@ -410,7 +410,7 @@ private fun LoadingContent(modifier: Modifier = Modifier) {
   CircularProgressIndicator()
   Spacer(modifier = Modifier.height(16.dp))
   Text(
-   text = "settings読み込みin...",
+   text = "Loading settings...",
    style = MaterialTheme.typography.bodyMedium,
    color = MaterialTheme.colorScheme.onSurfaceVariant
   )
@@ -550,7 +550,7 @@ private fun SteamAuthLoggedInSection(
      Spacer(modifier = Modifier.height(8.dp))
 
      Text(
-      text = "Login済み",
+      text = "Logged In",
       style = MaterialTheme.typography.headlineSmall.copy(
        fontWeight = FontWeight.Bold
       ),
@@ -591,7 +591,7 @@ private fun SteamAuthLoggedInSection(
       )
      ) {
       Text(
-       "再Login",
+       "Re-Login",
        style = MaterialTheme.typography.titleMedium.copy(
         fontWeight = FontWeight.Bold
        )
@@ -706,7 +706,7 @@ private fun SteamOpenIdAuthSection(
     
     // タイトル
     Text(
-     text = "アカウント サインイン",
+     text = "Sign In",
      style = MaterialTheme.typography.titleLarge.copy(
       fontWeight = FontWeight.Normal
      ),
@@ -741,7 +741,7 @@ private fun SteamOpenIdAuthSection(
       contentAlignment = Alignment.Center
      ) {
       Text(
-       text = "Steam サインイン",
+       text = "Sign In with Steam",
        style = MaterialTheme.typography.titleMedium.copy(
         fontWeight = FontWeight.Bold,
         letterSpacing = 0.5.sp
@@ -755,7 +755,7 @@ private fun SteamOpenIdAuthSection(
     
     // サブテキスト
     Text(
-     text = "Steam公式authentication（OpenID 2.0）",
+     text = "Official Steam Authentication (OpenID 2.0)",
      style = MaterialTheme.typography.bodySmall,
      color = steamGray
     )
@@ -807,7 +807,7 @@ private fun SteamClientContent(
       )
       Spacer(modifier = Modifier.width(16.dp))
       Text(
-       text = "confirmin...",
+       text = "Checking...",
        style = MaterialTheme.typography.bodyLarge,
        color = Color(0xFFC7D5E0)
       )
@@ -843,7 +843,7 @@ private fun SteamClientContent(
         color = Color.White
        )
        Text(
-        text = "未installation",
+        text = "Not Installed",
         style = MaterialTheme.typography.bodyMedium,
         color = Color(0xFF8F98A0)
        )
@@ -860,7 +860,7 @@ private fun SteamClientContent(
 
      // Description
      Text(
-      text = "Wine環境 Steam Clientinstallationdoこ 、Steamvia gamelaunch きます。",
+      text = "Install Steam Client in Wine environment to launch games via Steam.",
       style = MaterialTheme.typography.bodyMedium,
       color = Color(0xFFC7D5E0),
       lineHeight = 22.sp
@@ -888,7 +888,7 @@ private fun SteamClientContent(
          modifier = Modifier.size(20.dp)
         )
         Text(
-         text = "installation情報",
+         text = "Installation Info",
          style = MaterialTheme.typography.titleSmall.copy(
           fontWeight = FontWeight.Bold
          ),
@@ -896,7 +896,7 @@ private fun SteamClientContent(
         )
        }
        Text(
-        text = "• downloadSize: 約100MB\n• installation時間: 2〜3minutes\n• 初回 みBox64/Wine環境 展開 必要 す",
+        text = "• Download size: ~100MB\n• Install time: 2-3 minutes\n• First time requires Box64/Wine setup",
         style = MaterialTheme.typography.bodySmall,
         color = Color(0xFF8F98A0),
         lineHeight = 20.sp
@@ -939,7 +939,7 @@ private fun SteamClientContent(
          tint = Color.White
         )
         Text(
-         text = "Steam Clientinstallation",
+         text = "Install Steam Client",
          style = MaterialTheme.typography.titleMedium.copy(
           fontWeight = FontWeight.Bold
          ),
@@ -983,7 +983,7 @@ private fun SteamClientContent(
         color = Color.White
        )
        Text(
-        text = "installation済み",
+        text = "Installed",
         style = MaterialTheme.typography.bodyMedium,
         color = Color(0xFF5BA82E)
        )
@@ -1004,7 +1004,7 @@ private fun SteamClientContent(
       color = Color(0xFF2A475E).copy(alpha = 0.3f)
      ) {
       Text(
-       text = "installationパス:\n${state.installPath}",
+       text = "Install path:\n${state.installPath}",
        style = MaterialTheme.typography.bodySmall.copy(
         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
        ),
@@ -1050,7 +1050,7 @@ private fun SteamClientContent(
          tint = Color.White
         )
         Text(
-         text = "Steam Clientopen",
+         text = "Open Steam Client",
          style = MaterialTheme.typography.titleMedium.copy(
           fontWeight = FontWeight.Bold
          ),
@@ -1076,7 +1076,7 @@ private fun SteamClientContent(
        modifier = Modifier.size(18.dp)
       )
       Spacer(modifier = Modifier.width(6.dp))
-      Text("アンinstallation")
+      Text("Uninstall")
      }
     }
 
@@ -1109,7 +1109,7 @@ private fun SteamClientContent(
         color = Color(0xFFFF6B6B)
        )
        Text(
-        text = "installation failed",
+        text = "Installation Failed",
         style = MaterialTheme.typography.bodyMedium,
         color = Color(0xFF8F98A0)
        )
@@ -1136,7 +1136,7 @@ private fun SteamClientContent(
        verticalArrangement = Arrangement.spacedBy(12.dp)
       ) {
        Text(
-        text = "Error詳細:",
+        text = "Error Details:",
         style = MaterialTheme.typography.titleSmall.copy(
          fontWeight = FontWeight.Bold
         ),
@@ -1186,7 +1186,7 @@ private fun SteamClientContent(
          tint = Color.White
         )
         Text(
-         text = "retry",
+         text = "Retry",
          style = MaterialTheme.typography.titleMedium.copy(
           fontWeight = FontWeight.Bold
          ),
@@ -1222,7 +1222,7 @@ private fun LibrarySyncContent(
    verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
    Text(
-    text = "最終Sync: ${data.lastSyncFormatted}",
+    text = "Last Sync: ${data.lastSyncFormatted}",
     style = MaterialTheme.typography.bodyLarge,
     color = MaterialTheme.colorScheme.onSurfaceVariant
    )
@@ -1258,13 +1258,13 @@ private fun LibrarySyncContent(
     )
     Spacer(modifier = Modifier.width(8.dp))
     Text(
-     text = if (syncState is SyncState.Syncing) "Syncin..." else "library sync"
+     text = if (syncState is SyncState.Syncing) "Syncing..." else "Library Sync"
     )
    }
 
    if (!data.isSteamConfigured) {
     Text(
-     text = "※ Steamauthentication 必要 す",
+     text = "※ Steam authentication required",
      style = MaterialTheme.typography.bodySmall,
      color = MaterialTheme.colorScheme.error
     )
@@ -1292,7 +1292,7 @@ private fun ControllerContent(
    verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
    Text(
-    text = "gamecontroller ボタンマッピング プロファイル管理",
+    text = "Manage game controller button mapping and profiles",
     style = MaterialTheme.typography.bodyMedium,
     color = MaterialTheme.colorScheme.onSurfaceVariant
    )
@@ -1303,10 +1303,10 @@ private fun ControllerContent(
    ) {
     Icon(
      imageVector = Icons.Default.SportsEsports,
-     contentDescription = "controllersettings"
+     contentDescription = "Controller Settings"
     )
     Spacer(modifier = Modifier.width(8.dp))
-    Text("controllersettingsopen")
+    Text("Open Controller Settings")
    }
   }
  }
@@ -1331,7 +1331,7 @@ private fun WineTestContent(
    verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
    Text(
-    text = "🚧 Windowsgame実行環境（実験的機能）",
+    text = "🚧 Windows game runtime (experimental)",
     style = MaterialTheme.typography.bodyMedium,
     color = MaterialTheme.colorScheme.onSurfaceVariant
    )
@@ -1345,11 +1345,11 @@ private fun WineTestContent(
      contentDescription = "Test"
     )
     Spacer(modifier = Modifier.width(8.dp))
-    Text("Wine環境Test")
+    Text("Test Wine Environment")
    }
 
    Text(
-    text = "※ Wine環境 download 必要 す (~100MB)",
+    text = "※ Wine environment download required (~100MB)",
     style = MaterialTheme.typography.bodySmall,
     color = MaterialTheme.colorScheme.error
    )
@@ -1374,7 +1374,7 @@ private fun AppSettingsContent() {
    verticalArrangement = Arrangement.spacedBy(12.dp)
   ) {
    Text(
-    text = "🚧 テーマ切り替え、言語settingsなど 今後実装予定 す",
+    text = "🚧 Theme switching, language settings coming soon",
     style = MaterialTheme.typography.bodyMedium,
     color = MaterialTheme.colorScheme.onSurfaceVariant
    )
@@ -1395,7 +1395,7 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
   ) {
    Column {
     Text(
-     text = "Steam Clientinstallationin",
+     text = "Installing Steam Client",
      style = MaterialTheme.typography.titleLarge.copy(
       fontWeight = FontWeight.Bold
      ),
@@ -1452,7 +1452,7 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
       modifier = Modifier.size(20.dp)
      )
      Text(
-      text = if (state.progress < 0.4f) "Winlator initializationin" else "installationin",
+      text = if (state.progress < 0.4f) "Initializing Winlator" else "Installing",
       style = MaterialTheme.typography.titleSmall.copy(
        fontWeight = FontWeight.Bold
       ),
@@ -1462,9 +1462,9 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
 
     Text(
      text = if (state.progress < 0.4f) {
-      "初回 みBox64/Wineバイナリ展開しています。\nこ 処理 2〜3minutesかかる場合 あります。"
+      "Extracting Box64/Wine binaries (first time only).\nThis may take 2-3 minutes."
      } else {
-      "Steamインストーラー実行しています。\nCompleteま しばらくお待ちください。"
+      "Running Steam installer.\nPlease wait for completion."
      },
      style = MaterialTheme.typography.bodySmall,
      color = Color(0xFF8F98A0),
@@ -1492,7 +1492,7 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
      modifier = Modifier.size(20.dp)
     )
     Text(
-     text = "installationin 画面閉じない ください",
+     text = "Do not close this screen during installation",
      style = MaterialTheme.typography.bodySmall.copy(
       fontWeight = FontWeight.Bold
      ),

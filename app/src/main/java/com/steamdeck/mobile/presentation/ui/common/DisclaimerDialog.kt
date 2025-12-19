@@ -50,7 +50,7 @@ fun DisclaimerDialog(
   },
   title = {
    Text(
-    text = "重要な法的通知",
+    text = "Important Legal Notice",
     style = MaterialTheme.typography.headlineSmall.copy(
      fontWeight = FontWeight.Bold
     )
@@ -63,7 +63,7 @@ fun DisclaimerDialog(
      .verticalScroll(rememberScrollState())
    ) {
     Text(
-     text = "本アプリケーション Valve Corporation 提携、承認、また 推奨されていません。",
+     text = "This application is not affiliated with, endorsed, or sponsored by Valve Corporation.",
      style = MaterialTheme.typography.bodyMedium.copy(
       fontWeight = FontWeight.Bold
      ),
@@ -82,7 +82,7 @@ fun DisclaimerDialog(
     Spacer(modifier = Modifier.height(16.dp))
 
     Text(
-     text = "本アプリusedoこ 、以下認識した みなされます:",
+     text = "By using this app, you acknowledge the following:",
      style = MaterialTheme.typography.bodyMedium.copy(
       fontWeight = FontWeight.Bold
      )
@@ -91,10 +91,10 @@ fun DisclaimerDialog(
     Spacer(modifier = Modifier.height(8.dp))
 
     val risks = listOf(
-     "これ 非公式 サードパーティアプリケーション す",
-     "Steam利用規約 違反do可能性 あります",
-     "Steamアカウント stopまた BANされる可能性 あります",
-     "全て リスク ユーザー自身 負うも します"
+     "This is an unofficial third-party application",
+     "This may violate Steam Terms of Service",
+     "Your Steam account may be suspended or banned",
+     "All risks are assumed by the user"
     )
 
     risks.forEach { risk ->
@@ -108,7 +108,7 @@ fun DisclaimerDialog(
     Spacer(modifier = Modifier.height(16.dp))
 
     Text(
-     text = "本アプリ 「現状 まま」提供され、いかなる保証もありません。",
+     text = "This app is provided \"as is\" without any warranty.",
      style = MaterialTheme.typography.bodySmall.copy(
       fontWeight = FontWeight.Bold
      )
@@ -122,7 +122,7 @@ fun DisclaimerDialog(
      containerColor = MaterialTheme.colorScheme.error
     )
    ) {
-    Text("リスク理解し同意します")
+    Text("I Understand and Accept the Risks")
    }
   },
   dismissButton = {

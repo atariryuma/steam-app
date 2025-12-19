@@ -580,7 +580,7 @@ fun ErrorContent(
     color = MaterialTheme.colorScheme.onSurfaceVariant
    )
    Button(onClick = onNavigateBack) {
-    Text("return")
+    Text("Back")
    }
   }
  }
@@ -689,7 +689,7 @@ fun SplitLaunchButton(
        Text("Steamvia launch")
        if (!isSteamInstalled) {
         Text(
-         text = "(未installation)",
+         text = "(Not Installed)",
          style = MaterialTheme.typography.bodySmall,
          color = MaterialTheme.colorScheme.error
         )
@@ -723,7 +723,7 @@ fun SplitLaunchButton(
        Text("Steam Clientopen")
        if (!isSteamInstalled) {
         Text(
-         text = "(未installation)",
+         text = "(Not Installed)",
          style = MaterialTheme.typography.bodySmall,
          color = MaterialTheme.colorScheme.error
         )
@@ -754,7 +754,7 @@ fun SplitLaunchButton(
      onNavigateToSettings()
     },
     leadingIcon = {
-     Icon(Icons.Default.Settings, contentDescription = "settings")
+     Icon(Icons.Default.Settings, contentDescription = "Settings")
     }
    )
   }

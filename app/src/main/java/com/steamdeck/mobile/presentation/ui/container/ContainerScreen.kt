@@ -64,7 +64,7 @@ fun ContainerScreen(
     IconButton(onClick = onNavigateBack) {
      Icon(
       imageVector = Icons.Default.ArrowBack,
-      contentDescription = "return",
+      contentDescription = "Back",
       tint = MaterialTheme.colorScheme.primary
      )
     }
@@ -206,7 +206,7 @@ private fun EmptyContainersPlaceholder(
   ) {
    Icon(
     imageVector = Icons.Default.FolderOpen,
-    contentDescription = "空",
+    contentDescription = "Empty",
     modifier = Modifier.size(64.dp),
     tint = MaterialTheme.colorScheme.outline
    )
@@ -318,7 +318,7 @@ private fun CreateContainerDialog(
     OutlinedTextField(
      value = containerName,
      onValueChange = { containerName = it },
-     label = { Text("Container名") },
+     label = { Text("Container Name") },
      singleLine = true,
      modifier = Modifier.fillMaxWidth()
     )

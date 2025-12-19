@@ -86,10 +86,10 @@ private fun WineTestNavigationRail(onNavigateBack: () -> Unit) {
    icon = {
     Icon(
      imageVector = Icons.Default.ArrowBack,
-     contentDescription = "return"
+     contentDescription = "Back"
     )
    },
-   label = { Text("return", fontSize = 11.sp) }
+   label = { Text("Back", fontSize = 11.sp) }
   )
 
   Spacer(modifier = Modifier.weight(1f))

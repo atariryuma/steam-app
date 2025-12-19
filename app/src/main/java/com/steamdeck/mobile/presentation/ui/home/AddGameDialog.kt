@@ -103,12 +103,12 @@ fun AddGameDialog(
       IconButton(onClick = onDismiss) {
        Icon(
         imageVector = Icons.Default.ArrowBack,
-        contentDescription = "return",
+        contentDescription = "Back",
         tint = MaterialTheme.colorScheme.primary
        )
       }
       Text(
-       text = "gameadd",
+       text = "Add Game",
        style = MaterialTheme.typography.headlineMedium,
        fontWeight = FontWeight.Bold,
        color = MaterialTheme.colorScheme.primary
@@ -129,7 +129,7 @@ fun AddGameDialog(
      ) {
       Icon(Icons.Default.Add, contentDescription = null)
       Spacer(modifier = Modifier.width(8.dp))
-      Text("add")
+      Text("Add")
      }
     }
 
@@ -157,7 +157,7 @@ fun AddGameDialog(
        verticalArrangement = Arrangement.spacedBy(12.dp)
       ) {
        Text(
-        text = "game名",
+        text = "Game Name",
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary
@@ -202,14 +202,14 @@ fun AddGameDialog(
        OutlinedTextField(
         value = displayExecutablePath,
         onValueChange = { },
-        placeholder = { Text("ファイル選択ボタン from 選択") },
+        placeholder = { Text("Select using file picker") },
         isError = showError && selectedExecutablePath.isBlank(),
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         readOnly = true,
         trailingIcon = {
          IconButton(onClick = onSelectExecutable) {
-          Icon(Icons.Default.Folder, contentDescription = "ファイル選択")
+          Icon(Icons.Default.Folder, contentDescription = "Select File")
          }
         }
        )
@@ -232,7 +232,7 @@ fun AddGameDialog(
        verticalArrangement = Arrangement.spacedBy(12.dp)
       ) {
        Text(
-        text = "installationフォルダ",
+        text = "Install Folder",
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary
@@ -241,14 +241,14 @@ fun AddGameDialog(
        OutlinedTextField(
         value = displayInstallPath,
         onValueChange = { },
-        placeholder = { Text("フォルダ選択ボタン from 選択") },
+        placeholder = { Text("Select using folder picker") },
         isError = showError && selectedInstallPath.isBlank(),
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         readOnly = true,
         trailingIcon = {
          IconButton(onClick = onSelectInstallFolder) {
-          Icon(Icons.Default.Folder, contentDescription = "フォルダ選択")
+          Icon(Icons.Default.Folder, contentDescription = "Select Folder")
          }
         }
        )
@@ -266,7 +266,7 @@ fun AddGameDialog(
        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
       ) {
        Text(
-        text = "all 項目入力please",
+        text = "Please fill in all fields",
         color = MaterialTheme.colorScheme.onErrorContainer,
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier.padding(20.dp)
@@ -296,7 +296,7 @@ fun AddGameDialog(
         color = MaterialTheme.colorScheme.onSecondaryContainer
        )
        Text(
-        text = "• Windows .exeファイル指定please\n• installationパス game ルートフォルダ す\n• ファイルピッカー ファイル/フォルダ選択please",
+        text = "• Please specify a Windows .exe file\n• Install path is the game root folder\n• Use file picker to select file/folder",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSecondaryContainer
        )

@@ -55,7 +55,7 @@ fun DownloadScreen(
     IconButton(onClick = onNavigateBack) {
      Icon(
       imageVector = Icons.Default.ArrowBack,
-      contentDescription = "return",
+      contentDescription = "Back",
       tint = MaterialTheme.colorScheme.primary
      )
     }
@@ -254,7 +254,7 @@ private fun DownloadItem(
     when (download.status) {
      DownloadStatus.DOWNLOADING -> {
       IconButton(onClick = onPause) {
-       Icon(Icons.Default.Clear, contentDescription = "一時stop")
+       Icon(Icons.Default.Clear, contentDescription = "Pause")
       }
       IconButton(onClick = onCancel) {
        Icon(Icons.Default.Close, contentDescription = "cancel")
@@ -317,7 +317,7 @@ private fun DownloadStatusIcon(status: DownloadStatus) {
  when (status) {
   DownloadStatus.PENDING -> Icon(
    Icons.Default.Info,
-   contentDescription = "待機in",
+   contentDescription = "Waiting",
    tint = MaterialTheme.colorScheme.outline
   )
 
@@ -329,7 +329,7 @@ private fun DownloadStatusIcon(status: DownloadStatus) {
 
   DownloadStatus.PAUSED -> Icon(
    Icons.Default.Clear,
-   contentDescription = "一時stop",
+   contentDescription = "Pause",
    tint = MaterialTheme.colorScheme.secondary
   )
 

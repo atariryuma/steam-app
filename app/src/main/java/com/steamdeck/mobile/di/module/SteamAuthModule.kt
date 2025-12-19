@@ -2,7 +2,6 @@ package com.steamdeck.mobile.di.module
 
 import android.content.Context
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
-import com.steamdeck.mobile.BuildConfig
 import com.steamdeck.mobile.core.download.DownloadManager
 import com.steamdeck.mobile.core.steam.ProtonManager
 import com.steamdeck.mobile.core.steam.SteamInstallerService
@@ -22,7 +21,6 @@ import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
-import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -81,21 +79,6 @@ object SteamAuthModule {
         steamAuthService: SteamAuthenticationService
     ): SteamAuthRepository {
         return SteamAuthRepositoryImpl(steamAuthService)
-    }
-
-    /**
-     * Embedded Steam Web API Key
-     *
-     * Best Practice: Embedded in app for zero-configuration user experience
-     * Security: Obfuscated by ProGuard/R8 in release builds
-     *
-     * Reference: GameHub approach (https://github.com/tkashkin/GameHub)
-     */
-    @Provides
-    @Singleton
-    @Named("embedded_steam_api_key")
-    fun provideEmbeddedSteamApiKey(): String {
-        return BuildConfig.STEAM_API_KEY
     }
 
     /**

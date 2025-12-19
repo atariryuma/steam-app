@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.WorkManager
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.steamdeck.mobile.core.network.DataResultCallAdapterFactory
 import com.steamdeck.mobile.data.remote.steam.SteamApiService
 import com.steamdeck.mobile.data.remote.steam.SteamCdnService
 import com.steamdeck.mobile.data.remote.steam.SteamCmdApiService
@@ -24,6 +25,10 @@ import javax.inject.Singleton
 
 /**
  * ネットワーク関連の依存性注入モジュール
+ *
+ * Best Practice (2025):
+ * - DataResultCallAdapterFactory for automatic error handling
+ * - Unified error handling across all API calls
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -35,6 +40,17 @@ object NetworkModule {
         return GsonBuilder()
             .setLenient()
             .create()
+    }
+
+    /**
+     * DataResult CallAdapter Factory
+     *
+     * 全てのRetrofit APIコールで自動的にDataResult<T>でラップ
+     */
+    @Provides
+    @Singleton
+    fun provideDataResultCallAdapterFactory(): DataResultCallAdapterFactory {
+        return DataResultCallAdapterFactory()
     }
 
     @Provides
@@ -86,11 +102,13 @@ object NetworkModule {
     @Singleton
     fun provideSteamApiService(
         okHttpClient: OkHttpClient,
-        gson: Gson
+        gson: Gson,
+        callAdapterFactory: DataResultCallAdapterFactory
     ): SteamApiService {
         return Retrofit.Builder()
             .baseUrl(SteamApiService.BASE_URL)
             .client(okHttpClient)
+            .addCallAdapterFactory(callAdapterFactory)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
             .create(SteamApiService::class.java)
@@ -100,11 +118,13 @@ object NetworkModule {
     @Singleton
     fun provideSteamCdnService(
         okHttpClient: OkHttpClient,
-        gson: Gson
+        gson: Gson,
+        callAdapterFactory: DataResultCallAdapterFactory
     ): SteamCdnService {
         return Retrofit.Builder()
             .baseUrl(SteamCdnService.CDN_BASE_URL)
             .client(okHttpClient)
+            .addCallAdapterFactory(callAdapterFactory)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
             .create(SteamCdnService::class.java)
@@ -114,11 +134,13 @@ object NetworkModule {
     @Singleton
     fun provideSteamCmdApiService(
         okHttpClient: OkHttpClient,
-        gson: Gson
+        gson: Gson,
+        callAdapterFactory: DataResultCallAdapterFactory
     ): SteamCmdApiService {
         return Retrofit.Builder()
             .baseUrl(SteamCmdApiService.BASE_URL)
             .client(okHttpClient)
+            .addCallAdapterFactory(callAdapterFactory)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
             .create(SteamCmdApiService::class.java)

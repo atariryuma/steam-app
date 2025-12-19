@@ -5,8 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.steamdeck.mobile.core.steam.SteamLauncher
 import com.steamdeck.mobile.core.steam.SteamSetupManager
-import com.steamdeck.mobile.data.local.preferences.SecureSteamPreferences
-import com.steamdeck.mobile.data.remote.steam.SteamRepository
+import com.steamdeck.mobile.domain.repository.ISecurePreferences
 import com.steamdeck.mobile.domain.usecase.SyncSteamLibraryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,11 +19,12 @@ import javax.inject.Inject
  * Settings画面のViewModel
  *
  * Steam認証、ライブラリ同期、アプリ設定を管理
+ *
+ * Clean Architecture: Only depends on domain layer interfaces
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val steamPreferences: SecureSteamPreferences,
-    private val steamRepository: SteamRepository,
+    private val securePreferences: ISecurePreferences,
     private val syncSteamLibraryUseCase: SyncSteamLibraryUseCase,
     private val steamLauncher: SteamLauncher,
     private val steamSetupManager: SteamSetupManager
@@ -51,13 +51,14 @@ class SettingsViewModel @Inject constructor(
     /**
      * 設定データをロード
      *
-     * Note: API KeyはEmbedded（ユーザー不要）
+     * Note: ユーザーは自身のSteam Web API Keyを登録する必要があります
+     * 取得先: https://steamcommunity.com/dev/apikey
      */
     private fun loadSettings() {
         viewModelScope.launch {
-            val steamIdFlow = steamPreferences.getSteamId()
-            val usernameFlow = steamPreferences.getSteamUsername()
-            val lastSyncFlow = steamPreferences.getLastSyncTimestamp()
+            val steamIdFlow = securePreferences.getSteamId()
+            val usernameFlow = securePreferences.getSteamUsername()
+            val lastSyncFlow = securePreferences.getLastSyncTimestamp()
 
             combine(
                 steamIdFlow,
@@ -93,7 +94,8 @@ class SettingsViewModel @Inject constructor(
     /**
      * Steamライブラリを同期
      *
-     * Best Practice: Embedded API Key使用（ユーザーはSteam IDのみ必要）
+     * Best Practice: ユーザー提供のAPI Key使用
+     * ユーザーは事前にAPI Keyを登録する必要があります
      */
     fun syncSteamLibrary() {
         viewModelScope.launch {
@@ -109,12 +111,12 @@ class SettingsViewModel @Inject constructor(
             _syncState.value = SyncState.Syncing(progress = 0f, message = "同期を開始しています...")
 
             try {
-                // Embedded API Key使用（引数は steamId のみ）
+                // Steam APIからライブラリを取得
                 val result = syncSteamLibraryUseCase(steamId)
 
                 if (result.isSuccess) {
                     val syncedCount = result.getOrNull() ?: 0
-                    steamPreferences.setLastSyncTimestamp(System.currentTimeMillis())
+                    securePreferences.setLastSyncTimestamp(System.currentTimeMillis())
                     _syncState.value = SyncState.Success(syncedCount)
                     loadSettings() // 最終同期日時を更新
                 } else {
@@ -132,6 +134,7 @@ class SettingsViewModel @Inject constructor(
      * Steam API Keyを保存
      *
      * @param apiKey Steam Web API Key（32文字の16進数文字列）
+     * 取得先: https://steamcommunity.com/dev/apikey
      */
     fun saveSteamApiKey(apiKey: String) {
         viewModelScope.launch {
@@ -148,7 +151,7 @@ class SettingsViewModel @Inject constructor(
                 }
 
                 // API Keyを保存
-                steamPreferences.setSteamApiKey(apiKey)
+                securePreferences.saveSteamApiKey(apiKey)
                 android.util.Log.i("SettingsViewModel", "Steam API Key saved successfully")
 
                 _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
@@ -166,7 +169,7 @@ class SettingsViewModel @Inject constructor(
     fun clearSteamSettings() {
         viewModelScope.launch {
             try {
-                steamPreferences.clearSteamSettings()
+                securePreferences.clearSteamSettings()
                 loadSettings()
                 _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
                     successMessage = "Steam設定をクリアしました"

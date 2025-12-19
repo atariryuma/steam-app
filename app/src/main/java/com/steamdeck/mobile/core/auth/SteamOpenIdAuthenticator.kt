@@ -1,6 +1,11 @@
 package com.steamdeck.mobile.core.auth
 
 import android.net.Uri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.FormBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.security.SecureRandom
 import java.util.Base64
 
@@ -18,14 +23,21 @@ import java.util.Base64
  * - OpenID: Valve公式推奨、サードパーティアプリでの使用許可
  * - Web API: Steam公式クライアント専用（QRログイン等）
  *
- * Best Practice:
+ * Best Practice (2025):
  * - ステート検証でCSRF攻撃を防止
+ * - 署名検証でMITM攻撃を防止（OpenID 2.0仕様準拠）
  * - HTTPS必須（ローカル開発時はlocalhost例外）
  * - Claimed IDからSteamID64を抽出
  */
 object SteamOpenIdAuthenticator {
 
     private const val STEAM_OPENID_URL = "https://steamcommunity.com/openid/login"
+
+    // OkHttpClient for verification requests
+    private val httpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .build()
+    }
 
     /**
      * Steam OpenID認証URLを生成
@@ -58,40 +70,121 @@ object SteamOpenIdAuthenticator {
     }
 
     /**
-     * コールバックURLからSteamID64を抽出
+     * コールバックURLからSteamID64を抽出（署名検証付き）
      *
      * Steam OpenIDのclaimed_id形式:
      * https://steamcommunity.com/openid/id/76561197960435530
      *                                    ^^^^^^^^^^^^^^^^^^^
      *                                    SteamID64
      *
+     * Best Practice (2025):
+     * - ステート検証（CSRF対策）
+     * - 署名検証（MITM対策、OpenID 2.0仕様準拠）
+     *
      * @param callbackUrl Steam認証後のコールバックURL
      * @param expectedState 事前に生成したステート値
      * @return SteamID64（認証失敗時はnull）
      */
-    fun extractSteamId(callbackUrl: String, expectedState: String): String? {
+    suspend fun extractSteamId(callbackUrl: String, expectedState: String): String? {
         val uri = Uri.parse(callbackUrl)
 
-        // ステート検証（CSRF対策）
+        // Step 1: ステート検証（CSRF対策）
         val returnedState = uri.getQueryParameter("state")
         if (returnedState != expectedState) {
             android.util.Log.w("SteamOpenIdAuth", "State mismatch: expected=$expectedState, got=$returnedState")
             return null
         }
 
-        // OpenID検証
+        // Step 2: OpenID mode検証
         val mode = uri.getQueryParameter("openid.mode")
         if (mode != "id_res") {
             android.util.Log.w("SteamOpenIdAuth", "Invalid mode: $mode")
             return null
         }
 
-        // Claimed IDからSteamID64を抽出
+        // Step 3: 署名検証（MITM対策）
+        val params = extractOpenIdParams(uri)
+        val isSignatureValid = verifyOpenIdSignature(params)
+        if (!isSignatureValid) {
+            android.util.Log.e("SteamOpenIdAuth", "Signature verification failed - potential MITM attack")
+            return null
+        }
+
+        // Step 4: Claimed IDからSteamID64を抽出
         val claimedId = uri.getQueryParameter("openid.claimed_id") ?: return null
         val steamIdMatch = Regex("""https://steamcommunity\.com/openid/id/(\d+)""")
             .find(claimedId)
 
         return steamIdMatch?.groupValues?.getOrNull(1)
+    }
+
+    /**
+     * OpenID署名検証（OpenID 2.0仕様準拠）
+     *
+     * Reference: https://openid.net/specs/openid-authentication-2_0.html#verifying_assertions
+     *
+     * セキュリティ:
+     * - Steam OpenID Providerに直接検証リクエストを送信
+     * - 署名が有効でない場合は認証を拒否
+     *
+     * @param params OpenIDパラメータ
+     * @return 署名が有効な場合true
+     */
+    private suspend fun verifyOpenIdSignature(params: Map<String, String>): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // OpenID検証リクエストのパラメータを構築
+            val formBodyBuilder = FormBody.Builder()
+
+            // modeをcheck_authenticationに変更
+            params.forEach { (key, value) ->
+                if (key == "openid.mode") {
+                    formBodyBuilder.add(key, "check_authentication")
+                } else if (key.startsWith("openid.")) {
+                    formBodyBuilder.add(key, value)
+                }
+            }
+
+            val request = Request.Builder()
+                .url(STEAM_OPENID_URL)
+                .post(formBodyBuilder.build())
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    android.util.Log.e("SteamOpenIdAuth", "Verification request failed: ${response.code}")
+                    return@withContext false
+                }
+
+                val responseBody = response.body?.string() ?: ""
+                android.util.Log.d("SteamOpenIdAuth", "Verification response: $responseBody")
+
+                // Steam returns "is_valid:true" if signature is valid
+                return@withContext responseBody.contains("is_valid:true")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SteamOpenIdAuth", "Signature verification failed", e)
+            return@withContext false
+        }
+    }
+
+    /**
+     * URIからOpenIDパラメータを抽出
+     *
+     * @param uri コールバックURI
+     * @return OpenIDパラメータのMap
+     */
+    private fun extractOpenIdParams(uri: Uri): Map<String, String> {
+        val params = mutableMapOf<String, String>()
+
+        uri.queryParameterNames.forEach { paramName ->
+            if (paramName.startsWith("openid.")) {
+                uri.getQueryParameter(paramName)?.let { value ->
+                    params[paramName] = value
+                }
+            }
+        }
+
+        return params
     }
 
     /**

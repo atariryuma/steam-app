@@ -27,4 +27,33 @@
     <string name="disclaimer_decline">Decline</string>
 
     <string name="trademark_notice">This app is not affiliated with Valve Corporation.\nSteam and the Steam logo are trademarks of Valve Corporation.</string>
+
+    <!-- Error Messages -->
+    <string name="error_unknown">不明なエラーが発生しました</string>
+    <string name="error_network">ネットワークエラーが発生しました</string>
+    <string name="error_network_with_code">ネットワークエラー (コード: %1$d)</string>
+    <string name="error_auth">認証エラー: %1$s</string>
+    <string name="error_search_failed">検索に失敗しました</string>
+    <string name="error_favorite_update_failed">お気に入りの更新に失敗しました</string>
+    <string name="error_steam_sync_failed">Steam同期に失敗しました: %1$s</string>
+    <string name="error_game_not_found">ゲームが見つかりません</string>
+    <string name="error_database">データベースエラーが発生しました</string>
+    <string name="error_file_not_found">ファイルが見つかりません</string>
+    <string name="error_permission_denied">権限が拒否されました</string>
+    <string name="error_timeout">タイムアウトしました</string>
+    <string name="error_invalid_input">無効な入力です</string>
+
+    <!-- Steam API Key Related -->
+    <string name="error_steam_api_key_not_configured">Steam Web API Keyが設定されていません。設定画面でAPI Keyを登録してください。\n取得先: https://steamcommunity.com/dev/apikey</string>
+    <string name="error_steam_api_key_invalid">無効なAPI Keyです（32文字の16進数である必要があります）</string>
+    <string name="settings_steam_api_key_hint">Steam Web API Key（32文字）</string>
+    <string name="settings_steam_api_key_save">API Keyを保存</string>
+    <string name="settings_steam_api_key_saved">API Keyを保存しました</string>
+    <string name="settings_steam_api_key_info">Steam Web API Keyを取得するには:\n1. https://steamcommunity.com/dev/apikey にアクセス\n2. Steamアカウントでログイン\n3. ドメイン名に任意の文字列を入力（例: localhost）\n4. 生成された32文字のキーをコピー</string>
+
+    <!-- Steam Sync Errors -->
+    <string name="error_steam_profile_private">Steamプロフィールが非公開です。Steamの設定でプロフィールを公開にしてください。</string>
+    <string name="error_steam_auth_failed">Steam API認証エラー。Steamプロフィールが非公開の可能性があります。Steamの設定で「ゲームの詳細」を公開にしてください。</string>
+    <string name="error_steam_network_timeout">ネットワークタイムアウト。接続を確認してください。</string>
+    <string name="error_steam_api">Steam APIエラー: %1$s</string>
 </resources>

@@ -7,6 +7,10 @@ import com.steamdeck.mobile.domain.emulator.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -606,6 +610,41 @@ class WinlatorEmulator @Inject constructor(
             Result.failure(EmulatorException("Failed to get process status: ${e.message}", e))
         }
     }
+
+    override fun monitorProcess(processId: String, intervalMs: Long): Flow<EmulatorProcessStatus> = flow {
+        Log.i(TAG, "Starting process monitoring: $processId (interval: ${intervalMs}ms)")
+
+        try {
+            while (true) {
+                val statusResult = getProcessStatus(processId)
+
+                when {
+                    statusResult.isSuccess -> {
+                        val status = statusResult.getOrThrow()
+                        emit(status)
+
+                        // If process has terminated, complete the flow
+                        if (!status.isRunning) {
+                            Log.i(TAG, "Process terminated: $processId (exitCode: ${status.exitCode})")
+                            break
+                        }
+                    }
+                    else -> {
+                        // Process not found or error - assume terminated
+                        Log.w(TAG, "Process monitoring error: ${statusResult.exceptionOrNull()?.message}")
+                        break
+                    }
+                }
+
+                delay(intervalMs)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Process monitoring failed: $processId", e)
+            // Flow will complete naturally
+        } finally {
+            Log.d(TAG, "Process monitoring stopped: $processId")
+        }
+    }.flowOn(Dispatchers.IO)
 
     override suspend fun killProcess(processId: String, force: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
         try {

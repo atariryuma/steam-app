@@ -1,8 +1,11 @@
 package com.steamdeck.mobile.presentation.ui.game
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -14,11 +17,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.compose.foundation.shape.RoundedCornerShape
 import coil.compose.AsyncImage
+import com.steamdeck.mobile.R
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.presentation.viewmodel.GameDetailUiState
 import com.steamdeck.mobile.presentation.viewmodel.GameDetailViewModel
@@ -168,10 +172,14 @@ fun GameDetailContent(
     onDeleteGame: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Performance optimization (2025 best practice):
+    // Remember scroll state to prevent recreation on recomposition
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
     ) {
         // BackboneOne風 大画面バナー with オーバーレイヘッダー
         Box(
@@ -213,7 +221,7 @@ fun GameDetailContent(
                 IconButton(onClick = onNavigateBack) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "戻る",
+                        contentDescription = stringResource(R.string.content_desc_back),
                         tint = Color.White
                     )
                 }
@@ -222,21 +230,21 @@ fun GameDetailContent(
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(
                             imageVector = Icons.Default.Settings,
-                            contentDescription = "ゲーム設定",
+                            contentDescription = stringResource(R.string.content_desc_settings),
                             tint = Color.White
                         )
                     }
                     IconButton(onClick = onToggleFavorite) {
                         Icon(
                             imageVector = if (game.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "お気に入り",
+                            contentDescription = stringResource(R.string.content_desc_favorite),
                             tint = if (game.isFavorite) MaterialTheme.colorScheme.primary else Color.White
                         )
                     }
                     IconButton(onClick = onDeleteGame) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "削除",
+                            contentDescription = stringResource(R.string.content_desc_delete),
                             tint = Color.White
                         )
                     }
@@ -270,49 +278,93 @@ fun GameDetailContent(
             modifier = Modifier.padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Steam規約準拠: 公式Steamクライアント経由でのダウンロードを促す
+            // Steam ToS Compliance: Guide users to download via official Steam client
             if (game.source == com.steamdeck.mobile.domain.model.GameSource.STEAM &&
                 game.executablePath.isBlank()
             ) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    )
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Icon(
                                 Icons.Outlined.Download,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
                             )
                             Text(
-                                "ゲームダウンロード",
+                                "How to Download This Game",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
-                        Text(
-                            "このゲームをプレイするには、Winlator内のSteam公式クライアントからダウンロードしてください。",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                         )
+
+                        // Step-by-step instructions
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StepItem(number = 1, text = "Click the button below to launch Steam Client")
+                            StepItem(number = 2, text = "Search for \"${game.name}\" in your Library")
+                            StepItem(number = 3, text = "Click \"Install\" button in Steam")
+                            StepItem(number = 4, text = "Wait for download to complete")
+                            StepItem(number = 5, text = "Return to this app - the \"Launch Game\" button will activate")
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Primary action button
                         Button(
                             onClick = onOpenSteamClient,
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondary
+                                containerColor = MaterialTheme.colorScheme.primary
                             )
                         ) {
-                            Text("Steam Clientを開く")
+                            Icon(
+                                Icons.Default.SportsEsports,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Open Steam Client", style = MaterialTheme.typography.titleSmall)
                         }
+
+                        // Secondary action button (refresh)
+                        OutlinedButton(
+                            onClick = { /* TODO: Implement scan for installed games */ },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Rescan for Installed Games", style = MaterialTheme.typography.bodyMedium)
+                        }
+
+                        // Info footer
+                        Text(
+                            "Steam ToS Compliance: All downloads must go through the official Steam client",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
                     }
                 }
             }
@@ -420,9 +472,9 @@ fun DeleteConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Warning, contentDescription = "警告") },
-        title = { Text("ゲームを削除") },
-        text = { Text("「$gameName」を削除してもよろしいですか?\nこの操作は取り消せません。") },
+        icon = { Icon(Icons.Default.Warning, contentDescription = null) },
+        title = { Text(stringResource(R.string.dialog_delete_game_title, gameName)) },
+        text = { Text(stringResource(R.string.dialog_delete_game_message)) },
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
@@ -430,12 +482,12 @@ fun DeleteConfirmDialog(
                     contentColor = MaterialTheme.colorScheme.error
                 )
             ) {
-                Text("削除")
+                Text(stringResource(R.string.button_delete))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("キャンセル")
+                Text(stringResource(R.string.button_cancel))
             }
         }
     )
@@ -710,7 +762,50 @@ fun SplitLaunchButton(
 }
 
 /**
- * Steam起動エラーダイアログ
+ * Step item composable for download instructions
+ */
+@Composable
+private fun StepItem(
+    number: Int,
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        // Step number badge
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Text(
+                    text = number.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Step text
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+/**
+ * Steam Launch Error Dialog
  */
 @Composable
 fun SteamLaunchErrorDialog(
@@ -723,12 +818,12 @@ fun SteamLaunchErrorDialog(
         icon = {
             Icon(
                 imageVector = Icons.Default.Warning,
-                contentDescription = "エラー",
+                contentDescription = stringResource(R.string.content_desc_error),
                 tint = MaterialTheme.colorScheme.error
             )
         },
         title = {
-            Text("Steam起動エラー")
+            Text(stringResource(R.string.dialog_steam_launch_error_title))
         },
         text = {
             Column(
@@ -736,9 +831,9 @@ fun SteamLaunchErrorDialog(
             ) {
                 Text(message)
 
-                if (message.contains("インストール") || message.contains("コンテナ")) {
+                if (message.contains("install", ignoreCase = true) || message.contains("container", ignoreCase = true)) {
                     Text(
-                        text = "\n💡 設定画面からSteam Clientをインストールするか、Winlatorコンテナを設定してください。",
+                        text = stringResource(R.string.dialog_steam_launch_error_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -746,15 +841,15 @@ fun SteamLaunchErrorDialog(
             }
         },
         confirmButton = {
-            if (message.contains("インストール") || message.contains("コンテナ")) {
+            if (message.contains("install", ignoreCase = true) || message.contains("container", ignoreCase = true)) {
                 FilledTonalButton(onClick = onNavigateToSettings) {
-                    Text("設定を開く")
+                    Text(stringResource(R.string.button_open_settings))
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("閉じる")
+                Text(stringResource(R.string.button_close))
             }
         }
     )

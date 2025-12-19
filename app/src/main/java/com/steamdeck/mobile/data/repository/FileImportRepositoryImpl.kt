@@ -141,9 +141,8 @@ class FileImportRepositoryImpl @Inject constructor(
     }
 
     private fun createCifsContext(config: SmbConfig): CIFSContext {
-        if (cifsContext != null) {
-            return cifsContext!!
-        }
+        // Return cached context if available
+        cifsContext?.let { return it }
 
         val properties = Properties()
         // Use SMB2/3 for Windows 10/11 compatibility
@@ -163,13 +162,14 @@ class FileImportRepositoryImpl @Inject constructor(
             null
         }
 
-        cifsContext = if (auth != null) {
+        val newContext = if (auth != null) {
             baseContext.withCredentials(auth)
         } else {
             baseContext
         }
 
-        return cifsContext!!
+        cifsContext = newContext
+        return newContext
     }
 
     // ================================================================================

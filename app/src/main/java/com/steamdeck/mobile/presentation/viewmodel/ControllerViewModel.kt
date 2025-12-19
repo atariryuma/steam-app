@@ -345,8 +345,12 @@ class ControllerViewModel @Inject constructor(
 /**
  * UI state for controller configuration screen.
  */
+@Immutable
 sealed class ControllerUiState {
+    @Immutable
     data object Loading : ControllerUiState()
+    @Immutable
     data object Success : ControllerUiState()
+    @Immutable
     data class Error(val message: String) : ControllerUiState()
 }

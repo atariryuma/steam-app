@@ -43,7 +43,11 @@ class SteamLauncher @Inject constructor(
                 )
             }
 
-            val emulatorContainer = container.getOrNull()!!
+            val emulatorContainer = container.getOrElse {
+                return@withContext Result.failure(
+                    Exception("Container not available: ${it.message}")
+                )
+            }
 
             // 2. Steam.exe のパスを構築
             val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/steam.exe")
@@ -76,7 +80,11 @@ class SteamLauncher @Inject constructor(
                 )
             }
 
-            val process = processResult.getOrNull()!!
+            val process = processResult.getOrElse {
+                return@withContext Result.failure(
+                    Exception("Failed to get process handle: ${it.message}")
+                )
+            }
             Log.i(TAG, "Steam launched successfully: PID ${process.pid}")
 
             Result.success(Unit)
@@ -103,7 +111,11 @@ class SteamLauncher @Inject constructor(
                     )
                 }
 
-                val emulatorContainer = container.getOrNull()!!
+                val emulatorContainer = container.getOrElse {
+                    return@withContext Result.failure(
+                        Exception("Container not available: ${it.message}")
+                    )
+                }
 
                 // 2. Steam.exe のパスを構築
                 val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/steam.exe")
@@ -129,7 +141,11 @@ class SteamLauncher @Inject constructor(
                     )
                 }
 
-                val process = processResult.getOrNull()!!
+                val process = processResult.getOrElse {
+                    return@withContext Result.failure(
+                        Exception("Failed to get process handle: ${it.message}")
+                    )
+                }
                 Log.i(TAG, "Steam Client launched successfully: PID ${process.pid}")
 
                 Result.success(Unit)

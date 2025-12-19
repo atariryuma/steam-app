@@ -9,10 +9,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.steamdeck.mobile.R
 import com.steamdeck.mobile.domain.model.*
 import com.steamdeck.mobile.presentation.viewmodel.ControllerUiState
 import com.steamdeck.mobile.presentation.viewmodel.ControllerViewModel
@@ -116,9 +118,9 @@ fun ControllerSettingsScreen(
     }
 
     // Profile editor dialog
-    if (editingProfile != null) {
+    editingProfile?.let { profile ->
         ProfileEditorDialog(
-            profile = editingProfile!!,
+            profile = profile,
             onDismiss = { viewModel.cancelEditProfile() },
             onSave = { viewModel.saveProfile() },
             onUpdateButtonMapping = { key, action -> viewModel.updateButtonAction(key, action) },
@@ -132,8 +134,8 @@ fun ControllerSettingsScreen(
     showDeleteConfirmation?.let { profile ->
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = null },
-            title = { Text("プロファイルを削除") },
-            text = { Text("「${profile.name}」を削除してもよろしいですか？この操作は取り消せません。") },
+            title = { Text(stringResource(R.string.controller_delete_profile_title)) },
+            text = { Text(stringResource(R.string.dialog_delete_game_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -141,12 +143,12 @@ fun ControllerSettingsScreen(
                         showDeleteConfirmation = null
                     }
                 ) {
-                    Text("削除")
+                    Text(stringResource(R.string.button_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirmation = null }) {
-                    Text("キャンセル")
+                    Text(stringResource(R.string.button_cancel))
                 }
             }
         )
@@ -171,10 +173,13 @@ private fun ControllerSettingsContent(
     ) {
         // Connected controllers section
         item {
-            SectionHeader("接続済みコントローラー")
+            SectionHeader(stringResource(R.string.controller_section_connected))
         }
 
-        items(connectedControllers) { controller ->
+        items(
+            items = connectedControllers,
+            key = { controller -> controller.deviceId }  // Stable key for proper list tracking
+        ) { controller ->
             ControllerCard(
                 controller = controller,
                 isActive = controller.deviceId == activeController?.deviceId,
@@ -186,7 +191,7 @@ private fun ControllerSettingsContent(
         if (activeController != null) {
             item {
                 Spacer(modifier = Modifier.height(8.dp))
-                SectionHeader("ジョイスティックプレビュー")
+                SectionHeader(stringResource(R.string.controller_section_joystick))
             }
 
             item {
@@ -203,11 +208,11 @@ private fun ControllerSettingsContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SectionHeader("プロファイル")
+                    SectionHeader(stringResource(R.string.controller_section_profiles))
                     FilledTonalButton(onClick = onCreateProfile) {
-                        Icon(Icons.Default.Add, contentDescription = "追加")
+                        Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("新規作成")
+                        Text(stringResource(R.string.controller_button_new_profile))
                     }
                 }
             }
@@ -234,17 +239,17 @@ private fun ControllerSettingsContent(
                             ) {
                                 Icon(
                                     Icons.Default.Settings,
-                                    contentDescription = "設定",
+                                    contentDescription = null,
                                     modifier = Modifier.size(48.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    "プロファイルがありません",
+                                    stringResource(R.string.controller_no_profiles),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    "「新規作成」をタップして作成してください",
+                                    stringResource(R.string.controller_tap_to_create),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -253,7 +258,10 @@ private fun ControllerSettingsContent(
                     }
                 }
             } else {
-                items(profiles) { profile ->
+                items(
+                    items = profiles,
+                    key = { profile -> profile.id }  // Stable key for proper list tracking
+                ) { profile ->
                     ProfileCard(
                         profile = profile,
                         onEdit = { onProfileSelect(profile) },
@@ -469,7 +477,7 @@ private fun ProfileEditorDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("プロファイル編集: ${profile.name}") },
+        title = { Text(stringResource(R.string.controller_edit_profile_title, profile.name)) },
         text = {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp)

@@ -88,10 +88,11 @@ object SteamOpenIdAuthenticator {
     suspend fun extractSteamId(callbackUrl: String, expectedState: String): String? {
         val uri = Uri.parse(callbackUrl)
 
-        // Step 1: ステート検証（CSRF対策）
+        // Step 1: State verification (CSRF protection)
         val returnedState = uri.getQueryParameter("state")
         if (returnedState != expectedState) {
-            android.util.Log.w("SteamOpenIdAuth", "State mismatch: expected=$expectedState, got=$returnedState")
+            // Security: Never log CSRF tokens - they can be extracted from logcat
+            android.util.Log.w("SteamOpenIdAuth", "State mismatch detected - CSRF protection triggered")
             return null
         }
 

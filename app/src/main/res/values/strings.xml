@@ -29,106 +29,132 @@
     <string name="trademark_notice">This app is not affiliated with Valve Corporation.\nSteam and the Steam logo are trademarks of Valve Corporation.</string>
 
     <!-- Error Messages -->
-    <string name="error_unknown">不明なエラーが発生しました</string>
-    <string name="error_network">ネットワークエラーが発生しました</string>
-    <string name="error_network_with_code">ネットワークエラー (コード: %1$d)</string>
-    <string name="error_auth">認証エラー: %1$s</string>
-    <string name="error_search_failed">検索に失敗しました</string>
-    <string name="error_favorite_update_failed">お気に入りの更新に失敗しました</string>
-    <string name="error_steam_sync_failed">Steam同期に失敗しました: %1$s</string>
-    <string name="error_game_not_found">ゲームが見つかりません</string>
-    <string name="error_database">データベースエラーが発生しました</string>
-    <string name="error_file_not_found">ファイルが見つかりません</string>
-    <string name="error_permission_denied">権限が拒否されました</string>
-    <string name="error_timeout">タイムアウトしました</string>
-    <string name="error_invalid_input">無効な入力です</string>
+    <string name="error_unknown">An unknown error occurred</string>
+    <string name="error_network">Network error occurred</string>
+    <string name="error_network_with_code">Network error (code: %1$d)</string>
+    <string name="error_auth">Authentication error: %1$s</string>
+    <string name="error_search_failed">Search failed</string>
+    <string name="error_favorite_update_failed">Failed to update favorites</string>
+    <string name="error_steam_sync_failed">Steam sync failed: %1$s</string>
+    <string name="error_game_not_found">Game not found</string>
+    <string name="error_database">Database error occurred</string>
+    <string name="error_file_not_found">File not found</string>
+    <string name="error_permission_denied">Permission denied</string>
+    <string name="error_timeout">Request timed out</string>
+    <string name="error_invalid_input">Invalid input</string>
 
     <!-- Steam API Key Related -->
-    <string name="error_steam_api_key_not_configured">Steam Web API Keyが設定されていません。設定画面でAPI Keyを登録してください。\n取得先: https://steamcommunity.com/dev/apikey</string>
-    <string name="error_steam_api_key_invalid">無効なAPI Keyです（32文字の16進数である必要があります）</string>
-    <string name="settings_steam_api_key_hint">Steam Web API Key（32文字）</string>
-    <string name="settings_steam_api_key_save">API Keyを保存</string>
-    <string name="settings_steam_api_key_saved">API Keyを保存しました</string>
-    <string name="settings_steam_api_key_info">Steam Web API Keyを取得するには:\n1. https://steamcommunity.com/dev/apikey にアクセス\n2. Steamアカウントでログイン\n3. ドメイン名に任意の文字列を入力（例: localhost）\n4. 生成された32文字のキーをコピー</string>
+    <string name="error_steam_api_key_not_configured">Steam Web API Key is not configured. Please register your API Key in Settings.\nGet it here: https://steamcommunity.com/dev/apikey</string>
+    <string name="error_steam_api_key_invalid">Invalid API Key (must be 32 hexadecimal characters)</string>
+    <string name="settings_steam_api_key_hint">Steam Web API Key (32 characters)</string>
+    <string name="settings_steam_api_key_save">Save API Key</string>
+    <string name="settings_steam_api_key_saved">API Key saved successfully</string>
+    <string name="settings_steam_api_key_info">To get your Steam Web API Key:\n1. Visit https://steamcommunity.com/dev/apikey\n2. Log in with your Steam account\n3. Enter any domain name (e.g., localhost)\n4. Copy the generated 32-character key</string>
 
     <!-- Steam Sync Errors -->
-    <string name="error_steam_profile_private">Steamプロフィールが非公開です。Steamの設定でプロフィールを公開にしてください。</string>
-    <string name="error_steam_auth_failed">Steam API認証エラー。Steamプロフィールが非公開の可能性があります。Steamの設定で「ゲームの詳細」を公開にしてください。</string>
-    <string name="error_steam_network_timeout">ネットワークタイムアウト。接続を確認してください。</string>
-    <string name="error_steam_api">Steam APIエラー: %1$s</string>
+    <string name="error_steam_profile_private">Your Steam profile is private. Please set your profile to public in Steam settings.</string>
+    <string name="error_steam_auth_failed">Steam API authentication error. Your Steam profile may be private. Please make \"Game details\" public in Steam settings.</string>
+    <string name="error_steam_network_timeout">Network timeout. Please check your connection.</string>
+    <string name="error_steam_api">Steam API error: %1$s</string>
 
     <!-- ViewModel Error Messages -->
     <!-- HomeViewModel -->
-    <string name="error_unknown_error">不明なエラー</string>
-    <string name="error_search_error">検索エラー</string>
-    <string name="error_game_name_required">ゲーム名を入力してください</string>
-    <string name="error_executable_required">実行ファイルを選択してください</string>
-    <string name="error_install_folder_required">インストールフォルダを選択してください</string>
-    <string name="error_invalid_executable_path">実行ファイルのパスが無効です</string>
-    <string name="error_invalid_install_path">インストールフォルダのパスが無効です</string>
-    <string name="error_duplicate_game_name">同じ名前のゲームが既に存在します: %1$s</string>
-    <string name="error_duplicate_executable">同じ実行ファイルが既に登録されています</string>
-    <string name="error_invalid_game_id">ゲームの追加に失敗しました（無効なID: %1$d）</string>
-    <string name="error_game_already_exists">ゲームが既に存在します</string>
-    <string name="error_game_add_failed">ゲームの追加に失敗しました: %1$s</string>
+    <string name="error_unknown_error">Unknown error</string>
+    <string name="error_search_error">Search error</string>
+    <string name="error_game_name_required">Please enter a game name</string>
+    <string name="error_executable_required">Please select an executable file</string>
+    <string name="error_install_folder_required">Please select an installation folder</string>
+    <string name="error_invalid_executable_path">Invalid executable file path</string>
+    <string name="error_invalid_install_path">Invalid installation folder path</string>
+    <string name="error_duplicate_game_name">A game with the same name already exists: %1$s</string>
+    <string name="error_duplicate_executable">This executable is already registered</string>
+    <string name="error_invalid_game_id">Failed to add game (invalid ID: %1$d)</string>
+    <string name="error_game_already_exists">Game already exists</string>
+    <string name="error_game_add_failed">Failed to add game: %1$s</string>
 
     <!-- ControllerViewModel -->
-    <string name="error_controller_detection">コントローラー検出エラー</string>
-    <string name="error_profile_save">プロファイル保存エラー: %1$s</string>
-    <string name="error_profile_delete">プロファイル削除エラー: %1$s</string>
+    <string name="error_controller_detection">Controller detection error</string>
+    <string name="error_profile_save">Profile save error: %1$s</string>
+    <string name="error_profile_delete">Profile delete error: %1$s</string>
 
     <!-- ContainerViewModel -->
-    <string name="error_container_load_failed">コンテナの読み込みに失敗しました</string>
-    <string name="error_container_create_failed">コンテナの作成に失敗しました</string>
-    <string name="error_container_delete_failed">コンテナの削除に失敗しました</string>
+    <string name="error_container_load_failed">Failed to load container</string>
+    <string name="error_container_create_failed">Failed to create container</string>
+    <string name="error_container_delete_failed">Failed to delete container</string>
 
     <!-- GameDetailViewModel -->
-    <string name="error_download_failed">ダウンロードに失敗しました: %1$s</string>
-    <string name="error_download_start_failed">ダウンロードの開始に失敗しました: %1$s</string>
-    <string name="error_game_info_load_failed">ゲーム情報の取得に失敗しました</string>
-    <string name="error_container_not_configured">コンテナが設定されていません。設定画面でコンテナを作成してください。</string>
-    <string name="error_steam_app_id_not_set">Steam App IDが設定されていません</string>
-    <string name="error_steam_launch_failed">Steam経由での起動に失敗しました</string>
-    <string name="error_steam_launch_unexpected">Steam起動中に予期しないエラーが発生しました</string>
-    <string name="error_steam_client_launch_failed">Steam Clientの起動に失敗しました</string>
-    <string name="error_steam_client_unexpected">Steam Client起動中に予期しないエラーが発生しました</string>
+    <string name="error_download_failed">Download failed: %1$s</string>
+    <string name="error_download_start_failed">Failed to start download: %1$s</string>
+    <string name="error_game_info_load_failed">Failed to load game information</string>
+    <string name="error_container_not_configured">Container not configured. Please create a container in Settings.</string>
+    <string name="error_steam_app_id_not_set">Steam App ID not set</string>
+    <string name="error_steam_launch_failed">Failed to launch via Steam</string>
+    <string name="error_steam_launch_unexpected">Unexpected error occurred during Steam launch</string>
+    <string name="error_steam_client_launch_failed">Failed to launch Steam Client</string>
+    <string name="error_steam_client_unexpected">Unexpected error occurred during Steam Client launch</string>
 
     <!-- SettingsViewModel -->
-    <string name="error_steam_id_not_found">Steam IDが見つかりません。QRコードでログインしてください。</string>
-    <string name="error_api_key_required">API Keyを入力してください</string>
-    <string name="error_api_key_save_failed">API Keyの保存に失敗しました: %1$s</string>
-    <string name="error_clear_failed">クリアに失敗しました: %1$s</string>
-    <string name="error_install_status_check_failed">インストール状態の確認に失敗しました: %1$s</string>
-    <string name="error_install_failed">インストールに失敗しました: %1$s</string>
-    <string name="error_unexpected_error">予期しないエラーが発生しました: %1$s</string>
-    <string name="error_steam_launch_failed_detail">Steam Clientの起動に失敗しました: %1$s</string>
-    <string name="error_steam_client_launch_unexpected">Steam Client起動中に予期しないエラーが発生しました: %1$s</string>
-    <string name="error_uninstall_failed">アンインストールに失敗しました: %1$s</string>
+    <string name="error_steam_id_not_found">Steam ID not found. Please log in via QR code.</string>
+    <string name="error_api_key_required">Please enter an API Key</string>
+    <string name="error_api_key_save_failed">Failed to save API Key: %1$s</string>
+    <string name="error_clear_failed">Failed to clear: %1$s</string>
+    <string name="error_install_status_check_failed">Failed to check installation status: %1$s</string>
+    <string name="error_install_failed">Installation failed: %1$s</string>
+    <string name="error_unexpected_error">An unexpected error occurred: %1$s</string>
+    <string name="error_steam_launch_failed_detail">Failed to launch Steam Client: %1$s</string>
+    <string name="error_steam_client_launch_unexpected">Unexpected error during Steam Client launch: %1$s</string>
+    <string name="error_uninstall_failed">Uninstallation failed: %1$s</string>
 
     <!-- SteamLoginViewModel -->
-    <string name="error_auth_session_invalid">認証セッションが無効です。もう一度ログインしてください。</string>
-    <string name="error_auth_steamid_failed">認証に失敗しました。SteamIDを取得できませんでした。</string>
+    <string name="error_auth_session_invalid">Authentication session is invalid. Please log in again.</string>
+    <string name="error_auth_steamid_failed">Authentication failed. Could not retrieve SteamID.</string>
 
     <!-- WinlatorInitViewModel -->
-    <string name="error_init_failed">初期化に失敗しました</string>
-    <string name="error_init_unexpected">初期化中にエラーが発生しました</string>
+    <string name="error_init_failed">Initialization failed</string>
+    <string name="error_init_unexpected">An error occurred during initialization</string>
 
     <!-- Status Messages -->
-    <string name="status_syncing">同期を開始しています…</string>
-    <string name="status_syncing_progress">同期中…</string>
-    <string name="status_initializing">Winlatorを初期化中…</string>
-    <string name="status_not_synced">未同期</string>
-    <string name="status_synced_recently">1分以内</string>
-    <string name="status_synced_minutes">%1$d分前</string>
-    <string name="status_synced_hours">%1$d時間前</string>
-    <string name="status_synced_days">%1$d日前</string>
+    <string name="status_syncing">Starting sync...</string>
+    <string name="status_syncing_progress">Syncing...</string>
+    <string name="status_initializing">Initializing Winlator...</string>
+    <string name="status_not_synced">Not synced</string>
+    <string name="status_synced_recently">Within 1 minute</string>
+    <string name="status_synced_minutes">%1$d minutes ago</string>
+    <string name="status_synced_hours">%1$d hours ago</string>
+    <string name="status_synced_days">%1$d days ago</string>
 
     <!-- Success Messages -->
-    <string name="success_api_key_saved">API Keyを保存しました</string>
-    <string name="success_steam_settings_cleared">Steam設定をクリアしました</string>
-    <string name="success_steam_client_launched">Steam Clientを起動しました</string>
-    <string name="success_steam_uninstalled">Steam Clientはアンインストールされました</string>
+    <string name="success_api_key_saved">API Key saved successfully</string>
+    <string name="success_steam_settings_cleared">Steam settings cleared</string>
+    <string name="success_steam_client_launched">Steam Client launched successfully</string>
+    <string name="success_steam_uninstalled">Steam Client has been uninstalled</string>
 
     <!-- Install Status -->
-    <string name="install_status_not_installed">Steam Clientはインストールされていません</string>
+    <string name="install_status_not_installed">Steam Client is not installed</string>
+
+    <!-- UI Labels -->
+    <string name="content_desc_back">Back</string>
+    <string name="content_desc_settings">Game Settings</string>
+    <string name="content_desc_favorite">Favorite</string>
+    <string name="content_desc_delete">Delete</string>
+    <string name="content_desc_error">Error</string>
+    <string name="dialog_delete_game_title">Delete \"%1$s\"?</string>
+    <string name="dialog_delete_game_message">This will remove the game from your library. Game files will not be deleted.</string>
+    <string name="dialog_steam_launch_error_title">Steam Launch Error</string>
+    <string name="dialog_steam_launch_error_hint">Tip: Install Steam Client from Settings or configure a Winlator container.</string>
+    <string name="button_delete">Delete</string>
+    <string name="button_cancel">Cancel</string>
+    <string name="button_open_settings">Open Settings</string>
+    <string name="button_close">Close</string>
+    <string name="games_synced_count">%1$d games synced</string>
+
+    <!-- Controller Settings -->
+    <string name="controller_section_connected">Connected Controllers</string>
+    <string name="controller_section_joystick">Joystick Preview</string>
+    <string name="controller_section_profiles">Profiles</string>
+    <string name="controller_button_new_profile">New Profile</string>
+    <string name="controller_no_profiles">No Profiles</string>
+    <string name="controller_tap_to_create">Tap \"New Profile\" to create one</string>
+    <string name="controller_delete_profile_title">Delete Profile</string>
+    <string name="controller_edit_profile_title">Edit Profile: %1$s</string>
 </resources>

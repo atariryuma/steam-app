@@ -17,9 +17,11 @@ interface WinlatorEngine {
     suspend fun launchGame(game: Game, container: WinlatorContainer?): LaunchResult
 
     /**
-     * ゲーム実行中かどうか
+     * Check if game is currently running
+     *
+     * @return true if game process is active, false otherwise
      */
-    fun isGameRunning(): Boolean
+    suspend fun isGameRunning(): Boolean
 
     /**
      * 実行中のゲームを停止

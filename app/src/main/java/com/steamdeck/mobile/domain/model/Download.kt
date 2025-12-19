@@ -1,14 +1,20 @@
 package com.steamdeck.mobile.domain.model
 
+import androidx.compose.runtime.Immutable
+
 /**
- * ダウンロード情報のドメインモデル
+ * Download information domain model
+ *
+ * @Immutable enables Compose performance optimization by reducing unnecessary recompositions.
  */
+@Immutable
 data class Download(
     val id: Long = 0,
     val gameId: Long? = null,
     val fileName: String,
     val url: String,
     val status: DownloadStatus,
+    val installationStatus: InstallationStatus = InstallationStatus.NOT_INSTALLED,
     val progress: Int = 0,
     val downloadedBytes: Long = 0,
     val totalBytes: Long = 0,
@@ -134,4 +140,36 @@ enum class DownloadStatus {
      */
     val isActive: Boolean
         get() = this == DOWNLOADING || this == PENDING
+}
+
+/**
+ * インストール状態 (ダウンロード完了後)
+ */
+enum class InstallationStatus {
+    /** 未インストール (ダウンロードのみ完了) */
+    NOT_INSTALLED,
+
+    /** インストール待機中 */
+    PENDING,
+
+    /** インストール中 */
+    INSTALLING,
+
+    /** インストール完了 */
+    INSTALLED,
+
+    /** インストール失敗 */
+    FAILED;
+
+    /**
+     * 状態の日本語表示
+     */
+    val displayName: String
+        get() = when (this) {
+            NOT_INSTALLED -> "未インストール"
+            PENDING -> "待機中"
+            INSTALLING -> "インストール中"
+            INSTALLED -> "インストール済み"
+            FAILED -> "失敗"
+        }
 }

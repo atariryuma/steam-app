@@ -188,7 +188,8 @@ class DownloadWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val database: SteamDeckDatabase,
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    private val installDownloadedGameUseCase: com.steamdeck.mobile.domain.usecase.InstallDownloadedGameUseCase
 ) : CoroutineWorker(context, params) {
 
     companion object {
@@ -250,6 +251,29 @@ class DownloadWorker @AssistedInject constructor(
                 status = DownloadStatus.COMPLETED,
                 completedTimestamp = System.currentTimeMillis()
             )
+
+            // Best Practice (2025): Automatic game installation after download completion
+            // This provides seamless download-to-play workflow
+            Log.i(TAG, "Download completed successfully, starting automatic installation for download ID: $downloadId")
+            try {
+                when (val installResult = installDownloadedGameUseCase(downloadId)) {
+                    is com.steamdeck.mobile.core.result.DataResult.Success -> {
+                        Log.i(TAG, "Game installation completed successfully for download ID: $downloadId")
+                    }
+                    is com.steamdeck.mobile.core.result.DataResult.Error -> {
+                        Log.e(TAG, "Game installation failed for download ID: $downloadId - ${installResult.error}")
+                        // Installation failure is non-critical - download still succeeded
+                    }
+                    is com.steamdeck.mobile.core.result.DataResult.Loading -> {
+                        // Should not happen in UseCase invoke()
+                        Log.w(TAG, "Unexpected Loading state from InstallDownloadedGameUseCase")
+                    }
+                }
+            } catch (e: Exception) {
+                // Installation error is non-critical - download completed
+                Log.e(TAG, "Exception during automatic installation for download ID: $downloadId", e)
+            }
+
             Result.success()
         } catch (e: Exception) {
             // 詳細なエラーロギング

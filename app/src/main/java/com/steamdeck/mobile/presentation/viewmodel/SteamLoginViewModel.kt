@@ -131,23 +131,29 @@ class SteamLoginViewModel @Inject constructor(
 /**
  * Steam Login UI State
  *
- * Best Practice: Sealed class for type-safe state management
+ * Best Practice: Sealed class for type-safe state management with @Immutable for performance
  */
+@Immutable
 sealed class SteamLoginUiState {
-    /** 初期状態 */
+    /** Initial state */
+    @Immutable
     data object Initial : SteamLoginUiState()
 
-    /** ローディング中 */
+    /** Loading */
+    @Immutable
     data object Loading : SteamLoginUiState()
 
-    /** WebView表示（OpenID認証ページ） */
+    /** Show WebView (OpenID auth page) */
+    @Immutable
     data class ShowWebView(
         val authUrl: String
     ) : SteamLoginUiState()
 
-    /** 認証成功 */
+    /** Authentication success */
+    @Immutable
     data class Success(val steamId: String) : SteamLoginUiState()
 
-    /** エラー */
+    /** Error */
+    @Immutable
     data class Error(val message: String) : SteamLoginUiState()
 }

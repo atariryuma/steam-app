@@ -172,19 +172,21 @@ fun ContainerScreen(
         }
 
         // Delete confirmation dialog
-        if (showDeleteDialog && selectedContainer != null) {
-            DeleteContainerDialog(
-                containerName = selectedContainer!!.name,
-                onDismiss = {
-                    showDeleteDialog = false
-                    selectedContainer = null
-                },
-                onConfirm = {
-                    viewModel.deleteContainer(selectedContainer!!.id)
-                    showDeleteDialog = false
-                    selectedContainer = null
-                }
-            )
+        selectedContainer?.let { container ->
+            if (showDeleteDialog) {
+                DeleteContainerDialog(
+                    containerName = container.name,
+                    onDismiss = {
+                        showDeleteDialog = false
+                        selectedContainer = null
+                    },
+                    onConfirm = {
+                        viewModel.deleteContainer(container.id)
+                        showDeleteDialog = false
+                        selectedContainer = null
+                    }
+                )
+            }
         }
     }
 }

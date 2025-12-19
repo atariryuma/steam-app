@@ -70,27 +70,34 @@ class WinlatorInitViewModel @Inject constructor(
 }
 
 /**
- * Winlator初期化のUI状態
+ * Winlator initialization UI state
  */
+@Immutable
 sealed class WinlatorInitUiState {
-    /** アイドル状態 */
+    /** Idle state */
+    @Immutable
     data object Idle : WinlatorInitUiState()
 
-    /** 利用可能性チェック中 */
+    /** Checking availability */
+    @Immutable
     data object CheckingAvailability : WinlatorInitUiState()
 
-    /** 既に初期化済み */
+    /** Already initialized */
+    @Immutable
     data object AlreadyInitialized : WinlatorInitUiState()
 
-    /** 初期化中 */
+    /** Initializing */
+    @Immutable
     data class Initializing(
         val progress: Float,
         val statusText: String
     ) : WinlatorInitUiState()
 
-    /** 初期化完了 */
+    /** Completed */
+    @Immutable
     data object Completed : WinlatorInitUiState()
 
-    /** エラー */
+    /** Error */
+    @Immutable
     data class Error(val message: String) : WinlatorInitUiState()
 }

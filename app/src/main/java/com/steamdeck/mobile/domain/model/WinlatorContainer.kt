@@ -1,8 +1,13 @@
 package com.steamdeck.mobile.domain.model
 
+import androidx.compose.runtime.Immutable
+
 /**
- * Winlatorコンテナ設定のドメインモデル
+ * Winlator container configuration domain model
+ *
+ * @Immutable enables Compose performance optimization.
  */
+@Immutable
 data class WinlatorContainer(
     val id: Long = 0,
     val name: String,

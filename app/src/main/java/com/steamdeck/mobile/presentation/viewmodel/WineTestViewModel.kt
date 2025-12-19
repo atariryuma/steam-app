@@ -197,24 +197,29 @@ class WineTestViewModel @Inject constructor(
 /**
  * UI state for Wine testing.
  */
+@Immutable
 sealed class WineTestUiState {
     /**
      * Initial idle state.
      */
+    @Immutable
     data object Idle : WineTestUiState()
 
     /**
      * Test is running.
      */
+    @Immutable
     data class Testing(val message: String) : WineTestUiState()
 
     /**
      * Test completed successfully.
      */
+    @Immutable
     data class Success(val message: String) : WineTestUiState()
 
     /**
      * Test failed with error.
      */
+    @Immutable
     data class Error(val message: String) : WineTestUiState()
 }

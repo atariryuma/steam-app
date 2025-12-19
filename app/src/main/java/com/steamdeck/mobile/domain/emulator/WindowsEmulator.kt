@@ -1,5 +1,6 @@
 package com.steamdeck.mobile.domain.emulator
 
+import kotlinx.coroutines.flow.Flow
 import java.io.File
 
 /**
@@ -113,6 +114,18 @@ interface WindowsEmulator {
      * @return Result containing process status or error
      */
     suspend fun getProcessStatus(processId: String): Result<EmulatorProcessStatus>
+
+    /**
+     * Monitors a process continuously until it terminates.
+     *
+     * Performance optimization (2025 best practice):
+     * Enables accurate play time tracking by monitoring process lifecycle.
+     *
+     * @param processId Process identifier
+     * @param intervalMs Polling interval in milliseconds (default: 5000ms)
+     * @return Flow emitting process status updates until termination
+     */
+    fun monitorProcess(processId: String, intervalMs: Long = 5000L): Flow<EmulatorProcessStatus>
 
     /**
      * Terminates a running process.

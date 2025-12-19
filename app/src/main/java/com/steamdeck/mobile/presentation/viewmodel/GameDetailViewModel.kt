@@ -279,58 +279,75 @@ class GameDetailViewModel @Inject constructor(
 }
 
 /**
- * ゲーム詳細画面のUI状態
+ * Game detail screen UI state
  */
+@Immutable
 sealed class GameDetailUiState {
-    /** 読み込み中 */
+    /** Loading */
+    @Immutable
     data object Loading : GameDetailUiState()
 
-    /** 成功 */
+    /** Success */
+    @Immutable
     data class Success(val game: Game) : GameDetailUiState()
 
-    /** 削除完了 */
+    /** Deleted */
+    @Immutable
     data object Deleted : GameDetailUiState()
 
-    /** エラー */
+    /** Error */
+    @Immutable
     data class Error(val message: String) : GameDetailUiState()
 }
 
 /**
- * ゲーム起動状態
+ * Game launch state
  */
+@Immutable
 sealed class LaunchState {
-    /** アイドル状態 */
-    object Idle : LaunchState()
+    /** Idle state */
+    @Immutable
+    data object Idle : LaunchState()
 
-    /** 起動中 */
-    object Launching : LaunchState()
+    /** Launching */
+    @Immutable
+    data object Launching : LaunchState()
 
-    /** 実行中 */
+    /** Running */
+    @Immutable
     data class Running(val processId: Int) : LaunchState()
 
-    /** エラー */
+    /** Error */
+    @Immutable
     data class Error(val message: String) : LaunchState()
 }
 
 /**
- * Steam Client起動状態
+ * Steam Client launch state
  */
+@Immutable
 sealed class SteamLaunchState {
-    /** アイドル状態 */
-    object Idle : SteamLaunchState()
+    /** Idle state */
+    @Immutable
+    data object Idle : SteamLaunchState()
 
-    /** インストール状態確認中 */
-    object CheckingInstallation : SteamLaunchState()
+    /** Checking installation */
+    @Immutable
+    data object CheckingInstallation : SteamLaunchState()
 
-    /** 起動中 */
-    object Launching : SteamLaunchState()
+    /** Launching */
+    @Immutable
+    data object Launching : SteamLaunchState()
 
-    /** 実行中 */
+    /** Running */
+    @Immutable
     data class Running(val processId: Int) : SteamLaunchState()
 
-    /** エラー */
+    /** Error */
+    @Immutable
     data class Error(val message: String) : SteamLaunchState()
 
-    /** 未インストール */
+    /** Not installed */
+    @Immutable
     data class NotInstalled(val message: String) : SteamLaunchState()
 }

@@ -101,7 +101,11 @@ class SteamSetupManager @Inject constructor(
                 )
             }
 
-            val installerFile = installerResult.getOrNull()!!
+            val installerFile = installerResult.getOrElse {
+                return@withContext Result.success(
+                    SteamInstallResult.Error("Installer file not found after download: ${it.message}")
+                )
+            }
             Log.i(TAG, "Installer downloaded: ${installerFile.absolutePath}")
 
             // 進捗: 0.5 ~ 0.6 (10%)
@@ -115,7 +119,11 @@ class SteamSetupManager @Inject constructor(
                 )
             }
 
-            val container = containerResult.getOrNull()!!
+            val container = containerResult.getOrElse {
+                return@withContext Result.success(
+                    SteamInstallResult.Error("Container not available: ${it.message}")
+                )
+            }
             Log.i(TAG, "Using container: ${container.name} (${container.id})")
 
             // 進捗: 0.6 ~ 0.65 (5%)
@@ -129,7 +137,11 @@ class SteamSetupManager @Inject constructor(
                 )
             }
 
-            val containerInstaller = containerInstallerPath.getOrNull()!!
+            val containerInstaller = containerInstallerPath.getOrElse {
+                return@withContext Result.success(
+                    SteamInstallResult.Error("Failed to get installer path in container: ${it.message}")
+                )
+            }
             Log.i(TAG, "Installer copied to container: ${containerInstaller.absolutePath}")
 
             // 進捗: 0.65 ~ 0.95 (30%)
@@ -311,7 +323,11 @@ class SteamSetupManager @Inject constructor(
                 )
             }
 
-            val process = processResult.getOrNull()!!
+            val process = processResult.getOrElse {
+                return@withContext Result.failure(
+                    Exception("Failed to get process handle: ${it.message}")
+                )
+            }
             Log.i(TAG, "Steam installer process started: PID ${process.pid}")
 
             // インストーラーの完了を待つ (タイムアウト: 5分)

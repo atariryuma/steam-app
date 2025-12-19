@@ -64,9 +64,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.steamdeck.mobile.R
 import com.steamdeck.mobile.presentation.ui.auth.SteamOpenIdLoginScreen
 import com.steamdeck.mobile.presentation.viewmodel.SettingsUiState
 import com.steamdeck.mobile.presentation.viewmodel.SettingsViewModel
@@ -96,6 +99,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     steamLoginViewModel: SteamLoginViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val syncState by viewModel.syncState.collectAsState()
     val steamInstallState by viewModel.steamInstallState.collectAsState()
@@ -132,7 +136,7 @@ fun SettingsScreen(
         when (val state = syncState) {
             is SyncState.Success -> {
                 snackbarHostState.showSnackbar(
-                    message = "${state.syncedGamesCount}個のゲームを同期しました",
+                    message = context.getString(R.string.games_synced_count, state.syncedGamesCount),
                     duration = SnackbarDuration.Short
                 )
                 viewModel.resetSyncState()

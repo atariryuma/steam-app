@@ -56,34 +56,20 @@ class SettingsViewModel @Inject constructor(
     init {
         loadSettings()
         checkSteamInstallation()
-        autoConfigureDevApiKey()
+        // autoConfigureDevApiKey() - REMOVED for security (no hardcoded API keys)
     }
 
     /**
-     * 開発用: BuildConfigのAPIキーを自動設定
+     * REMOVED: Development API Key Auto-Configuration
      *
-     * 本番環境では無視され、ユーザーが手動でAPIキーを設定する
-     * DEV_STEAM_API_KEYが空の場合は何もしない
+     * Security Note: Hardcoded API keys were removed to prevent extraction via APK decompilation.
+     * Users must obtain their own Steam Web API Key from https://steamcommunity.com/dev/apikey
+     * and enter it manually in the settings.
+     *
+     * For development testing, use local.properties (not committed to git):
+     * - Add: DEV_STEAM_API_KEY=your_key_here
+     * - Access via BuildConfig if needed for local testing only
      */
-    private fun autoConfigureDevApiKey() {
-        viewModelScope.launch {
-            try {
-                val devApiKey = com.steamdeck.mobile.BuildConfig.DEV_STEAM_API_KEY
-                if (devApiKey.isNotBlank()) {
-                    // 既にAPIキーが保存されているか確認
-                    val existingKey = securePreferences.getSteamApiKey()
-                    if (existingKey.isNullOrBlank()) {
-                        // 開発用APIキーを自動保存
-                        securePreferences.saveSteamApiKey(devApiKey)
-                        AppLogger.i(TAG, "Development API Key auto-configured from BuildConfig")
-                    }
-                }
-            } catch (e: Exception) {
-                // BuildConfigにDEV_STEAM_API_KEYがない場合は無視
-                AppLogger.d(TAG, "No dev API key in BuildConfig (expected in production)")
-            }
-        }
-    }
 
     /**
      * 設定データをロード
@@ -408,24 +394,29 @@ class SettingsViewModel @Inject constructor(
 }
 
 /**
- * Settings画面のUI状態
+ * Settings screen UI state
  */
+@Immutable
 sealed class SettingsUiState {
+    @Immutable
     data object Loading : SettingsUiState()
 
+    @Immutable
     data class Success(
         val data: SettingsData,
         val successMessage: String? = null
     ) : SettingsUiState()
 
+    @Immutable
     data class Error(val message: String) : SettingsUiState()
 }
 
 /**
- * 設定データ
+ * Settings data
  *
- * Note: API Keyはアプリに埋め込み済み（ユーザー入力不要）
+ * Note: API Key must be provided by user (removed from app for security)
  */
+@Immutable
 data class SettingsData(
     val steamId: String,
     val steamUsername: String,
@@ -451,46 +442,58 @@ data class SettingsData(
 }
 
 /**
- * 同期状態
+ * Sync state
  */
+@Immutable
 sealed class SyncState {
+    @Immutable
     data object Idle : SyncState()
 
+    @Immutable
     data class Syncing(
         val progress: Float,
         val message: String
     ) : SyncState()
 
+    @Immutable
     data class Success(val syncedGamesCount: Int) : SyncState()
 
+    @Immutable
     data class Error(val message: String) : SyncState()
 }
 
 /**
- * Steam Clientインストール状態
+ * Steam Client installation state
  */
+@Immutable
 sealed class SteamInstallState {
-    /** アイドル状態 */
+    /** Idle state */
+    @Immutable
     data object Idle : SteamInstallState()
 
-    /** インストール状態確認中 */
+    /** Checking installation status */
+    @Immutable
     data object Checking : SteamInstallState()
 
-    /** 未インストール */
+    /** Not installed */
+    @Immutable
     data class NotInstalled(val message: String) : SteamInstallState()
 
-    /** インストール済み */
+    /** Installed */
+    @Immutable
     data class Installed(
         val installPath: String,
         val containerId: String
     ) : SteamInstallState()
 
-    /** インストール中 */
+    /** Installing */
+    @Immutable
     data class Installing(
         val progress: Float,
         val message: String
     ) : SteamInstallState()
 
-    /** エラー */
+    /** Error */
+    @Immutable
     data class Error(val message: String) : SteamInstallState()
 }

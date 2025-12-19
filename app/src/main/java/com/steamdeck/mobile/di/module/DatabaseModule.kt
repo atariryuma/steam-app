@@ -160,7 +160,80 @@ object DatabaseModule {
     }
 
     /**
-     * SteamDeckDatabaseインスタンスを提供
+     * Database Migration 4→5
+     *
+     * Changes:
+     * - Add indexes to games table for performance optimization
+     */
+    private val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // Add performance indexes to games table
+            database.execSQL("""
+                CREATE INDEX IF NOT EXISTS index_games_source
+                ON games(source)
+            """.trimIndent())
+
+            database.execSQL("""
+                CREATE INDEX IF NOT EXISTS index_games_isFavorite
+                ON games(isFavorite)
+            """.trimIndent())
+
+            database.execSQL("""
+                CREATE INDEX IF NOT EXISTS index_games_lastPlayedTimestamp
+                ON games(lastPlayedTimestamp)
+            """.trimIndent())
+        }
+    }
+
+    /**
+     * Database Migration 5→6
+     *
+     * Changes:
+     * - Add installationStatus column to downloads table
+     */
+    private val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // Add installationStatus column with default value
+            database.execSQL("""
+                ALTER TABLE downloads
+                ADD COLUMN installationStatus TEXT NOT NULL DEFAULT 'NOT_INSTALLED'
+            """.trimIndent())
+        }
+    }
+
+    /**
+     * Database Migration 6→7
+     *
+     * Changes:
+     * - Add indexes to downloads table for query optimization
+     */
+    private val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // Add indexes for frequently queried columns
+            database.execSQL("""
+                CREATE INDEX IF NOT EXISTS index_downloads_status
+                ON downloads(status)
+            """.trimIndent())
+
+            database.execSQL("""
+                CREATE INDEX IF NOT EXISTS index_downloads_gameId
+                ON downloads(gameId)
+            """.trimIndent())
+
+            database.execSQL("""
+                CREATE INDEX IF NOT EXISTS index_downloads_installationStatus
+                ON downloads(installationStatus)
+            """.trimIndent())
+        }
+    }
+
+    /**
+     * Provides SteamDeckDatabase instance
+     *
+     * Security & Performance Best Practices 2025:
+     * - All migrations implemented (4→5, 5→6, 6→7)
+     * - fallbackToDestructiveMigration() REMOVED for production safety
+     * - User data is preserved across app updates
      */
     @Provides
     @Singleton
@@ -172,10 +245,17 @@ object DatabaseModule {
             SteamDeckDatabase::class.java,
             SteamDeckDatabase.DATABASE_NAME
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
-            // Best Practice: fallbackToDestructiveMigration()削除（本番環境ではユーザーデータ保護）
-            // Reference: https://medium.com/androiddevelopers/understanding-migrations-with-room-f01e04b07929
-            .fallbackToDestructiveMigration() // <- MVP段階のみ使用、本番では削除
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7
+            )
+            // Production-ready: Destructive migration removed to protect user data
+            // Reference: https://developer.android.com/training/data-storage/room/migrating-db-versions
+            // .fallbackToDestructiveMigration() // REMOVED - causes data loss on schema changes
             .build()
     }
 

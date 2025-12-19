@@ -1,11 +1,17 @@
 package com.steamdeck.mobile.domain.model
 
+import androidx.compose.runtime.Immutable
+
 /**
  * Game controller domain model.
  *
  * Represents a physical game controller detected by Android InputDevice API.
  * Supports Xbox, PlayStation, Nintendo, and generic controllers.
+ *
+ * @Immutable annotation enables Compose Strong Skipping optimization
+ * Reference: https://developer.android.com/develop/ui/compose/performance/bestpractices
  */
+@Immutable
 data class Controller(
     val deviceId: Int,
     val name: String,
@@ -35,14 +41,14 @@ enum class ControllerType {
     GENERIC;        // Other HID-compliant controllers
 
     /**
-     * UI表示用の名前（ProGuard/R8で難読化されない）
+     * Display name for UI (not obfuscated by ProGuard/R8)
      */
     val displayName: String
         get() = when (this) {
-            XBOX -> "Xbox コントローラー"
-            PLAYSTATION -> "PlayStation コントローラー"
-            NINTENDO -> "Nintendo コントローラー"
-            GENERIC -> "汎用コントローラー"
+            XBOX -> "Xbox Controller"
+            PLAYSTATION -> "PlayStation Controller"
+            NINTENDO -> "Nintendo Controller"
+            GENERIC -> "Generic Controller"
         }
 
     companion object {
@@ -67,7 +73,10 @@ enum class ControllerType {
  * Button mapping profile for a controller.
  *
  * Maps Android keycodes to game actions.
+ *
+ * @Immutable annotation enables Compose Strong Skipping optimization
  */
+@Immutable
 data class ButtonMapping(
     val buttonA: GameAction = GameAction.CONFIRM,
     val buttonB: GameAction = GameAction.CANCEL,
@@ -133,7 +142,10 @@ enum class GameAction {
  * Joystick state.
  *
  * Represents analog stick and trigger positions.
+ *
+ * @Immutable annotation enables Compose Strong Skipping optimization
  */
+@Immutable
 data class JoystickState(
     val leftX: Float = 0f,
     val leftY: Float = 0f,
@@ -178,7 +190,10 @@ data class JoystickState(
  * Controller profile.
  *
  * Saved configuration for a specific controller.
+ *
+ * @Immutable annotation enables Compose Strong Skipping optimization
  */
+@Immutable
 data class ControllerProfile(
     val id: Long = 0,
     val controllerId: String,  // uniqueId from Controller

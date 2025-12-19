@@ -27,6 +27,20 @@ class WinlatorEngineImpl @Inject constructor(
     private var currentProcessId: String? = null
     private var currentEmulatorProcess: com.steamdeck.mobile.domain.emulator.EmulatorProcess? = null
 
+    /**
+     * クリーンアップメソッド（メモリリーク防止）
+     *
+     * Best Practice (2025):
+     * - ViewModelのonCleared()から呼び出す
+     * - プロセス参照をnullクリアしてGC可能にする
+     * - アプリ終了時やゲーム終了時に呼び出すことを推奨
+     */
+    fun cleanup() {
+        Log.d(TAG, "Cleaning up WinlatorEngine resources")
+        currentProcessId = null
+        currentEmulatorProcess = null
+    }
+
     override suspend fun launchGame(game: Game, container: WinlatorContainer?): LaunchResult {
         return try {
             Log.d(TAG, "Launching game: ${game.name}")
@@ -120,14 +134,12 @@ class WinlatorEngineImpl @Inject constructor(
         }
     }
 
-    override fun isGameRunning(): Boolean {
-        if (currentProcessId == null) return false
+    override suspend fun isGameRunning(): Boolean {
+        val processId = currentProcessId ?: return false
 
-        // Check actual process status
+        // Check actual process status without blocking
         return try {
-            val statusResult = kotlinx.coroutines.runBlocking {
-                winlatorEmulator.getProcessStatus(currentProcessId!!)
-            }
+            val statusResult = winlatorEmulator.getProcessStatus(processId)
             statusResult.getOrNull()?.isRunning ?: false
         } catch (e: Exception) {
             Log.w(TAG, "Failed to check process status", e)
@@ -137,19 +149,19 @@ class WinlatorEngineImpl @Inject constructor(
 
     override suspend fun stopGame(): Result<Unit> {
         return try {
-            if (currentProcessId == null) {
-                return Result.failure(IllegalStateException("実行中のゲームがありません"))
+            val processId = currentProcessId
+            if (processId == null) {
+                return Result.failure(IllegalStateException("No game is currently running"))
             }
 
-            Log.d(TAG, "Stopping game process: $currentProcessId")
+            Log.d(TAG, "Stopping game process: $processId")
 
             // Kill process via WinlatorEmulator
-            val killResult = winlatorEmulator.killProcess(currentProcessId!!, force = false)
+            val killResult = winlatorEmulator.killProcess(processId, force = false)
 
             if (killResult.isSuccess) {
                 Log.i(TAG, "Game stopped successfully")
-                currentProcessId = null
-                currentEmulatorProcess = null
+                cleanup()  // Clean up resources to prevent memory leaks
                 Result.success(Unit)
             } else {
                 val error = killResult.exceptionOrNull()

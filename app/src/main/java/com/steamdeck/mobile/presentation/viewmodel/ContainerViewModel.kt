@@ -81,15 +81,19 @@ class ContainerViewModel @Inject constructor(
 }
 
 /**
- * コンテナ管理のUI状態
+ * Container management UI state
  */
+@Immutable
 sealed class ContainerUiState {
-    /** 読み込み中 */
+    /** Loading */
+    @Immutable
     data object Loading : ContainerUiState()
 
-    /** 成功 */
+    /** Success */
+    @Immutable
     data class Success(val containers: List<EmulatorContainer>) : ContainerUiState()
 
-    /** エラー */
+    /** Error */
+    @Immutable
     data class Error(val message: String) : ContainerUiState()
 }

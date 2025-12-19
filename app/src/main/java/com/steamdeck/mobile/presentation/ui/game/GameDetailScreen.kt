@@ -65,14 +65,14 @@ fun GameDetailScreen(
   viewModel.loadGame(gameId)
  }
 
- // delete完了時 return
+ // deleteComplete時 return
  LaunchedEffect(uiState) {
   if (uiState is GameDetailUiState.Deleted) {
    onNavigateBack()
   }
  }
 
- // launchエラー監視
+ // launchError監視
  LaunchedEffect(launchState) {
   if (launchState is LaunchState.Error) {
    launchErrorMessage = (launchState as LaunchState.Error).message
@@ -80,7 +80,7 @@ fun GameDetailScreen(
   }
  }
 
- // Steamlaunchエラー監視
+ // SteamlaunchError監視
  LaunchedEffect(steamLaunchState) {
   if (steamLaunchState is SteamLaunchState.Error) {
    steamLaunchErrorMessage = (steamLaunchState as SteamLaunchState.Error).message
@@ -118,12 +118,12 @@ fun GameDetailScreen(
      )
     }
 
-    // launchinダイアログ (Winlator初期化含む)
+    // launchinダイアログ (Winlator initialization含む)
     if (launchState is LaunchState.Launching) {
      LaunchingDialog()
     }
 
-    // launchエラーダイアログ
+    // launchErrorダイアログ
     if (showLaunchErrorDialog) {
      LaunchErrorDialog(
       message = launchErrorMessage,
@@ -131,7 +131,7 @@ fun GameDetailScreen(
      )
     }
 
-    // Steamlaunchエラーダイアログ
+    // SteamlaunchErrorダイアログ
     if (showSteamLaunchErrorDialog) {
      SteamLaunchErrorDialog(
       message = steamLaunchErrorMessage,
@@ -153,7 +153,7 @@ fun GameDetailScreen(
     )
    }
    is GameDetailUiState.Deleted -> {
-    // delete完了後 LaunchedEffect return
+    // deleteComplete後 LaunchedEffect return
    }
   }
  }
@@ -386,25 +386,25 @@ fun GameDetailContent(
     items = listOf(
      "play time" to game.playTimeFormatted,
      "最終プレイdate and time" to game.lastPlayedFormatted,
-     "ソース" to when (game.source) {
+     "Source" to when (game.source) {
       com.steamdeck.mobile.domain.model.GameSource.STEAM -> "Steam"
-      com.steamdeck.mobile.domain.model.GameSource.IMPORTED -> "インポート"
+      com.steamdeck.mobile.domain.model.GameSource.IMPORTED -> "Import"
      }
     )
    )
 
-   // ファイルパスカード
+   // File Pathsカード
    InfoCard(
-    title = "ファイルパス",
+    title = "File Paths",
     items = listOf(
-     "実行ファイル" to game.executablePath,
+     "Executable" to game.executablePath,
      "installationパス" to game.installPath
     )
    )
 
    if (game.steamAppId != null) {
     InfoCard(
-     title = "Steam情報",
+     title = "Steam Info",
      items = listOf(
       "Steam App ID" to game.steamAppId.toString()
      )
@@ -564,12 +564,12 @@ fun ErrorContent(
   ) {
    Icon(
     imageVector = Icons.Default.Warning,
-    contentDescription = "エラー",
+    contentDescription = "Error",
     modifier = Modifier.size(64.dp),
     tint = MaterialTheme.colorScheme.error
    )
    Text(
-    text = "エラー 発生しました",
+    text = "Error 発生しました",
     style = MaterialTheme.typography.titleLarge,
     fontWeight = FontWeight.Bold,
     color = MaterialTheme.colorScheme.error

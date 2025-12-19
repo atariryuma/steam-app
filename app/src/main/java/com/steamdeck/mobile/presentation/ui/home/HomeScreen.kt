@@ -140,7 +140,7 @@ fun BackboneOneStyleContent(
    }
   }
 
-  // 最近プレイしたgame
+  // Recently Playedgame
   if (recentGames.isNotEmpty()) {
    item {
     GameSection(
@@ -166,11 +166,11 @@ fun BackboneOneStyleContent(
    }
   }
 
-  // インポートgame
+  // Importgame
   if (importedGames.isNotEmpty()) {
    item {
     GameSection(
-     title = "インポート済み",
+     title = "Import済み",
      icon = Icons.Default.Folder,
      games = importedGames,
      onGameClick = onGameClick,
@@ -422,7 +422,7 @@ fun ErrorContent(message: String, onRetry: () -> Unit) {
     tint = MaterialTheme.colorScheme.error
    )
    Text(
-    text = "エラー 発生しました",
+    text = "Error 発生しました",
     style = MaterialTheme.typography.headlineSmall
    )
    Text(message, style = MaterialTheme.typography.bodyMedium)

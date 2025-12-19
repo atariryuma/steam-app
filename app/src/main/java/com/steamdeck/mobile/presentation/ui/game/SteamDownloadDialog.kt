@@ -16,7 +16,7 @@ import com.steamdeck.mobile.domain.model.Game
  *
  * Phase 5B実装版:
  * - Steam CDNdirectlydownload対応
- * - 代替手段 してファイルインポート誘導
+ * - 代替手段 してファイルImport誘導
  * - download進捗表示to ナビゲーション
  */
 @Composable
@@ -116,7 +116,7 @@ fun SteamDownloadDialog(
    dismissButton = {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
      TextButton(onClick = onNavigateToImport) {
-      Text("ファイルインポート")
+      Text("ファイルImport")
      }
      TextButton(onClick = onDismiss) {
       Text("cancel")

@@ -67,14 +67,14 @@ fun DownloadScreen(
     )
    }
 
-   // 完了済みクリアボタン
+   // Complete済みクリアボタン
    IconButton(
     onClick = { viewModel.clearCompleted() },
     enabled = downloads.any { it.status == DownloadStatus.COMPLETED }
    ) {
     Icon(
      imageVector = Icons.Default.Clear,
-     contentDescription = "完了済みクリア",
+     contentDescription = "Complete済みクリア",
      tint = MaterialTheme.colorScheme.onSurface
     )
    }
@@ -263,7 +263,7 @@ private fun DownloadItem(
 
      DownloadStatus.PAUSED -> {
       IconButton(onClick = onResume) {
-       Icon(Icons.Default.PlayArrow, contentDescription = "再開")
+       Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
       }
       IconButton(onClick = onCancel) {
        Icon(Icons.Default.Close, contentDescription = "cancel")
@@ -284,7 +284,7 @@ private fun DownloadItem(
      DownloadStatus.COMPLETED -> {
       Icon(
        Icons.Default.CheckCircle,
-       contentDescription = "完了",
+       contentDescription = "Complete",
        tint = MaterialTheme.colorScheme.primary
       )
       IconButton(onClick = onCancel) {
@@ -300,10 +300,10 @@ private fun DownloadItem(
     }
    }
 
-   // エラーメッセージ
+   // Errorメッセージ
    if (download.status == DownloadStatus.FAILED && download.errorMessage != null) {
     Text(
-     text = "エラー: ${download.errorMessage}",
+     text = "Error: ${download.errorMessage}",
      style = MaterialTheme.typography.bodySmall,
      color = MaterialTheme.colorScheme.error
     )
@@ -335,13 +335,13 @@ private fun DownloadStatusIcon(status: DownloadStatus) {
 
   DownloadStatus.COMPLETED -> Icon(
    Icons.Default.CheckCircle,
-   contentDescription = "完了",
+   contentDescription = "Complete",
    tint = MaterialTheme.colorScheme.primary
   )
 
   DownloadStatus.FAILED -> Icon(
    Icons.Default.Warning,
-   contentDescription = "失敗",
+   contentDescription = "Failed",
    tint = MaterialTheme.colorScheme.error
   )
 

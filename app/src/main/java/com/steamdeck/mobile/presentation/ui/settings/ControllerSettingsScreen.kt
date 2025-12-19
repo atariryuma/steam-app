@@ -75,7 +75,7 @@ fun ControllerSettingsScreen(
    IconButton(onClick = { viewModel.refreshControllers() }) {
     Icon(
      imageVector = Icons.Default.Refresh,
-     contentDescription = "更新",
+     contentDescription = "Update",
      tint = MaterialTheme.colorScheme.onSurface
     )
    }
@@ -365,7 +365,7 @@ private fun JoystickPreview(joystickState: JoystickState) {
    verticalArrangement = Arrangement.spacedBy(8.dp)
   ) {
    Text(
-    "左スティック",
+    "Left Stick",
     style = MaterialTheme.typography.labelMedium,
     fontWeight = FontWeight.Bold
    )
@@ -377,7 +377,7 @@ private fun JoystickPreview(joystickState: JoystickState) {
    Spacer(modifier = Modifier.height(8.dp))
 
    Text(
-    "右スティック",
+    "Right Stick",
     style = MaterialTheme.typography.labelMedium,
     fontWeight = FontWeight.Bold
    )
@@ -389,7 +389,7 @@ private fun JoystickPreview(joystickState: JoystickState) {
    Spacer(modifier = Modifier.height(8.dp))
 
    Text(
-    "トリガー",
+    "Trigger",
     style = MaterialTheme.typography.labelMedium,
     fontWeight = FontWeight.Bold
    )
@@ -448,14 +448,14 @@ private fun ProfileCard(
     )
     Spacer(modifier = Modifier.height(4.dp))
     Text(
-     text = "振動: ${if (profile.vibrationEnabled) "有効" else "無効"} | デッドゾーン: ${String.format("%.1f", profile.deadzone * 100)}%",
+     text = "Vibration: ${if (profile.vibrationEnabled) "Enabled" else "Disabled"} | Deadzone: ${String.format("%.1f", profile.deadzone * 100)}%",
      style = MaterialTheme.typography.bodySmall,
      color = MaterialTheme.colorScheme.onSurfaceVariant
     )
    }
 
    IconButton(onClick = onEdit) {
-    Icon(Icons.Default.Edit, contentDescription = "編集")
+    Icon(Icons.Default.Edit, contentDescription = "Edit")
    }
 
    IconButton(onClick = onDelete) {
@@ -502,7 +502,7 @@ private fun ProfileEditorDialog(
 
     item {
      Text(
-      "振動settings",
+      "Vibrationsettings",
       style = MaterialTheme.typography.titleSmall,
       fontWeight = FontWeight.Bold
      )
@@ -514,7 +514,7 @@ private fun ProfileEditorDialog(
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically
      ) {
-      Text("振動有効化")
+      Text("VibrationEnabled化")
       Switch(
        checked = profile.vibrationEnabled,
        onCheckedChange = onUpdateVibration
@@ -528,7 +528,7 @@ private fun ProfileEditorDialog(
 
     item {
      Text(
-      "デッドゾーンsettings",
+      "Deadzonesettings",
       style = MaterialTheme.typography.titleSmall,
       fontWeight = FontWeight.Bold
      )
@@ -576,7 +576,7 @@ private fun ErrorMessage(
  ) {
   Icon(
    Icons.Default.Warning,
-   contentDescription = "エラー",
+   contentDescription = "Error",
    modifier = Modifier.size(64.dp),
    tint = MaterialTheme.colorScheme.error
   )
@@ -612,7 +612,7 @@ private fun NoControllersMessage(modifier: Modifier = Modifier) {
    color = MaterialTheme.colorScheme.outline
   )
   Text(
-   text = "controllerconnectionして「更新」ボタンタップplease",
+   text = "controllerconnectionして「Update」ボタンタップplease",
    style = MaterialTheme.typography.bodyMedium,
    color = MaterialTheme.colorScheme.onSurfaceVariant
   )

@@ -24,13 +24,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /**
- * 免責事項ダイアログ
+ * Disclaimerダイアログ
  *
- * Steam利用規約違反リスク ついてユーザー 警告
+ * Steam利用規約違反リスク ついてユーザー Warning
  *
  * Best Practice:
  * - 初回launch時 表示（DataStore フラグ管理）
- * - 同意しない場合 アプリend
+ * - Disagree場合 アプリend
  * - 重要な法的情報 ため、スクロール可能 
  */
 @Composable
@@ -40,7 +40,7 @@ fun DisclaimerDialog(
  modifier: Modifier = Modifier
 ) {
  AlertDialog(
-  onDismissRequest = { /* ダイアログ外タップ無効 */ },
+  onDismissRequest = { /* ダイアログ外タップDisabled */ },
   icon = {
    Icon(
     imageVector = Icons.Default.Warning,
@@ -127,7 +127,7 @@ fun DisclaimerDialog(
   },
   dismissButton = {
    TextButton(onClick = onDecline) {
-    Text("同意しない")
+    Text("Disagree")
    }
   },
   modifier = modifier

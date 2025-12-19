@@ -73,7 +73,7 @@ class ControllerViewModel @Inject constructor(
     _uiState.value = ControllerUiState.Success
    } catch (e: Exception) {
     AppLogger.e(TAG, "Failed to load controllers", e)
-    _uiState.value = ControllerUiState.Error(e.message ?: "controller検出エラー")
+    _uiState.value = ControllerUiState.Error(e.message ?: "controller検出Error")
    }
   }
  }
@@ -271,7 +271,7 @@ class ControllerViewModel @Inject constructor(
      }
      is DataResult.Error -> {
       AppLogger.e(TAG, "Failed to save profile: ${profile.name}")
-      _uiState.value = ControllerUiState.Error("プロファイルsaveエラー: ${result.error}")
+      _uiState.value = ControllerUiState.Error("プロファイルsaveError: ${result.error}")
      }
      is DataResult.Loading -> {
       // Should not happen for legacy Result conversion
@@ -279,7 +279,7 @@ class ControllerViewModel @Inject constructor(
     }
    } catch (e: Exception) {
     AppLogger.e(TAG, "Exception saving profile", e)
-    _uiState.value = ControllerUiState.Error(e.message ?: "不明なエラー")
+    _uiState.value = ControllerUiState.Error(e.message ?: "不明なError")
    }
   }
  }
@@ -313,7 +313,7 @@ class ControllerViewModel @Inject constructor(
      }
      is DataResult.Error -> {
       AppLogger.e(TAG, "Failed to delete profile: ${profile.name}")
-      _uiState.value = ControllerUiState.Error("プロファイルdeleteエラー: ${result.error}")
+      _uiState.value = ControllerUiState.Error("プロファイルdeleteError: ${result.error}")
      }
      is DataResult.Loading -> {
       // Should not happen for legacy Result conversion
@@ -321,7 +321,7 @@ class ControllerViewModel @Inject constructor(
     }
    } catch (e: Exception) {
     AppLogger.e(TAG, "Exception deleting profile", e)
-    _uiState.value = ControllerUiState.Error(e.message ?: "不明なエラー")
+    _uiState.value = ControllerUiState.Error(e.message ?: "不明なError")
    }
   }
  }

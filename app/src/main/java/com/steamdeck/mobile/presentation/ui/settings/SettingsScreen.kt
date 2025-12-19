@@ -108,7 +108,7 @@ fun SettingsScreen(
  var selectedSection by remember { mutableIntStateOf(0) }
  var showWebView by remember { mutableStateOf(false) }
 
- // エラー・成功メッセージ スナックバー表示
+ // Error・Successメッセージ スナックバー表示
  LaunchedEffect(uiState) {
   when (val state = uiState) {
    is SettingsUiState.Error -> {
@@ -131,7 +131,7 @@ fun SettingsScreen(
   }
  }
 
- // 同期完了メッセージ スナックバー表示
+ // SyncCompleteメッセージ スナックバー表示
  LaunchedEffect(syncState) {
   when (val state = syncState) {
    is SyncState.Success -> {
@@ -267,7 +267,7 @@ private fun SettingsNavigationRail(
      contentDescription = "library"
     )
    },
-   label = { Text("同期") }
+   label = { Text("Sync") }
   )
 
   // controller
@@ -432,7 +432,7 @@ private fun SteamAuthContent(
 ) {
  val steamLoginState by steamLoginViewModel.uiState.collectAsState()
  
- // authentication成功時 WebView閉じる
+ // authenticationSuccess時 WebViewClose
  LaunchedEffect(steamLoginState) {
   if (steamLoginState is SteamLoginUiState.Success) {
    onHideWebView()
@@ -440,7 +440,7 @@ private fun SteamAuthContent(
  }
  
  if (showWebView) {
-  // WebView表示（フルサイズ、サイドバー維持）
+  // WebView表示（フルSize、サイドバー維持）
   val (authUrl, _) = remember { steamLoginViewModel.startOpenIdLogin() }
   
   Box(
@@ -460,7 +460,7 @@ private fun SteamAuthContent(
    )
   }
  } else if (data.isSteamConfigured) {
-  // ログイン済み - Steamstyle design
+  // Login済み - Steamstyle design
   SteamAuthLoggedInSection(
    username = data.steamUsername,
    steamId = data.steamId,
@@ -468,7 +468,7 @@ private fun SteamAuthContent(
    onLogout = onClear
   )
  } else {
-  // 未ログイン - OpenIDログインボタン表示
+  // 未Login - OpenIDLoginボタン表示
   SteamOpenIdAuthSection(
    onNavigateToLogin = onShowWebView
   )
@@ -550,7 +550,7 @@ private fun SteamAuthLoggedInSection(
      Spacer(modifier = Modifier.height(8.dp))
 
      Text(
-      text = "ログイン済み",
+      text = "Login済み",
       style = MaterialTheme.typography.headlineSmall.copy(
        fontWeight = FontWeight.Bold
       ),
@@ -591,7 +591,7 @@ private fun SteamAuthLoggedInSection(
       )
      ) {
       Text(
-       "再ログイン",
+       "再Login",
        style = MaterialTheme.typography.titleMedium.copy(
         fontWeight = FontWeight.Bold
        )
@@ -607,7 +607,7 @@ private fun SteamAuthLoggedInSection(
       border = BorderStroke(1.dp, Color(0xFF8F98A0))
      ) {
       Text(
-       "ログアウト",
+       "Logout",
        style = MaterialTheme.typography.titleMedium
       )
      }
@@ -715,7 +715,7 @@ private fun SteamOpenIdAuthSection(
     
     Spacer(modifier = Modifier.height(32.dp))
     
-    // ログインボタン（Steam風グラデーション）
+    // Loginボタン（Steam風グラデーション）
     Button(
      onClick = onNavigateToLogin,
      modifier = Modifier
@@ -896,7 +896,7 @@ private fun SteamClientContent(
         )
        }
        Text(
-        text = "• downloadサイズ: 約100MB\n• installation時間: 2〜3minutes\n• 初回 みBox64/Wine環境 展開 必要 す",
+        text = "• downloadSize: 約100MB\n• installation時間: 2〜3minutes\n• 初回 みBox64/Wine環境 展開 必要 す",
         style = MaterialTheme.typography.bodySmall,
         color = Color(0xFF8F98A0),
         lineHeight = 20.sp
@@ -1102,7 +1102,7 @@ private fun SteamClientContent(
       }
       Column(modifier = Modifier.weight(1f)) {
        Text(
-        text = "エラー",
+        text = "Error",
         style = MaterialTheme.typography.titleLarge.copy(
          fontWeight = FontWeight.Bold
         ),
@@ -1136,7 +1136,7 @@ private fun SteamClientContent(
        verticalArrangement = Arrangement.spacedBy(12.dp)
       ) {
        Text(
-        text = "エラー詳細:",
+        text = "Error詳細:",
         style = MaterialTheme.typography.titleSmall.copy(
          fontWeight = FontWeight.Bold
         ),
@@ -1222,12 +1222,12 @@ private fun LibrarySyncContent(
    verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
    Text(
-    text = "最終同期: ${data.lastSyncFormatted}",
+    text = "最終Sync: ${data.lastSyncFormatted}",
     style = MaterialTheme.typography.bodyLarge,
     color = MaterialTheme.colorScheme.onSurfaceVariant
    )
 
-   // 同期状態表示
+   // Sync状態表示
    when (val state = syncState) {
     is SyncState.Syncing -> {
      Column(
@@ -1246,7 +1246,7 @@ private fun LibrarySyncContent(
     else -> {}
    }
 
-   // 同期ボタン
+   // Syncボタン
    FilledTonalButton(
     onClick = onSync,
     enabled = data.isSteamConfigured && syncState !is SyncState.Syncing,
@@ -1254,11 +1254,11 @@ private fun LibrarySyncContent(
    ) {
     Icon(
      imageVector = Icons.Default.Refresh,
-     contentDescription = "同期"
+     contentDescription = "Sync"
     )
     Spacer(modifier = Modifier.width(8.dp))
     Text(
-     text = if (syncState is SyncState.Syncing) "同期in..." else "library sync"
+     text = if (syncState is SyncState.Syncing) "Syncin..." else "library sync"
     )
    }
 
@@ -1342,10 +1342,10 @@ private fun WineTestContent(
    ) {
     Icon(
      imageVector = Icons.Default.Refresh,
-     contentDescription = "テスト"
+     contentDescription = "Test"
     )
     Spacer(modifier = Modifier.width(8.dp))
-    Text("Wine環境テスト")
+    Text("Wine環境Test")
    }
 
    Text(
@@ -1402,7 +1402,7 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
      color = Color.White
     )
     Text(
-     text = "${(state.progress * 100).toInt()}% 完了",
+     text = "${(state.progress * 100).toInt()}% Complete",
      style = MaterialTheme.typography.bodyMedium,
      color = Color(0xFF66C0F4)
     )
@@ -1452,7 +1452,7 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
       modifier = Modifier.size(20.dp)
      )
      Text(
-      text = if (state.progress < 0.4f) "Winlator初期化in" else "installationin",
+      text = if (state.progress < 0.4f) "Winlator initializationin" else "installationin",
       style = MaterialTheme.typography.titleSmall.copy(
        fontWeight = FontWeight.Bold
       ),
@@ -1464,7 +1464,7 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
      text = if (state.progress < 0.4f) {
       "初回 みBox64/Wineバイナリ展開しています。\nこ 処理 2〜3minutesかかる場合 あります。"
      } else {
-      "Steamインストーラー実行しています。\n完了ま しばらくお待ちください。"
+      "Steamインストーラー実行しています。\nCompleteま しばらくお待ちください。"
      },
      style = MaterialTheme.typography.bodySmall,
      color = Color(0xFF8F98A0),

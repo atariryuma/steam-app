@@ -105,11 +105,11 @@ class SettingsViewModel @Inject constructor(
  /**
   * QRauthentication後 自動library sync
   *
-  * QRauthentication成功後、自動的 library sync
+  * QRauthenticationSuccess後、自動的 library sync
   */
  fun syncAfterQrLogin() {
   viewModelScope.launch {
-   // 少し待機（QRauthentication完了確実 do）
+   // 少し待機（QRauthenticationComplete確実 do）
    kotlinx.coroutines.delay(500)
    syncSteamLibrary()
   }
@@ -121,7 +121,7 @@ class SettingsViewModel @Inject constructor(
   * Best Practice: ユーザー提供 API Keyuse
   * ユーザー 事前 API Key登録do必要 あります
   *
-  * 2025 Best Practice: DataResult<T> エラーハンドリング
+  * 2025 Best Practice: DataResult<T> Errorハンドリング
   */
  fun syncSteamLibrary() {
   viewModelScope.launch {
@@ -131,20 +131,20 @@ class SettingsViewModel @Inject constructor(
 
    if (steamId.isNullOrBlank()) {
     AppLogger.w(TAG, "Sync attempted without Steam ID")
-    _syncState.value = SyncState.Error("Steam ID not found。QRコード ログインplease。")
+    _syncState.value = SyncState.Error("Steam ID not found。QRコード Loginplease。")
     return@launch
    }
 
-   _syncState.value = SyncState.Syncing(progress = 0f, message = "同期startしています...")
+   _syncState.value = SyncState.Syncing(progress = 0f, message = "Syncstartしています...")
    AppLogger.i(TAG, "Starting library sync for Steam ID: $steamId")
 
-   // DataResult<Int>useした型安全なエラーハンドリング
+   // DataResult<Int>useした型安全なErrorハンドリング
    when (val result = syncSteamLibraryUseCase(steamId)) {
     is DataResult.Success -> {
      val syncedCount = result.data
      securePreferences.setLastSyncTimestamp(System.currentTimeMillis())
      _syncState.value = SyncState.Success(syncedCount)
-     loadSettings() // 最終同期date and time更新
+     loadSettings() // 最終Syncdate and timeUpdate
      AppLogger.i(TAG, "Library sync completed: $syncedCount games")
     }
     is DataResult.Error -> {
@@ -153,10 +153,10 @@ class SettingsViewModel @Inject constructor(
      AppLogger.e(TAG, "Library sync failed: $errorMessage")
     }
     is DataResult.Loading -> {
-     // 進捗更新（将来的 ProgressBar 対応）
+     // 進捗Update（将来的 ProgressBar 対応）
      _syncState.value = SyncState.Syncing(
       progress = result.progress ?: 0f,
-      message = "同期in..."
+      message = "Syncin..."
      )
     }
    }
@@ -179,7 +179,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     if (apiKey.length != 32 || !apiKey.matches(Regex("^[0-9A-Fa-f]{32}$"))) {
-     _uiState.value = SettingsUiState.Error("無効なAPI Key す（32文字 16進数 ある必要 あります）")
+     _uiState.value = SettingsUiState.Error("DisabledなAPI Key す（32文字 16進数 ある必要 あります）")
      return@launch
     }
 
@@ -245,7 +245,7 @@ class SettingsViewModel @Inject constructor(
  /**
   * Steam Clientinstallation
   *
-  * @param containerId Winlatorコンテナ ID (String型)
+  * @param containerId WinlatorContainer ID (String型)
   */
  fun installSteamClient(containerId: String) {
   viewModelScope.launch {
@@ -290,7 +290,7 @@ class SettingsViewModel @Inject constructor(
 
    } catch (e: Exception) {
     _steamInstallState.value = SteamInstallState.Error(
-     "予期しないエラー 発生しました: ${e.message}"
+     "予期しないError 発生しました: ${e.message}"
     )
     AppLogger.e(TAG, "Exception during Steam installation", e)
    }
@@ -300,7 +300,7 @@ class SettingsViewModel @Inject constructor(
  /**
   * Steam Clientopen
   *
-  * @param containerId Winlatorコンテナ ID
+  * @param containerId WinlatorContainer ID
   */
  fun openSteamClient(containerId: String) {
   viewModelScope.launch {
@@ -326,7 +326,7 @@ class SettingsViewModel @Inject constructor(
 
    } catch (e: Exception) {
     _steamInstallState.value = SteamInstallState.Error(
-     "Steam Clientlaunchin 予期しないエラー 発生しました: ${e.message}"
+     "Steam Clientlaunchin 予期しないError 発生しました: ${e.message}"
     )
     AppLogger.e(TAG, "Exception while opening Steam Client", e)
    }
@@ -336,7 +336,7 @@ class SettingsViewModel @Inject constructor(
  /**
   * Steam Clientアンinstallation
   *
-  * @param containerId Winlatorコンテナ ID
+  * @param containerId WinlatorContainer ID
   */
  fun uninstallSteamClient(containerId: String) {
   viewModelScope.launch {
@@ -368,7 +368,7 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * エラーメッセージクリア
+  * Errorメッセージクリア
   */
  fun clearError() {
   if (_uiState.value is SettingsUiState.Error) {
@@ -377,7 +377,7 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * 成功メッセージクリア
+  * Successメッセージクリア
   */
  fun clearSuccessMessage() {
   val currentState = _uiState.value as? SettingsUiState.Success
@@ -387,7 +387,7 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * 同期状態リセット
+  * Sync状態リセット
   */
  fun resetSyncState() {
   _syncState.value = SyncState.Idle
@@ -425,19 +425,19 @@ data class SettingsData(
  val isSteamConfigured: Boolean
 ) {
  /**
-  * 最終同期date and timeフォーマット
+  * 最終Syncdate and timeフォーマット
   */
  val lastSyncFormatted: String
   get() {
-   if (lastSyncTimestamp == null) return "未同期"
+   if (lastSyncTimestamp == null) return "Never synced"
    val now = System.currentTimeMillis()
    val diff = now - lastSyncTimestamp
 
    return when {
-    diff < 60_000 -> "1minutes以内"
+    diff < 60_000 -> "Less than 1 minute ago"
     diff < 3600_000 -> "${diff / 60_000}minutes前"
-    diff < 86400_000 -> "${diff / 3600_000}時間前"
-    else -> "${diff / 86400_000}日前"
+    diff < 86400_000 -> "${diff / 3600_000} hours ago"
+    else -> "${diff / 86400_000} days ago"
    }
   }
 }

@@ -30,7 +30,7 @@ class DownloadViewModel @Inject constructor(
 ) : ViewModel() {
 
  /**
-  * 全downloadlist（リアルタイム更新）
+  * 全downloadlist（リアルタイムUpdate）
   */
  val downloads: StateFlow<List<DownloadEntity>> = downloadDao.getAllDownloads()
   .stateIn(
@@ -65,7 +65,7 @@ class DownloadViewModel @Inject constructor(
  }
 
  /**
-  * download再開
+  * downloadResume
   */
  fun resumeDownload(downloadId: Long) {
   viewModelScope.launch {
@@ -93,7 +93,7 @@ class DownloadViewModel @Inject constructor(
  }
 
  /**
-  * 完了済みdownloadクリア
+  * Complete済みdownloadクリア
   */
  fun clearCompleted() {
   viewModelScope.launch {

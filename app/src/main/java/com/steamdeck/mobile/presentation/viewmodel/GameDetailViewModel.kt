@@ -74,7 +74,7 @@ class GameDetailViewModel @Inject constructor(
      GameDetailUiState.Error("game not found")
     }
    } catch (e: Exception) {
-    _uiState.value = GameDetailUiState.Error(e.message ?: "不明なエラー")
+    _uiState.value = GameDetailUiState.Error(e.message ?: "不明なError")
    }
   }
  }
@@ -109,7 +109,7 @@ class GameDetailViewModel @Inject constructor(
   viewModelScope.launch {
    when (val result = toggleFavoriteUseCase(gameId, isFavorite)) {
     is DataResult.Success -> {
-     // UI状態更新
+     // UI状態Update
      val currentState = _uiState.value
      if (currentState is GameDetailUiState.Success) {
       _uiState.value = GameDetailUiState.Success(
@@ -179,10 +179,10 @@ class GameDetailViewModel @Inject constructor(
 
     val game = currentState.game
 
-    // コンテナID Steam App IDcheck
+    // ContainerID Steam App IDcheck
     if (game.winlatorContainerId == null) {
      _steamLaunchState.value = SteamLaunchState.Error(
-      "コンテナ settingsされていません。settings画面 コンテナcreateplease。"
+      "Container settingsされていません。settings画面 Containercreateplease。"
      )
      return@launch
     }
@@ -214,7 +214,7 @@ class GameDetailViewModel @Inject constructor(
 
    } catch (e: Exception) {
     _steamLaunchState.value = SteamLaunchState.Error(
-     e.message ?: "Steamlaunchin 予期しないエラー 発生しました"
+     e.message ?: "Steamlaunchin 予期しないError 発生しました"
     )
     AppLogger.e(TAG, "Exception during Steam launch", e)
    }
@@ -238,10 +238,10 @@ class GameDetailViewModel @Inject constructor(
 
     val game = currentState.game
 
-    // コンテナIDcheck
+    // ContainerIDcheck
     if (game.winlatorContainerId == null) {
      _steamLaunchState.value = SteamLaunchState.Error(
-      "コンテナ settingsされていません。settings画面 コンテナcreateplease。"
+      "Container settingsされていません。settings画面 Containercreateplease。"
      )
      return@launch
     }
@@ -263,7 +263,7 @@ class GameDetailViewModel @Inject constructor(
 
    } catch (e: Exception) {
     _steamLaunchState.value = SteamLaunchState.Error(
-     e.message ?: "Steam Clientlaunchin 予期しないエラー 発生しました"
+     e.message ?: "Steam Clientlaunchin 予期しないError 発生しました"
     )
     AppLogger.e(TAG, "Exception while opening Steam Client", e)
    }

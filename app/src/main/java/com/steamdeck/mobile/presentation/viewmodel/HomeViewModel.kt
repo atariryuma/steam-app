@@ -53,13 +53,13 @@ class HomeViewModel @Inject constructor(
     }
    } catch (e: Exception) {
     AppLogger.e(TAG, "Failed to load games", e)
-    _uiState.value = HomeUiState.Error(e.message ?: "不明なエラー")
+    _uiState.value = HomeUiState.Error(e.message ?: "不明なError")
    }
   }
  }
 
  /**
-  * game検索
+  * gameSearch
   */
  fun searchGames(query: String) {
   _searchQuery.value = query
@@ -79,7 +79,7 @@ class HomeViewModel @Inject constructor(
     }
    } catch (e: Exception) {
     AppLogger.e(TAG, "Game search failed: $query", e)
-    _uiState.value = HomeUiState.Error(e.message ?: "検索エラー")
+    _uiState.value = HomeUiState.Error(e.message ?: "SearchError")
    }
   }
  }
@@ -113,7 +113,7 @@ class HomeViewModel @Inject constructor(
   * - 入力値 バリデーション
   * - 重複check
   * - insertGame 戻り値verify
-  * - 適切なエラーハンドリング
+  * - 適切なErrorハンドリング
   */
  fun addGame(name: String, executablePath: String, installPath: String) {
   viewModelScope.launch {
@@ -124,7 +124,7 @@ class HomeViewModel @Inject constructor(
      return@launch
     }
     if (executablePath.isBlank()) {
-     _uiState.value = HomeUiState.Error("実行ファイル選択please")
+     _uiState.value = HomeUiState.Error("Executable選択please")
      return@launch
     }
     if (installPath.isBlank()) {
@@ -151,11 +151,11 @@ class HomeViewModel @Inject constructor(
           installPath.startsWith("/")
 
     if (!isValidExecutablePath) {
-     _uiState.value = HomeUiState.Error("実行ファイル パス 無効 す")
+     _uiState.value = HomeUiState.Error("Executable パス Disabled す")
      return@launch
     }
     if (!isValidInstallPath) {
-     _uiState.value = HomeUiState.Error("installationフォルダ パス 無効 す")
+     _uiState.value = HomeUiState.Error("installationフォルダ パス Disabled す")
      return@launch
     }
 
@@ -185,7 +185,7 @@ class HomeViewModel @Inject constructor(
      return@launch
     }
     if (isDuplicatePath) {
-     _uiState.value = HomeUiState.Error("同じ実行ファイル 既 登録されています")
+     _uiState.value = HomeUiState.Error("同じExecutable 既 登録されています")
      return@launch
     }
 
@@ -202,15 +202,15 @@ class HomeViewModel @Inject constructor(
 
     // 6. 挿入結果verify
     if (insertedId <= 0) {
-     _uiState.value = HomeUiState.Error("game add failed（無効なID: $insertedId）")
+     _uiState.value = HomeUiState.Error("game add failed（DisabledなID: $insertedId）")
      AppLogger.e(TAG, "Invalid game ID returned: $insertedId")
      return@launch
     }
 
     AppLogger.i(TAG, "Game added successfully: $name (ID: $insertedId)")
 
-    // 7. add後、リスト更新
-    // Note: Flow 自動更新される 、明示的 refresh()呼ぶこ 即座 反映
+    // 7. add後、リストUpdate
+    // Note: Flow 自動Updateされる 、明示的 refresh()呼ぶこ 即座 反映
     refresh()
 
    } catch (e: android.database.sqlite.SQLiteConstraintException) {

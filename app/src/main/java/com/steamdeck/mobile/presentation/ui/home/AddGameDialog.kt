@@ -29,11 +29,11 @@ import androidx.compose.ui.window.DialogProperties
  * - Derived state パス表示管理
  * - Material3 Card design: elevation 2dp, padding 20dp
  *
- * @param onDismiss ダイアログ閉じる
+ * @param onDismiss ダイアログClose
  * @param onConfirm game情報確定 (name, executablePath, installPath)
- * @param onSelectExecutable 実行ファイル選択ボタン 押された
+ * @param onSelectExecutable Executable選択ボタン 押された
  * @param onSelectInstallFolder installationフォルダ選択ボタン 押された
- * @param selectedExecutablePath 選択された実行ファイルパス（親 from 渡される、変更不可）
+ * @param selectedExecutablePath 選択された実行File Paths（親 from 渡される、変更不可）
  * @param selectedInstallPath 選択されたinstallationパス（親 from 渡される、変更不可）
  */
 @Composable
@@ -193,7 +193,7 @@ fun AddGameDialog(
        verticalArrangement = Arrangement.spacedBy(12.dp)
       ) {
        Text(
-        text = "実行ファイル",
+        text = "Executable",
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary
@@ -255,7 +255,7 @@ fun AddGameDialog(
       }
      }
 
-     // エラーメッセージ
+     // Errorメッセージ
      if (showError) {
       Card(
        modifier = Modifier.fillMaxWidth(),
@@ -290,7 +290,7 @@ fun AddGameDialog(
        verticalArrangement = Arrangement.spacedBy(8.dp)
       ) {
        Text(
-        text = "注意事項",
+        text = "Notes",
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSecondaryContainer

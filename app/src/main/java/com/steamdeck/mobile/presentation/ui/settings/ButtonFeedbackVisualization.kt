@@ -55,7 +55,7 @@ fun ButtonFeedbackGrid(
    verticalArrangement = Arrangement.spacedBy(12.dp)
   ) {
    Text(
-    "ボタンテスト",
+    "ボタンTest",
     style = MaterialTheme.typography.titleSmall,
     fontWeight = FontWeight.Bold
    )
@@ -174,8 +174,8 @@ private fun ButtonIndicatorChip(
  *
  * Research findings:
  * - Canvas API customグラフィックス
- * - デッドゾーン表示（通常0.1 = 10%）
- * - スティック位置 リアルタイム更新
+ * - Deadzone表示（通常0.1 = 10%）
+ * - スティック位置 リアルタイムUpdate
  */
 @Composable
 fun JoystickVisualization(
@@ -210,13 +210,13 @@ fun JoystickVisualization(
     modifier = Modifier.fillMaxWidth(),
     horizontalArrangement = Arrangement.spacedBy(16.dp)
    ) {
-    // 左スティック
+    // Left Stick
     Column(
      modifier = Modifier.weight(1f),
      horizontalAlignment = Alignment.CenterHorizontally
     ) {
      Text(
-      "左スティック",
+      "Left Stick",
       style = MaterialTheme.typography.labelMedium
      )
      Spacer(modifier = Modifier.height(8.dp))
@@ -234,13 +234,13 @@ fun JoystickVisualization(
      )
     }
 
-    // 右スティック
+    // Right Stick
     Column(
      modifier = Modifier.weight(1f),
      horizontalAlignment = Alignment.CenterHorizontally
     ) {
      Text(
-      "右スティック",
+      "Right Stick",
       style = MaterialTheme.typography.labelMedium
      )
      Spacer(modifier = Modifier.height(8.dp))
@@ -288,7 +288,7 @@ private fun JoystickCanvas(
    style = Stroke(width = 2.dp.toPx())
   )
 
-  // デッドゾーン円
+  // Deadzone円
   drawCircle(
    color = errorColor.copy(alpha = 0.2f),
    radius = radius * deadzone,
@@ -329,7 +329,7 @@ private fun JoystickCanvas(
 }
 
 /**
- * トリガー圧力バー（アナログL2/R2）
+ * Trigger圧力バー（アナログL2/R2）
  */
 @Composable
 fun TriggerPressureBar(
@@ -352,19 +352,19 @@ fun TriggerPressureBar(
    verticalArrangement = Arrangement.spacedBy(12.dp)
   ) {
    Text(
-    "トリガー圧力",
+    "Trigger圧力",
     style = MaterialTheme.typography.titleSmall,
     fontWeight = FontWeight.Bold
    )
 
-   // L2トリガー
+   // L2Trigger
    TriggerIndicator(
     label = "L2",
     value = leftTrigger,
     modifier = Modifier.fillMaxWidth()
    )
 
-   // R2トリガー
+   // R2Trigger
    TriggerIndicator(
     label = "R2",
     value = rightTrigger,

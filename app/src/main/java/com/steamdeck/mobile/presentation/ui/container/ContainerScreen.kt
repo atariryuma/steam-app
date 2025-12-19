@@ -19,7 +19,7 @@ import com.steamdeck.mobile.presentation.viewmodel.ContainerUiState
 import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
 
 /**
- * Winlatorコンテナ管理画面 - BackboneOnestyle design
+ * WinlatorContainer Management画面 - BackboneOnestyle design
  *
  * Best Practices:
  * - No TopAppBar for immersive full-screen experience
@@ -28,10 +28,10 @@ import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
  * - LazyColumn with 24dp contentPadding, 16dp item spacing
  *
  * 機能:
- * - コンテナlist表示
- * - 新規コンテナcreate
- * - コンテナ編集
- * - コンテナdelete
+ * - Containerlist表示
+ * - 新規Containercreate
+ * - ContainerEdit
+ * - Containerdelete
  */
 @Composable
 fun ContainerScreen(
@@ -69,7 +69,7 @@ fun ContainerScreen(
      )
     }
     Text(
-     text = "コンテナ管理",
+     text = "Container Management",
      style = MaterialTheme.typography.headlineMedium,
      fontWeight = FontWeight.Bold,
      color = MaterialTheme.colorScheme.primary
@@ -137,12 +137,12 @@ fun ContainerScreen(
      ) {
       Icon(
        imageVector = Icons.Default.Error,
-       contentDescription = "エラー",
+       contentDescription = "Error",
        modifier = Modifier.size(64.dp),
        tint = MaterialTheme.colorScheme.error
       )
       Text(
-       text = "エラー 発生しました",
+       text = "Error 発生しました",
        style = MaterialTheme.typography.titleLarge,
        fontWeight = FontWeight.Bold,
        color = MaterialTheme.colorScheme.error
@@ -211,20 +211,20 @@ private fun EmptyContainersPlaceholder(
     tint = MaterialTheme.colorScheme.outline
    )
    Text(
-    text = "コンテナ ありません",
+    text = "Container ありません",
     style = MaterialTheme.typography.titleLarge,
     fontWeight = FontWeight.Bold,
     color = MaterialTheme.colorScheme.outline
    )
    Text(
-    text = "コンテナcreateしてgame実行 きます",
+    text = "Containercreateしてgame実行 きます",
     style = MaterialTheme.typography.bodyMedium,
     color = MaterialTheme.colorScheme.onSurfaceVariant
    )
    Button(onClick = onCreateClick) {
     Icon(Icons.Default.Add, "create")
     Spacer(modifier = Modifier.width(8.dp))
-    Text("コンテナcreate")
+    Text("Containercreate")
    }
   }
  }
@@ -269,7 +269,7 @@ private fun ContainerItem(
      horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
      Text(
-      text = "サイズ: ${formatSize(container.sizeBytes)}",
+      text = "Size: ${formatSize(container.sizeBytes)}",
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant
      )
@@ -308,17 +308,17 @@ private fun CreateContainerDialog(
  AlertDialog(
   onDismissRequest = onDismiss,
   icon = { Icon(Icons.Default.Add, "新規create") },
-  title = { Text("新しいコンテナcreate") },
+  title = { Text("新しいContainercreate") },
   text = {
    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Text(
-     text = "コンテナ名入力please",
+     text = "Container名入力please",
      style = MaterialTheme.typography.bodyMedium
     )
     OutlinedTextField(
      value = containerName,
      onValueChange = { containerName = it },
-     label = { Text("コンテナ名") },
+     label = { Text("Container名") },
      singleLine = true,
      modifier = Modifier.fillMaxWidth()
     )
@@ -351,11 +351,11 @@ private fun DeleteContainerDialog(
   icon = {
    Icon(
     imageVector = Icons.Default.Warning,
-    contentDescription = "警告",
+    contentDescription = "Warning",
     tint = MaterialTheme.colorScheme.error
    )
   },
-  title = { Text("コンテナdelete") },
+  title = { Text("Containerdelete") },
   text = {
    Text("「$containerName」deleteしますか？\n\nこ 操作 取り消せません。")
   },
@@ -392,10 +392,10 @@ private fun formatDate(timestamp: Long): String {
  val days = diff / (1000 * 60 * 60 * 24)
 
  return when {
-  days == 0L -> "今日"
-  days == 1L -> "昨日"
-  days < 7 -> "${days}日前"
-  days < 30 -> "${days / 7}週間前"
-  else -> "${days / 30}ヶ月前"
+  days == 0L -> "Today"
+  days == 1L -> "Yesterday"
+  days < 7 -> "${days} days ago"
+  days < 30 -> "${days / 7} weeks ago"
+  else -> "${days / 30} months ago"
  }
 }

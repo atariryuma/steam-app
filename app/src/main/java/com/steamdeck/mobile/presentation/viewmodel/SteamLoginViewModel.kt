@@ -15,10 +15,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Steam OpenIDログインViewModel（規約準拠版）
+ * Steam OpenIDLoginViewModel（規約準拠版）
  *
  * ⚠️ 変更内容:
- * - QRコードログインdelete（Steam規約違反リスク ため）
+ * - QRコードLogindelete（Steam規約違反リスク ため）
  * - Steam OpenID 2.0authentication 移行（Valve公式推奨）
  *
  * Best Practices:
@@ -87,7 +87,7 @@ class SteamLoginViewModel @Inject constructor(
    val expectedState = currentState
    if (expectedState == null) {
     _uiState.update {
-     SteamLoginUiState.Error("authenticationセッション 無効 す。もう一度ログインplease。")
+     SteamLoginUiState.Error("authenticationセッション Disabled す。もう一度Loginplease。")
     }
     return@launch
    }
@@ -115,7 +115,7 @@ class SteamLoginViewModel @Inject constructor(
  }
 
  /**
-  * エラー状態クリア
+  * Error状態クリア
   */
  fun clearError() {
   _uiState.update { SteamLoginUiState.Initial }

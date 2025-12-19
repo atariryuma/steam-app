@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Winlator初期化 ViewModel
+ * Winlator initialization ViewModel
  */
 @HiltViewModel
 class WinlatorInitViewModel @Inject constructor(
@@ -23,7 +23,7 @@ class WinlatorInitViewModel @Inject constructor(
  val uiState: StateFlow<WinlatorInitUiState> = _uiState.asStateFlow()
 
  /**
-  * Winlator初期化
+  * Winlator initialization
   */
  fun initialize() {
   viewModelScope.launch {
@@ -43,7 +43,7 @@ class WinlatorInitViewModel @Inject constructor(
     // 2. Initialize Winlator
     _uiState.value = WinlatorInitUiState.Initializing(
      progress = 0f,
-     statusText = "Winlator初期化in..."
+     statusText = "Winlator initializationin..."
     )
 
     val initResult = winlatorEmulator.initialize { progress, status ->
@@ -63,7 +63,7 @@ class WinlatorInitViewModel @Inject constructor(
     }
    } catch (e: Exception) {
     _uiState.value = WinlatorInitUiState.Error(
-     e.message ?: "初期化in エラー 発生しました"
+     e.message ?: "初期化in Error 発生しました"
     )
    }
   }

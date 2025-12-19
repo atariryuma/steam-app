@@ -180,7 +180,17 @@ object DatabaseModule {
 
    database.execSQL("""
     CREATE INDEX IF NOT EXISTS index_games_lastPlayedTimestamp
-    ON games(lastPlayedTimestamp)
+    ON games(lastPlayedTimestamp DESC)
+   """.trimIndent())
+
+   database.execSQL("""
+    CREATE UNIQUE INDEX IF NOT EXISTS index_games_steamAppId
+    ON games(steamAppId)
+   """.trimIndent())
+
+   database.execSQL("""
+    CREATE INDEX IF NOT EXISTS index_games_name
+    ON games(name)
    """.trimIndent())
   }
  }
@@ -206,6 +216,7 @@ object DatabaseModule {
   *
   * Changes:
   * - Add indexes to downloads table for query optimization
+  * - Ensure games indexes match current schema (fixes older migrations)
   */
  private val MIGRATION_6_7 = object : Migration(6, 7) {
   override fun migrate(database: SupportSQLiteDatabase) {
@@ -223,6 +234,29 @@ object DatabaseModule {
    database.execSQL("""
     CREATE INDEX IF NOT EXISTS index_downloads_installationStatus
     ON downloads(installationStatus)
+   """.trimIndent())
+
+   // Ensure games indexes are aligned with current Room schema
+   database.execSQL("DROP INDEX IF EXISTS index_games_lastPlayedTimestamp")
+   database.execSQL("""
+    CREATE INDEX IF NOT EXISTS index_games_lastPlayedTimestamp
+    ON games(lastPlayedTimestamp DESC)
+   """.trimIndent())
+   database.execSQL("""
+    CREATE INDEX IF NOT EXISTS index_games_source
+    ON games(source)
+   """.trimIndent())
+   database.execSQL("""
+    CREATE INDEX IF NOT EXISTS index_games_isFavorite
+    ON games(isFavorite)
+   """.trimIndent())
+   database.execSQL("""
+    CREATE UNIQUE INDEX IF NOT EXISTS index_games_steamAppId
+    ON games(steamAppId)
+   """.trimIndent())
+   database.execSQL("""
+    CREATE INDEX IF NOT EXISTS index_games_name
+    ON games(name)
    """.trimIndent())
   }
  }

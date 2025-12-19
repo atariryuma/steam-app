@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * コンテナ管理 ViewModel
+ * Container Management ViewModel
  */
 @HiltViewModel
 class ContainerViewModel @Inject constructor(
@@ -25,7 +25,7 @@ class ContainerViewModel @Inject constructor(
  val uiState: StateFlow<ContainerUiState> = _uiState.asStateFlow()
 
  /**
-  * コンテナlist読み込み
+  * Containerlist読み込み
   */
  fun loadContainers() {
   viewModelScope.launch {
@@ -37,14 +37,14 @@ class ContainerViewModel @Inject constructor(
     ContainerUiState.Success(result.getOrThrow())
    } else {
     ContainerUiState.Error(
-     result.exceptionOrNull()?.message ?: "コンテナ 読み込み failed"
+     result.exceptionOrNull()?.message ?: "Container 読み込み failed"
     )
    }
   }
  }
 
  /**
-  * 新しいコンテナcreate
+  * 新しいContainercreate
   */
  fun createContainer(name: String) {
   viewModelScope.launch {
@@ -56,14 +56,14 @@ class ContainerViewModel @Inject constructor(
     loadContainers()
    } else {
     _uiState.value = ContainerUiState.Error(
-     result.exceptionOrNull()?.message ?: "コンテナ create failed"
+     result.exceptionOrNull()?.message ?: "Container create failed"
     )
    }
   }
  }
 
  /**
-  * コンテナdelete
+  * Containerdelete
   */
  fun deleteContainer(containerId: String) {
   viewModelScope.launch {
@@ -74,7 +74,7 @@ class ContainerViewModel @Inject constructor(
     loadContainers()
    } else {
     _uiState.value = ContainerUiState.Error(
-     result.exceptionOrNull()?.message ?: "コンテナ delete failed"
+     result.exceptionOrNull()?.message ?: "Container delete failed"
     )
    }
   }

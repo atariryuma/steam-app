@@ -236,6 +236,14 @@ class SteamSetupManager @Inject constructor(
     val container = containers.firstOrNull { it.id == containerId }
 
     if (container != null) {
+     if (!isWinePrefixInitialized(container)) {
+      return@withContext Result.failure(
+       Exception(
+        "Wine prefix initialization failed (system.reg missing). " +
+         "Please reinitialize Winlator and try again."
+       )
+      )
+     }
      return@withContext Result.success(container)
     }
 
@@ -253,13 +261,40 @@ class SteamSetupManager @Inject constructor(
      }
     )
 
-    winlatorEmulator.createContainer(config)
+    val created = winlatorEmulator.createContainer(config)
+    if (created.isFailure) {
+     return@withContext Result.failure(
+      Exception(
+       "Failed to initialize Wine prefix: ${created.exceptionOrNull()?.message}"
+      )
+     )
+    }
+
+    val createdContainer = created.getOrNull()
+     ?: return@withContext Result.failure(Exception("Container creation failed"))
+
+    if (!isWinePrefixInitialized(createdContainer)) {
+     return@withContext Result.failure(
+      Exception(
+       "Wine prefix initialization failed (system.reg missing). " +
+        "Please reinitialize Winlator and try again."
+      )
+     )
+    }
+
+    Result.success(createdContainer)
 
    } catch (e: Exception) {
     Log.e(TAG, "Failed to get or create container", e)
     Result.failure(e)
    }
   }
+
+ private fun isWinePrefixInitialized(container: com.steamdeck.mobile.domain.emulator.EmulatorContainer): Boolean {
+  val systemReg = File(container.rootPath, "system.reg")
+  val userReg = File(container.rootPath, "user.reg")
+  return systemReg.exists() && userReg.exists()
+ }
 
  /**
   * installercontainercopy to

@@ -122,14 +122,14 @@ fun SteamDeckNavHost(
    )
   }
 
-  // settingsサブ画面：Wineテスト
+  // settingsサブ画面：WineTest
   composable(Screen.WineTest.route) {
    WineTestScreen(
     onNavigateBack = { navController.popBackStack() }
    )
   }
 
-  // settingsサブ画面：Steam ログイン（OpenIDauthentication）
+  // settingsサブ画面：Steam Login（OpenIDauthentication）
   composable(Screen.SteamLogin.route) {
    val loginViewModel: SteamLoginViewModel = hiltViewModel()
    val uiState by loginViewModel.uiState.collectAsState()
@@ -137,7 +137,7 @@ fun SteamDeckNavHost(
    // authenticationURLgenerate
    val (authUrl, _) = remember { loginViewModel.startOpenIdLogin() }
 
-   // Steam OpenID ログイン画面
+   // Steam OpenID Login画面
    com.steamdeck.mobile.presentation.ui.auth.SteamOpenIdLoginScreen(
     authUrl = authUrl,
     callbackScheme = "steamdeckmobile",
@@ -145,7 +145,7 @@ fun SteamDeckNavHost(
     onError = { errorMessage -> android.util.Log.e("Navigation", "OpenID error: $errorMessage") }
    )
 
-   // authentication成功時 処理
+   // authenticationSuccess時 処理
    val isSuccess = uiState is com.steamdeck.mobile.presentation.viewmodel.SteamLoginUiState.Success
    LaunchedEffect(isSuccess) {
     if (isSuccess) {

@@ -131,7 +131,7 @@ private fun WineTestContent(
   // ステータス表示（コンパクト）
   CompactStatusRow(uiState = uiState)
 
-  // テストボタン（横並び2列）
+  // Testボタン（横並び2列）
   if (uiState !is WineTestUiState.Testing) {
    CompactTestButtons(
     onCheckWine = onCheckWine,
@@ -148,14 +148,14 @@ private fun WineTestContent(
    }
    is WineTestUiState.Success -> {
     TestResultCard(
-     title = "✓ テスト成功",
+     title = "✓ TestSuccess",
      message = state.message,
      isSuccess = true
     )
    }
    is WineTestUiState.Error -> {
     TestResultCard(
-     title = "✗ エラー",
+     title = "✗ Error",
      message = state.message,
      isSuccess = false
     )
@@ -201,10 +201,10 @@ private fun CompactStatusRow(uiState: WineTestUiState) {
     )
     Text(
      text = when (uiState) {
-      is WineTestUiState.Idle -> "準備完了"
+      is WineTestUiState.Idle -> "Ready"
       is WineTestUiState.Testing -> "実行in..."
-      is WineTestUiState.Success -> "利用可能"
-      is WineTestUiState.Error -> "エラー"
+      is WineTestUiState.Success -> "Available"
+      is WineTestUiState.Error -> "Error"
      },
      style = MaterialTheme.typography.titleSmall,
      fontWeight = FontWeight.Bold

@@ -24,7 +24,7 @@ import androidx.compose.ui.viewinterop.AndroidView
  *
  * Valve公式 OpenID 2.0authenticationuse
  * - QRコードauthentication 異なり、規約準拠 安全な方法
- * - WebView steamcommunity.com 公式ログインページ表示
+ * - WebView steamcommunity.com 公式Loginページ表示
  * - コールバックURL SteamID64retrieve
  *
  * 公式ドキュメント:
@@ -32,8 +32,8 @@ import androidx.compose.ui.viewinterop.AndroidView
  * - https://steamcommunity.com/dev
  *
  * Best Practice:
- * - JavaScript有効化（Steamログインフォーム動作 必要）
- * - DOM Storage有効化（セッション管理）
+ * - JavaScriptEnabled化（SteamLoginフォーム動作 必要）
+ * - DOM StorageEnabled化（セッション管理）
  * - リダイレクトインターセプトしてコールバック処理
  */
 @Composable
@@ -56,7 +56,7 @@ fun SteamOpenIdLoginScreen(
    factory = { context ->
     WebView(context).apply {
      settings.apply {
-      javaScriptEnabled = true // Steamログインフォーム 必要
+      javaScriptEnabled = true // SteamLoginフォーム 必要
       domStorageEnabled = true // セッション管理
       setSupportMultipleWindows(false)
       loadWithOverviewMode = true
@@ -91,7 +91,7 @@ fun SteamOpenIdLoginScreen(
        failingUrl: String?
       ) {
        super.onReceivedError(view, errorCode, description, failingUrl)
-       onError("ページ読み込みエラー: $description")
+       onError("ページ読み込みError: $description")
       }
      }
 

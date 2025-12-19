@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 REM SteamDeck Mobile - Debug APKビルド＆インストールスクリプト
 REM 使用方法: install-debug.bat
 
@@ -11,6 +12,8 @@ REM 環境変数設定
 set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot
 set PATH=%JAVA_HOME%\bin;%PATH%
 set ADB=C:\Android\sdk\platform-tools\adb.exe
+set PACKAGE=com.steamdeck.mobile.debug
+set MAIN_ACTIVITY=com.steamdeck.mobile.presentation.MainActivity
 
 echo [1/4] デバイス接続確認...
 %ADB% devices
@@ -35,16 +38,15 @@ if %ERRORLEVEL% NEQ 0 (
 echo.
 
 echo [4/4] アプリ起動中...
-%ADB% shell am start -n com.steamdeck.mobile/.presentation.MainActivity
+%ADB% shell am start -n %PACKAGE%/%MAIN_ACTIVITY%
 echo.
 
 echo ========================================
 echo インストール完了！
-echo APKサイズ: 89MB
-echo パッケージ名: com.steamdeck.mobile
+echo パッケージ名: %PACKAGE%
 echo ========================================
 echo.
 echo リアルタイムログを表示する場合:
-echo   adb logcat -s AppLogger:*
+echo   %ADB% logcat -s AppLogger:*
 echo.
 pause

@@ -381,8 +381,12 @@ class WinlatorEmulator @Inject constructor(
    // Initialize Wine prefix with wineboot
    val initResult = initializeWinePrefix(containerDir)
    if (initResult.isFailure) {
-    Log.w(TAG, "Wine prefix initialization failed: ${initResult.exceptionOrNull()?.message}")
-    // Continue anyway - some games might work without full prefix initialization
+    Log.e(TAG, "Wine prefix initialization failed: ${initResult.exceptionOrNull()?.message}")
+    containerDir.deleteRecursively()
+    return@withContext Result.failure(
+     initResult.exceptionOrNull()
+      ?: EmulatorException("Wine prefix initialization failed")
+    )
    }
 
    val container = EmulatorContainer(
@@ -758,6 +762,10 @@ class WinlatorEmulator @Inject constructor(
  ): Map<String, String> {
   return buildMap {
    put("WINEPREFIX", containerDir.absolutePath)
+   put("HOME", containerDir.absolutePath)
+   put("TMPDIR", context.cacheDir.absolutePath)
+   put("LANG", "C")
+   put("LC_ALL", "C")
 
    // CRITICAL: Reduce WINEDEBUG verbosity based on attempt
    // Excessive logging (+all,+relay,+file) destabilizes Wine and causes SIGSEGV
@@ -768,11 +776,20 @@ class WinlatorEmulator @Inject constructor(
    }
 
    put("WINEARCH", "win64")
+   put("WINELOADERNOEXEC", "1")
+   put("WINESERVER", wineserverBinary.absolutePath)
    put("WINEFSYNC", "0") // Disable FSync during initialization for stability
 
    // Paths
    put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}")
-   put("LD_LIBRARY_PATH", "${rootfsDir.absolutePath}/lib:${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu:${wineDir.absolutePath}/lib:${wineDir.absolutePath}/lib/wine/x86_64-unix")
+   put(
+    "LD_LIBRARY_PATH",
+    "${rootfsDir.absolutePath}/lib:" +
+     "${rootfsDir.absolutePath}/usr/lib:" +
+     "${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu:" +
+     "${wineDir.absolutePath}/lib:" +
+     "${wineDir.absolutePath}/lib/wine/x86_64-unix"
+   )
    put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/x86_64-windows")
 
    // Box64 library paths (critical for Android dlopen restrictions)
@@ -894,10 +911,14 @@ class WinlatorEmulator @Inject constructor(
   }
 
   val winebootExe = File(wineDir, "lib/wine/x86_64-windows/wineboot.exe")
-  if (!winebootExe.exists()) {
+  val useWinebootBinary = winebootBinary.exists() && isElfBinary(winebootBinary)
+  if (!useWinebootBinary && !winebootExe.exists()) {
    return@withContext Result.failure(
-    EmulatorException("wineboot.exe not found: ${winebootExe.absolutePath}")
+    EmulatorException("wineboot not found: ${winebootBinary.absolutePath}")
    )
+  }
+  if (winebootBinary.exists() && !useWinebootBinary) {
+   Log.w(TAG, "wineboot is not an ELF binary, falling back to wineboot.exe")
   }
 
   val linker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
@@ -911,16 +932,28 @@ class WinlatorEmulator @Inject constructor(
   Log.i(TAG, "Using linker: ${linker.absolutePath}")
   Log.i(TAG, "Using box64: ${box64ToUse.absolutePath}")
   Log.i(TAG, "Using wine: ${wineBinary.absolutePath}")
-  Log.i(TAG, "Using wineboot.exe: ${winebootExe.absolutePath}")
+  Log.i(
+   TAG,
+   "Using wineboot: ${if (useWinebootBinary) winebootBinary.absolutePath else winebootExe.absolutePath}"
+  )
 
   // Build command (same for all attempts)
-  val command = listOf(
-   linker.absolutePath,
-   box64ToUse.absolutePath,
-   wineBinary.absolutePath,
-   winebootExe.absolutePath,
-   "--init"
-  )
+  val command = if (useWinebootBinary) {
+   listOf(
+    linker.absolutePath,
+    box64ToUse.absolutePath,
+    winebootBinary.absolutePath,
+    "-i"
+   )
+  } else {
+   listOf(
+    linker.absolutePath,
+    box64ToUse.absolutePath,
+    wineBinary.absolutePath,
+    winebootExe.absolutePath,
+    "--init"
+   )
+  }
 
   // 3-tier retry loop
   for (attemptNumber in 0 until 3) {
@@ -1091,10 +1124,16 @@ class WinlatorEmulator @Inject constructor(
   return buildMap {
    // Wine basic configuration
    put("WINEPREFIX", winePrefix.absolutePath)
+   put("HOME", winePrefix.absolutePath)
+   put("TMPDIR", context.cacheDir.absolutePath)
+   put("LANG", "C")
+   put("LC_ALL", "C")
    // CRITICAL: Use minimal logging to prevent SIGSEGV crashes
    // Excessive logging (+all,+relay,+file) destabilizes Wine execution
    put("WINEDEBUG", "-all") // Silent - most stable for game execution
    put("WINEARCH", "win64")
+   put("WINELOADERNOEXEC", "1")
+   put("WINESERVER", wineserverBinary.absolutePath)
 
    // Graphics configuration
    when (config.directXWrapper) {
@@ -1165,8 +1204,15 @@ class WinlatorEmulator @Inject constructor(
    val existingPath = System.getenv("PATH") ?: ""
    put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:$existingPath")
 
-   // Set LD_LIBRARY_PATH to rootfs libraries + Wine libraries for Box64
-   put("LD_LIBRARY_PATH", "${rootfsDir.absolutePath}/lib:${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu:${wineDir.absolutePath}/lib:${wineDir.absolutePath}/lib/wine/x86_64-unix")
+   // Set LD_LIBRARY_PATH for Box64/Wine loader (glibc from rootfs)
+   put(
+    "LD_LIBRARY_PATH",
+    "${rootfsDir.absolutePath}/lib:" +
+     "${rootfsDir.absolutePath}/usr/lib:" +
+     "${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu:" +
+     "${wineDir.absolutePath}/lib:" +
+     "${wineDir.absolutePath}/lib/wine/x86_64-unix"
+   )
 
    // Set Wine DLL path for Windows libraries
    put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/x86_64-windows")
@@ -1194,6 +1240,22 @@ class WinlatorEmulator @Inject constructor(
   } catch (e: Exception) {
    Log.w(TAG, "Failed to get PID via reflection, using fallback", e)
    -1 // Fallback PID
+  }
+ }
+
+ private fun isElfBinary(file: File): Boolean {
+  if (!file.exists() || !file.isFile) return false
+  return try {
+   file.inputStream().use { input ->
+    val header = ByteArray(4)
+    if (input.read(header) != 4) return false
+    header[0] == 0x7F.toByte() &&
+     header[1] == 'E'.code.toByte() &&
+     header[2] == 'L'.code.toByte() &&
+     header[3] == 'F'.code.toByte()
+   }
+  } catch (e: Exception) {
+   false
   }
  }
 

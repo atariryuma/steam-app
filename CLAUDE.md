@@ -32,8 +32,8 @@ com.steamdeck.mobile/
 │   ├── util/ (ErrorExtensions - UI error mapping)
 │   └── MainActivity (Single Activity, immersive fullscreen)
 ├── domain/
-│   ├── model/ (Game, GameSource, Download, WinlatorContainer, Controller, ImportSource, SteamAuthResult)
-│   ├── repository/ (interfaces: GameRepository, WinlatorContainerRepository, DownloadRepository, FileImportRepository, SteamAuthRepository, ControllerRepository, ISteamRepository, ISecurePreferences)
+│   ├── model/ (Game, GameSource, Download, WinlatorContainer, Controller, ImportSource)
+│   ├── repository/ (interfaces: GameRepository, WinlatorContainerRepository, DownloadRepository, FileImportRepository, ControllerRepository, ISteamRepository, ISecurePreferences)
 │   ├── usecase/ (GetAllGamesUseCase, GetGameByIdUseCase, SearchGamesUseCase, AddGameUseCase, DeleteGameUseCase, ToggleFavoriteUseCase, UpdatePlayTimeUseCase, SyncSteamLibraryUseCase, LaunchGameUseCase)
 │   ├── error/ (SteamSyncError - domain-specific errors)
 │   └── emulator/WindowsEmulator (interface)
@@ -45,12 +45,12 @@ com.steamdeck.mobile/
 │   │   └── preferences/
 │   │       ├── SecureSteamPreferences (EncryptedSharedPreferences AES256-GCM)
 │   │       └── SecurePreferencesImpl (ISecurePreferences implementation)
-│   ├── remote/steam/ (SteamApiService Retrofit, SteamAuthenticationService, SteamRepositoryImpl, SteamCdnService, SteamCmdApiService)
-│   ├── repository/ (impls: GameRepositoryImpl, WinlatorContainerRepositoryImpl, DownloadRepositoryImpl, FileImportRepositoryImpl, SteamAuthRepositoryImpl, ControllerRepositoryImpl, SteamRepositoryAdapter)
+│   ├── remote/steam/ (SteamApiService Retrofit, SteamRepositoryImpl)
+│   ├── repository/ (impls: GameRepositoryImpl, WinlatorContainerRepositoryImpl, DownloadRepositoryImpl, FileImportRepositoryImpl, ControllerRepositoryImpl, SteamRepositoryAdapter)
 │   └── mapper/ (GameMapper, WinlatorContainerMapper, DownloadMapper, ControllerMapper, SteamGameMapper)
 ├── core/
-│   ├── auth/ (SteamOpenIdAuthenticator OpenID 2.0 + signature verification, JwtDecoder)
-│   ├── download/ (DownloadManager WorkManager 8MB chunks, SteamDownloadManager, ApiError)
+│   ├── auth/ (SteamOpenIdAuthenticator OpenID 2.0 + signature verification)
+│   ├── download/ (DownloadManager WorkManager 8MB chunks, ApiError)
 │   ├── error/ (AppError - unified error hierarchy)
 │   ├── result/ (DataResult<T> - type-safe result wrapper)
 │   ├── network/ (DataResultCallAdapter - Retrofit automatic error handling)
@@ -117,12 +117,13 @@ abstract class RepositoryModule {
 
 ### Auth (Steam OpenID 2.0 + Security)
 
+- **ONLY OpenID 2.0**: Valve公式推奨のサードパーティ向け認証方式
 - `SteamOpenIdAuthenticator` with CSRF protection (256-bit secure random state)
-- **NEW (2025)**: OpenID 2.0 signature verification (MITM attack prevention)
+- OpenID 2.0 signature verification (MITM attack prevention)
 - SteamID64 validation (range: 76561197960265728 ~ 76561202255233023)
 - **No embedded API keys**: Users provide their own Steam Web API Key
 - Encrypted token storage via `SecurePreferencesImpl` (AES256-GCM)
-- QR-based login (password login deprecated in UI)
+- WebView-based login (Steam公式ログインページ経由)
 
 ## MANDATORY RULES
 
@@ -181,12 +182,50 @@ abstract class RepositoryModule {
 
 ## CURRENT STATE (git status)
 ```
-Clean working directory (last commit: 5149617)
+Modified files (Steam ToS compliance refactoring - 2025-12-19)
 ```
 
-## RECENT CHANGES (last commit 5149617 - 2025-12-19)
+## RECENT CHANGES
 
-### Security & Architecture Improvements
+### Latest: Steam ToS Compliance Refactoring (2025-12-19)
+
+**CRITICAL: Removed Steam CDN direct download infrastructure to comply with Steam Terms of Service**
+
+- **Deleted ToS-violating code:**
+  - ❌ `SteamDownloadManager.kt` - Direct CDN download (based on DepotDownloader)
+  - ❌ `SteamCdnService.kt` - Unauthorized CDN API endpoints
+  - ❌ `SteamCmdApiService.kt` - Unofficial third-party API
+  - ❌ `SteamDepotModels.kt` - Depot/Manifest data models
+- **Updated modules:**
+  - `NetworkModule.kt`: Removed CDN service providers, reduced OkHttpClient timeouts (5min→60s)
+  - `GameDetailViewModel.kt`: Removed SteamDownloadManager dependency and download methods
+- **Compliance status:** ✅ **FULLY COMPLIANT with Steam Subscriber Agreement**
+
+**Approved Architecture (Legal):**
+1. Users download games via **official Steam client** (in Winlator container)
+2. App launches games via `steam.exe -applaunch <appId>` (official command)
+3. Wine/Proton compatibility layer (Valve officially supports this via Steam Deck)
+4. Steam Web API for library sync (official, documented API)
+5. OpenID 2.0 authentication (Valve-recommended for third-party apps)
+
+**Reference:** [Steam Subscriber Agreement](https://store.steampowered.com/subscriber_agreement/) prohibits:
+- Protocol emulation ❌
+- Steam client modification ❌
+- Bypassing DRM ❌
+- Unauthorized depot downloads ❌
+
+**Our implementation:** Uses official Steam client binary + official APIs only ✅
+
+### Previous: QR Auth Cleanup (2025-12-19)
+
+- **Removed unused QR authentication code** (Steam規約準拠のため)
+  - 削除: `SteamAuthenticationService`, `SteamAuthRepository`, `SteamAuthRepositoryImpl`
+  - 削除: `JwtDecoder`, `SteamAuthResult`, `SteamAuthModels`
+  - 削除: `SteamLoginScreen`, `SteamStyleLoginScreen` (旧UI)
+  - **保持**: `SteamOpenIdAuthenticator` (Valve公式推奨のOpenID 2.0)
+  - **保持**: `SteamOpenIdLoginScreen` (WebView-based OpenID login)
+
+### Commit 5149617 (2025-12-19)
 
 - **Removed embedded Steam API key** (security & compliance)
   - Users now provide their own API keys
@@ -235,7 +274,6 @@ Clean working directory (last commit: 5149617)
 ## KNOWN ISSUES
 - zstd-jni disabled (no ARM64 native libs)
 - libaums USB migration to v0.10.0 pending
-- QrCodeGenerator.kt pending deletion
 
 ## UI SPECS
 - Material3 dynamic colors (Android 12+)

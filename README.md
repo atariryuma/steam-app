@@ -66,14 +66,15 @@ Winlator（Wine + Box86/Box64）を統合し、Snapdragon搭載デバイスで�
 #### クイックスタート
 
 ```bash
-# 1. 環境チェック
+# 1. 環境チェック（初回のみ）
 check-environment.bat
 
-# 2. Debug APKをビルド
-build-apk.bat
+# 2. (オプション) 開発用API Key設定
+# local.propertiesに以下を追加:
+# STEAM_API_KEY=YOUR_32_CHAR_HEX_KEY
 
-# 3. 実機にインストール
-adb install app\build\outputs\apk\debug\app-debug.apk
+# 3. Debug APKビルド + インストール
+build-debug.bat
 ```
 
 #### Android Studioを使う場合
@@ -92,18 +93,27 @@ cd steam-app
 
 ### ビルド方法
 
-```bash
-# 環境チェック（初回のみ）
-check-environment.bat
+#### 利用可能なビルドスクリプト
 
+```bash
+# Debug APK (開発用 - 推奨)
+build-debug.bat                # ビルド + adbインストール
+
+# Release APK (配布用 - R8最適化)
+build-release.bat              # ビルドのみ
+build-and-install.bat          # ビルド + adbインストール
+
+# 既存APKの再インストール
+install-debug.bat              # ビルド済みDebug APKをインストール
+```
+
+#### Gradleコマンド
+
+```bash
 # Debug APKをビルド（開発用）
-build-apk.bat
-# または
 ./gradlew assembleDebug
 
 # Release APKをビルド（配布用、最適化済み）
-build-release.bat
-# または
 ./gradlew assembleRelease
 
 # テスト実行

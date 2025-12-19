@@ -74,13 +74,13 @@ class WinlatorInitViewModel @Inject constructor(
  */
 sealed class WinlatorInitUiState {
     /** アイドル状態 */
-    object Idle : WinlatorInitUiState()
+    data object Idle : WinlatorInitUiState()
 
     /** 利用可能性チェック中 */
-    object CheckingAvailability : WinlatorInitUiState()
+    data object CheckingAvailability : WinlatorInitUiState()
 
     /** 既に初期化済み */
-    object AlreadyInitialized : WinlatorInitUiState()
+    data object AlreadyInitialized : WinlatorInitUiState()
 
     /** 初期化中 */
     data class Initializing(
@@ -89,7 +89,7 @@ sealed class WinlatorInitUiState {
     ) : WinlatorInitUiState()
 
     /** 初期化完了 */
-    object Completed : WinlatorInitUiState()
+    data object Completed : WinlatorInitUiState()
 
     /** エラー */
     data class Error(val message: String) : WinlatorInitUiState()

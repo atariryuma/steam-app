@@ -1,13 +1,17 @@
 package com.steamdeck.mobile.presentation.viewmodel
 
-import android.util.Log
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.steamdeck.mobile.core.logging.AppLogger
+import com.steamdeck.mobile.core.result.DataResult
 import com.steamdeck.mobile.core.steam.SteamLauncher
 import com.steamdeck.mobile.core.steam.SteamSetupManager
 import com.steamdeck.mobile.domain.repository.ISecurePreferences
 import com.steamdeck.mobile.domain.usecase.SyncSteamLibraryUseCase
+import com.steamdeck.mobile.presentation.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,9 +25,15 @@ import javax.inject.Inject
  * Steam認証、ライブラリ同期、アプリ設定を管理
  *
  * Clean Architecture: Only depends on domain layer interfaces
+ *
+ * 2025 Best Practice:
+ * - DataResult<T> for type-safe results
+ * - AppLogger for centralized logging
+ * - ErrorExtensions for UI error mapping
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val securePreferences: ISecurePreferences,
     private val syncSteamLibraryUseCase: SyncSteamLibraryUseCase,
     private val steamLauncher: SteamLauncher,
@@ -31,7 +41,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     companion object {
-        private const val TAG = "SettingsViewModel"
+        private const val TAG = "SettingsVM"
     }
 
     private val _uiState = MutableStateFlow<SettingsUiState>(SettingsUiState.Loading)
@@ -46,6 +56,33 @@ class SettingsViewModel @Inject constructor(
     init {
         loadSettings()
         checkSteamInstallation()
+        autoConfigureDevApiKey()
+    }
+
+    /**
+     * 開発用: BuildConfigのAPIキーを自動設定
+     *
+     * 本番環境では無視され、ユーザーが手動でAPIキーを設定する
+     * DEV_STEAM_API_KEYが空の場合は何もしない
+     */
+    private fun autoConfigureDevApiKey() {
+        viewModelScope.launch {
+            try {
+                val devApiKey = com.steamdeck.mobile.BuildConfig.DEV_STEAM_API_KEY
+                if (devApiKey.isNotBlank()) {
+                    // 既にAPIキーが保存されているか確認
+                    val existingKey = securePreferences.getSteamApiKey()
+                    if (existingKey.isNullOrBlank()) {
+                        // 開発用APIキーを自動保存
+                        securePreferences.saveSteamApiKey(devApiKey)
+                        AppLogger.i(TAG, "Development API Key auto-configured from BuildConfig")
+                    }
+                }
+            } catch (e: Exception) {
+                // BuildConfigにDEV_STEAM_API_KEYがない場合は無視
+                AppLogger.d(TAG, "No dev API key in BuildConfig (expected in production)")
+            }
+        }
     }
 
     /**
@@ -96,6 +133,8 @@ class SettingsViewModel @Inject constructor(
      *
      * Best Practice: ユーザー提供のAPI Key使用
      * ユーザーは事前にAPI Keyを登録する必要があります
+     *
+     * 2025 Best Practice: DataResult<T>でエラーハンドリング
      */
     fun syncSteamLibrary() {
         viewModelScope.launch {
@@ -104,28 +143,35 @@ class SettingsViewModel @Inject constructor(
             val steamId = currentData?.steamId
 
             if (steamId.isNullOrBlank()) {
+                AppLogger.w(TAG, "Sync attempted without Steam ID")
                 _syncState.value = SyncState.Error("Steam IDが見つかりません。QRコードでログインしてください。")
                 return@launch
             }
 
             _syncState.value = SyncState.Syncing(progress = 0f, message = "同期を開始しています...")
+            AppLogger.i(TAG, "Starting library sync for Steam ID: $steamId")
 
-            try {
-                // Steam APIからライブラリを取得
-                val result = syncSteamLibraryUseCase(steamId)
-
-                if (result.isSuccess) {
-                    val syncedCount = result.getOrNull() ?: 0
+            // DataResult<Int>を使用した型安全なエラーハンドリング
+            when (val result = syncSteamLibraryUseCase(steamId)) {
+                is DataResult.Success -> {
+                    val syncedCount = result.data
                     securePreferences.setLastSyncTimestamp(System.currentTimeMillis())
                     _syncState.value = SyncState.Success(syncedCount)
                     loadSettings() // 最終同期日時を更新
-                } else {
-                    _syncState.value = SyncState.Error(
-                        result.exceptionOrNull()?.message ?: "同期に失敗しました"
+                    AppLogger.i(TAG, "Library sync completed: $syncedCount games")
+                }
+                is DataResult.Error -> {
+                    val errorMessage = result.error.toUserMessage(context)
+                    _syncState.value = SyncState.Error(errorMessage)
+                    AppLogger.e(TAG, "Library sync failed: $errorMessage")
+                }
+                is DataResult.Loading -> {
+                    // 進捗更新（将来的にProgressBarに対応）
+                    _syncState.value = SyncState.Syncing(
+                        progress = result.progress ?: 0f,
+                        message = "同期中..."
                     )
                 }
-            } catch (e: Exception) {
-                _syncState.value = SyncState.Error("エラーが発生しました: ${e.message}")
             }
         }
     }
@@ -152,7 +198,7 @@ class SettingsViewModel @Inject constructor(
 
                 // API Keyを保存
                 securePreferences.saveSteamApiKey(apiKey)
-                android.util.Log.i("SettingsViewModel", "Steam API Key saved successfully")
+                AppLogger.i(TAG, "Steam API Key saved successfully")
 
                 _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
                     successMessage = "API Keyを保存しました"
@@ -198,10 +244,10 @@ class SettingsViewModel @Inject constructor(
                     SteamInstallState.NotInstalled("Steam Clientはインストールされていません")
                 }
 
-                Log.d(TAG, "Steam installation check: installed=${installation != null}, containerId=${installation?.containerId}")
+                AppLogger.d(TAG, "Steam installation check: installed=${installation != null}, containerId=${installation?.containerId}")
 
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to check Steam installation", e)
+                AppLogger.e(TAG, "Failed to check Steam installation", e)
                 _steamInstallState.value = SteamInstallState.Error(
                     "インストール状態の確認に失敗しました: ${e.message}"
                 )
@@ -217,13 +263,13 @@ class SettingsViewModel @Inject constructor(
     fun installSteamClient(containerId: String) {
         viewModelScope.launch {
             try {
-                Log.i(TAG, "Starting Steam Client installation for container: $containerId")
+                AppLogger.i(TAG, "Starting Steam Client installation for container: $containerId")
 
                 val result = steamSetupManager.installSteam(
                     containerId = containerId,
                     progressCallback = { progress, message ->
                         _steamInstallState.value = SteamInstallState.Installing(progress, message)
-                        Log.d(TAG, "Install progress: $progress - $message")
+                        AppLogger.d(TAG, "Install progress: $progress - $message")
                     }
                 )
 
@@ -235,13 +281,13 @@ class SettingsViewModel @Inject constructor(
                                     installPath = installResult.installPath,
                                     containerId = installResult.containerId
                                 )
-                                Log.i(TAG, "Steam Client installed successfully: ${installResult.installPath}, Container ID: ${installResult.containerId}")
+                                AppLogger.i(TAG, "Steam Client installed successfully: ${installResult.installPath}, Container ID: ${installResult.containerId}")
                             }
                             is SteamSetupManager.SteamInstallResult.Error -> {
                                 _steamInstallState.value = SteamInstallState.Error(
                                     installResult.message
                                 )
-                                Log.e(TAG, "Steam installation error: ${installResult.message}")
+                                AppLogger.e(TAG, "Steam installation error: ${installResult.message}")
                             }
                             is SteamSetupManager.SteamInstallResult.Progress -> {
                                 // Progress updates handled by callback
@@ -252,14 +298,14 @@ class SettingsViewModel @Inject constructor(
                         _steamInstallState.value = SteamInstallState.Error(
                             "インストールに失敗しました: ${error.message}"
                         )
-                        Log.e(TAG, "Failed to install Steam Client", error)
+                        AppLogger.e(TAG, "Failed to install Steam Client", error)
                     }
 
             } catch (e: Exception) {
                 _steamInstallState.value = SteamInstallState.Error(
                     "予期しないエラーが発生しました: ${e.message}"
                 )
-                Log.e(TAG, "Exception during Steam installation", e)
+                AppLogger.e(TAG, "Exception during Steam installation", e)
             }
         }
     }
@@ -272,13 +318,13 @@ class SettingsViewModel @Inject constructor(
     fun openSteamClient(containerId: String) {
         viewModelScope.launch {
             try {
-                Log.i(TAG, "Opening Steam Client for container: $containerId")
+                AppLogger.i(TAG, "Opening Steam Client for container: $containerId")
 
                 val result = steamLauncher.launchSteamClient(containerId)
 
                 result
                     .onSuccess {
-                        Log.i(TAG, "Steam Client opened successfully")
+                        AppLogger.i(TAG, "Steam Client opened successfully")
                         // Steam Clientが起動したことをユーザーに通知
                         _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
                             successMessage = "Steam Clientを起動しました"
@@ -288,14 +334,14 @@ class SettingsViewModel @Inject constructor(
                         _steamInstallState.value = SteamInstallState.Error(
                             "Steam Clientの起動に失敗しました: ${error.message}"
                         )
-                        Log.e(TAG, "Failed to open Steam Client", error)
+                        AppLogger.e(TAG, "Failed to open Steam Client", error)
                     }
 
             } catch (e: Exception) {
                 _steamInstallState.value = SteamInstallState.Error(
                     "Steam Client起動中に予期しないエラーが発生しました: ${e.message}"
                 )
-                Log.e(TAG, "Exception while opening Steam Client", e)
+                AppLogger.e(TAG, "Exception while opening Steam Client", e)
             }
         }
     }
@@ -308,7 +354,7 @@ class SettingsViewModel @Inject constructor(
     fun uninstallSteamClient(containerId: String) {
         viewModelScope.launch {
             try {
-                Log.i(TAG, "Uninstalling Steam Client for container: $containerId")
+                AppLogger.i(TAG, "Uninstalling Steam Client for container: $containerId")
 
                 // 将来的には実際のアンインストール処理を実装
                 // 現時点ではデータベースの状態をクリア
@@ -316,13 +362,13 @@ class SettingsViewModel @Inject constructor(
                     "Steam Clientはアンインストールされました"
                 )
 
-                Log.i(TAG, "Steam Client uninstalled (placeholder)")
+                AppLogger.i(TAG, "Steam Client uninstalled (placeholder)")
 
             } catch (e: Exception) {
                 _steamInstallState.value = SteamInstallState.Error(
                     "アンインストールに失敗しました: ${e.message}"
                 )
-                Log.e(TAG, "Exception during Steam uninstallation", e)
+                AppLogger.e(TAG, "Exception during Steam uninstallation", e)
             }
         }
     }

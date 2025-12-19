@@ -6,8 +6,6 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.steamdeck.mobile.core.network.DataResultCallAdapterFactory
 import com.steamdeck.mobile.data.remote.steam.SteamApiService
-import com.steamdeck.mobile.data.remote.steam.SteamCdnService
-import com.steamdeck.mobile.data.remote.steam.SteamCmdApiService
 import com.steamdeck.mobile.data.remote.steam.SteamRepository
 import com.steamdeck.mobile.data.remote.steam.SteamRepositoryImpl
 import dagger.Binds
@@ -76,25 +74,11 @@ object NetworkModule {
                 }
             }
             // タイムアウト設定
-            // ベストプラクティス: 大容量ダウンロード（Manifest、Chunk）を考慮
-            .connectTimeout(30, TimeUnit.SECONDS)      // 接続タイムアウト（変更なし）
-            .readTimeout(5, TimeUnit.MINUTES)          // 読み取りタイムアウト（30秒→5分）
-            .writeTimeout(5, TimeUnit.MINUTES)         // 書き込みタイムアウト（30秒→5分）
-            .callTimeout(10, TimeUnit.MINUTES)         // コール全体のタイムアウト（新規追加）
+            .connectTimeout(30, TimeUnit.SECONDS)      // 接続タイムアウト
+            .readTimeout(60, TimeUnit.SECONDS)         // 読み取りタイムアウト
+            .writeTimeout(60, TimeUnit.SECONDS)        // 書き込みタイムアウト
             // リトライ設定
             .retryOnConnectionFailure(true)            // 接続失敗時の自動リトライ
-            // 接続プール設定
-            // 同時に最大5接続を維持、アイドル接続は5分後にクローズ
-            .connectionPool(
-                okhttp3.ConnectionPool(
-                    maxIdleConnections = 5,
-                    keepAliveDuration = 5,
-                    timeUnit = TimeUnit.MINUTES
-                )
-            )
-            // キャッシュ設定
-            // Note: Manifestやゲームチャンクは頻繁に変わらないためキャッシュ有効
-            .cache(null)  // キャッシュは無効（Steam CDNはHTTPキャッシュヘッダーを持たないため）
             .build()
     }
 
@@ -112,38 +96,6 @@ object NetworkModule {
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
             .create(SteamApiService::class.java)
-    }
-
-    @Provides
-    @Singleton
-    fun provideSteamCdnService(
-        okHttpClient: OkHttpClient,
-        gson: Gson,
-        callAdapterFactory: DataResultCallAdapterFactory
-    ): SteamCdnService {
-        return Retrofit.Builder()
-            .baseUrl(SteamCdnService.CDN_BASE_URL)
-            .client(okHttpClient)
-            .addCallAdapterFactory(callAdapterFactory)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
-            .create(SteamCdnService::class.java)
-    }
-
-    @Provides
-    @Singleton
-    fun provideSteamCmdApiService(
-        okHttpClient: OkHttpClient,
-        gson: Gson,
-        callAdapterFactory: DataResultCallAdapterFactory
-    ): SteamCmdApiService {
-        return Retrofit.Builder()
-            .baseUrl(SteamCmdApiService.BASE_URL)
-            .client(okHttpClient)
-            .addCallAdapterFactory(callAdapterFactory)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
-            .create(SteamCmdApiService::class.java)
     }
 
     @Provides

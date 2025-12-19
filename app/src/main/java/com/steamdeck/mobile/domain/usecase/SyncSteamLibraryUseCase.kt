@@ -1,17 +1,15 @@
 package com.steamdeck.mobile.domain.usecase
 
-import android.content.Context
+import com.steamdeck.mobile.core.error.AppError
+import com.steamdeck.mobile.core.logging.AppLogger
+import com.steamdeck.mobile.core.result.DataResult
 import com.steamdeck.mobile.domain.error.SteamSyncError
-import com.steamdeck.mobile.domain.model.Game
-import com.steamdeck.mobile.domain.model.GameSource
 import com.steamdeck.mobile.domain.repository.GameRepository
 import com.steamdeck.mobile.domain.repository.ISecurePreferences
 import com.steamdeck.mobile.domain.repository.ISteamRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import java.io.File
 import javax.inject.Inject
 
 /**
@@ -22,9 +20,14 @@ import javax.inject.Inject
  * 取得先: https://steamcommunity.com/dev/apikey
  *
  * Clean Architecture: Only depends on domain layer interfaces
+ *
+ * 2025 Best Practice:
+ * - DataResult<T> for type-safe results with Loading/Success/Error
+ * - AppLogger for centralized logging
+ * - Structured concurrency with proper error handling
+ * - No Android dependencies in domain layer (no Context)
  */
 class SyncSteamLibraryUseCase @Inject constructor(
-    @ApplicationContext private val context: Context,
     private val steamRepository: ISteamRepository,
     private val gameRepository: GameRepository,
     private val securePreferences: ISecurePreferences
@@ -35,97 +38,94 @@ class SyncSteamLibraryUseCase @Inject constructor(
      * @param steamId Steam ID (from QR authentication)
      * @return 同期結果（成功した場合は同期されたゲーム数）
      */
-    suspend operator fun invoke(steamId: String): Result<Int> {
+    suspend operator fun invoke(steamId: String): DataResult<Int> {
         return try {
             // API Keyを取得（必須: ユーザー自身のAPI Key）
             val apiKey = securePreferences.getSteamApiKey()
 
             if (apiKey.isNullOrBlank()) {
-                android.util.Log.e(
-                    "SyncSteamLibrary",
-                    "Steam API Key not configured"
-                )
-                return Result.failure(SteamSyncError.ApiKeyNotConfigured)
+                AppLogger.e(TAG, "Steam API Key not configured")
+                return DataResult.Error(AppError.AuthError.ApiKeyNotConfigured)
             }
 
-            android.util.Log.d(
-                "SyncSteamLibrary",
-                "Using user-provided API Key"
-            )
+            AppLogger.d(TAG, "Using user-provided API Key for Steam ID: $steamId")
 
             // Steam APIからゲーム一覧を取得
-            android.util.Log.d(
-                "SyncSteamLibrary",
-                "Starting sync - Steam ID: $steamId"
-            )
-
             val steamGamesResult = steamRepository.getUserLibrary(steamId, apiKey)
             if (steamGamesResult.isFailure) {
                 val error = steamGamesResult.exceptionOrNull()
-                android.util.Log.e(
-                    "SyncSteamLibrary",
-                    "GetOwnedGames failed - Steam ID: $steamId",
-                    error
-                )
+                AppLogger.e(TAG, "GetOwnedGames failed for Steam ID: $steamId", error)
 
-                // Check if it's an auth failure vs network issue
-                val errorMessage = error?.message ?: ""
-                return Result.failure(
-                    when {
-                        errorMessage.contains("403") -> SteamSyncError.PrivateProfile
-                        errorMessage.contains("401") -> SteamSyncError.AuthFailed
-                        errorMessage.contains("timeout", ignoreCase = true) -> SteamSyncError.NetworkTimeout
-                        else -> SteamSyncError.ApiError(errorMessage)
-                    }
-                )
+                // Convert to domain-specific error
+                val appError = convertToSteamSyncError(error)
+                return DataResult.Error(appError)
             }
 
-            android.util.Log.d("SyncSteamLibrary", "Successfully fetched games from Steam API")
+            AppLogger.d(TAG, "Successfully fetched games from Steam API")
 
             val games = steamGamesResult.getOrNull() ?: emptyList()
             if (games.isEmpty()) {
-                return Result.success(0)
+                AppLogger.i(TAG, "No games found for Steam ID: $steamId")
+                return DataResult.Success(0)
             }
 
             // 並列処理でゲームを同期（高速化）
-            coroutineScope {
-                val syncJobs = games.map { game ->
+            val syncedCount = coroutineScope {
+                val syncJobs = games.mapIndexed { index, game ->
                     async {
                         try {
                             // ゲームをDBに追加
                             gameRepository.insertGame(game)
-
-                            android.util.Log.d(
-                                "SyncSteamLibrary",
-                                "Synced: ${game.name} (${game.steamAppId})"
-                            )
-
-                            true // 成功
+                            AppLogger.d(TAG, "Synced [${index + 1}/${games.size}]: ${game.name}")
+                            true
                         } catch (e: Exception) {
-                            android.util.Log.e(
-                                "SyncSteamLibrary",
-                                "Failed to sync game: ${game.name}",
-                                e
-                            )
-                            false // 失敗
+                            AppLogger.e(TAG, "Failed to sync game: ${game.name}", e)
+                            false
                         }
                     }
                 }
 
                 // すべての同期ジョブを待機
                 val results = syncJobs.awaitAll()
-                val syncedCount = results.count { it }
-
-                android.util.Log.d(
-                    "SyncSteamLibrary",
-                    "Sync completed - $syncedCount/${games.size} games synced successfully"
-                )
-
-                Result.success(syncedCount)
+                results.count { it }
             }
+
+            AppLogger.i(TAG, "Sync completed - $syncedCount/${games.size} games synced successfully")
+            DataResult.Success(syncedCount)
+
         } catch (e: Exception) {
-            android.util.Log.e("SyncSteamLibrary", "Sync failed with exception", e)
-            Result.failure(e)
+            AppLogger.e(TAG, "Sync failed with exception", e)
+            DataResult.Error(AppError.from(e))
         }
+    }
+
+    /**
+     * Convert legacy Result errors to domain-specific errors
+     */
+    private fun convertToSteamSyncError(error: Throwable?): AppError {
+        val errorMessage = error?.message ?: ""
+
+        // Check for SteamSyncError first
+        if (error is SteamSyncError) {
+            return when (error) {
+                is SteamSyncError.PrivateProfile -> AppError.AuthError("Private profile")
+                is SteamSyncError.AuthFailed -> AppError.AuthError("Authentication failed")
+                is SteamSyncError.NetworkTimeout -> AppError.TimeoutError("Steam API request")
+                is SteamSyncError.ApiError -> AppError.NetworkError(0, error, retryable = true)
+            }
+        }
+
+        // HTTP error code mapping
+        return when {
+            errorMessage.contains("403") -> AppError.AuthError("Private profile (403)")
+            errorMessage.contains("401") -> AppError.AuthError("Authentication failed (401)")
+            errorMessage.contains("timeout", ignoreCase = true) -> AppError.TimeoutError("Steam API request")
+            error != null -> AppError.NetworkError(0, error, retryable = true)
+            else -> AppError.Unknown()
+        }
+    }
+
+    companion object {
+        private const val TAG = "SyncSteamLibrary"
     }
 }

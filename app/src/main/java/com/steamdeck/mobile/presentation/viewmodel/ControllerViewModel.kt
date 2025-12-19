@@ -1,10 +1,12 @@
 package com.steamdeck.mobile.presentation.viewmodel
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.steamdeck.mobile.core.controller.ControllerManager
+import com.steamdeck.mobile.core.error.AppError
 import com.steamdeck.mobile.core.input.GameControllerManager
+import com.steamdeck.mobile.core.logging.AppLogger
+import com.steamdeck.mobile.core.result.DataResult
 import com.steamdeck.mobile.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -24,7 +26,7 @@ class ControllerViewModel @Inject constructor(
 ) : ViewModel() {
 
     companion object {
-        private const val TAG = "ControllerViewModel"
+        private const val TAG = "ControllerVM"
     }
 
     // UI State
@@ -69,7 +71,7 @@ class ControllerViewModel @Inject constructor(
                 controllerManager.detectControllers()
                 _uiState.value = ControllerUiState.Success
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to load controllers", e)
+                AppLogger.e(TAG, "Failed to load controllers", e)
                 _uiState.value = ControllerUiState.Error(e.message ?: "コントローラー検出エラー")
             }
         }
@@ -97,9 +99,9 @@ class ControllerViewModel @Inject constructor(
         try {
             val profilesList = controllerManager.getProfilesForActiveController()
             _profiles.value = profilesList
-            Log.d(TAG, "Loaded ${profilesList.size} profiles for active controller")
+            AppLogger.d(TAG, "Loaded ${profilesList.size} profiles for active controller")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load profiles", e)
+            AppLogger.e(TAG, "Failed to load profiles", e)
             _profiles.value = emptyList()
         }
     }
@@ -118,7 +120,7 @@ class ControllerViewModel @Inject constructor(
      */
     fun setActiveController(controller: Controller) {
         controllerManager.setActiveController(controller)
-        Log.d(TAG, "Active controller changed to: ${controller.name}")
+        AppLogger.d(TAG, "Active controller changed to: ${controller.name}")
     }
 
     /**
@@ -130,7 +132,7 @@ class ControllerViewModel @Inject constructor(
         viewModelScope.launch {
             val controller = activeController.value
             if (controller == null) {
-                Log.w(TAG, "Cannot create profile: No active controller")
+                AppLogger.w(TAG, "Cannot create profile: No active controller")
                 return@launch
             }
 
@@ -149,7 +151,7 @@ class ControllerViewModel @Inject constructor(
             )
 
             _editingProfile.value = newProfile
-            Log.d(TAG, "Started creating new profile: $baseName")
+            AppLogger.d(TAG, "Started creating new profile: $baseName")
         }
     }
 
@@ -160,7 +162,7 @@ class ControllerViewModel @Inject constructor(
      */
     fun startEditProfile(profile: ControllerProfile) {
         _editingProfile.value = profile
-        Log.d(TAG, "Started editing profile: ${profile.name}")
+        AppLogger.d(TAG, "Started editing profile: ${profile.name}")
     }
 
     /**
@@ -171,7 +173,7 @@ class ControllerViewModel @Inject constructor(
     fun updateButtonMapping(newMapping: ButtonMapping) {
         val current = _editingProfile.value ?: return
         _editingProfile.value = current.copy(buttonMapping = newMapping)
-        Log.d(TAG, "Updated button mapping for profile: ${current.name}")
+        AppLogger.d(TAG, "Updated button mapping for profile: ${current.name}")
     }
 
     /**
@@ -202,13 +204,13 @@ class ControllerViewModel @Inject constructor(
             "leftStickButton" -> currentMapping.copy(leftStickButton = action)
             "rightStickButton" -> currentMapping.copy(rightStickButton = action)
             else -> {
-                Log.w(TAG, "Unknown button key: $buttonKey")
+                AppLogger.w(TAG, "Unknown button key: $buttonKey")
                 return
             }
         }
 
         _editingProfile.value = current.copy(buttonMapping = newMapping)
-        Log.d(TAG, "Updated $buttonKey to $action")
+        AppLogger.d(TAG, "Updated $buttonKey to $action")
     }
 
     /**
@@ -219,7 +221,7 @@ class ControllerViewModel @Inject constructor(
     fun updateVibration(enabled: Boolean) {
         val current = _editingProfile.value ?: return
         _editingProfile.value = current.copy(vibrationEnabled = enabled)
-        Log.d(TAG, "Updated vibration: $enabled")
+        AppLogger.d(TAG, "Updated vibration: $enabled")
     }
 
     /**
@@ -231,7 +233,7 @@ class ControllerViewModel @Inject constructor(
         val current = _editingProfile.value ?: return
         val clampedDeadzone = deadzone.coerceIn(0f, 1f)
         _editingProfile.value = current.copy(deadzone = clampedDeadzone)
-        Log.d(TAG, "Updated deadzone: $clampedDeadzone")
+        AppLogger.d(TAG, "Updated deadzone: $clampedDeadzone")
     }
 
     /**
@@ -241,14 +243,14 @@ class ControllerViewModel @Inject constructor(
         viewModelScope.launch {
             val profile = _editingProfile.value
             if (profile == null) {
-                Log.w(TAG, "Cannot save: No profile being edited")
+                AppLogger.w(TAG, "Cannot save: No profile being edited")
                 return@launch
             }
 
             try {
                 _uiState.value = ControllerUiState.Loading
 
-                val result = if (profile.id == 0L) {
+                val legacyResult = if (profile.id == 0L) {
                     // New profile - returns Result<Long>
                     controllerManager.saveProfile(profile).map { Unit }
                 } else {
@@ -256,17 +258,26 @@ class ControllerViewModel @Inject constructor(
                     controllerManager.updateProfile(profile)
                 }
 
-                result.onSuccess {
-                    Log.i(TAG, "Profile saved successfully: ${profile.name}")
-                    _editingProfile.value = null
-                    loadProfilesForActiveController()
-                    _uiState.value = ControllerUiState.Success
-                }.onFailure { error ->
-                    Log.e(TAG, "Failed to save profile", error)
-                    _uiState.value = ControllerUiState.Error("プロファイル保存エラー: ${error.message}")
+                // Convert legacy Result<T> to DataResult<T>
+                val result = DataResult.fromResult(legacyResult)
+
+                when (result) {
+                    is DataResult.Success -> {
+                        AppLogger.i(TAG, "Profile saved successfully: ${profile.name}")
+                        _editingProfile.value = null
+                        loadProfilesForActiveController()
+                        _uiState.value = ControllerUiState.Success
+                    }
+                    is DataResult.Error -> {
+                        AppLogger.e(TAG, "Failed to save profile: ${profile.name}")
+                        _uiState.value = ControllerUiState.Error("プロファイル保存エラー: ${result.error}")
+                    }
+                    is DataResult.Loading -> {
+                        // Should not happen for legacy Result conversion
+                    }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Exception saving profile", e)
+                AppLogger.e(TAG, "Exception saving profile", e)
                 _uiState.value = ControllerUiState.Error(e.message ?: "不明なエラー")
             }
         }
@@ -277,7 +288,7 @@ class ControllerViewModel @Inject constructor(
      */
     fun cancelEditProfile() {
         _editingProfile.value = null
-        Log.d(TAG, "Cancelled profile editing")
+        AppLogger.d(TAG, "Cancelled profile editing")
     }
 
     /**
@@ -290,17 +301,25 @@ class ControllerViewModel @Inject constructor(
             try {
                 _uiState.value = ControllerUiState.Loading
 
-                val result = controllerManager.deleteProfile(profile)
-                result.onSuccess {
-                    Log.i(TAG, "Profile deleted: ${profile.name}")
-                    loadProfilesForActiveController()
-                    _uiState.value = ControllerUiState.Success
-                }.onFailure { error ->
-                    Log.e(TAG, "Failed to delete profile", error)
-                    _uiState.value = ControllerUiState.Error("プロファイル削除エラー: ${error.message}")
+                val legacyResult = controllerManager.deleteProfile(profile)
+                val result = DataResult.fromResult(legacyResult)
+
+                when (result) {
+                    is DataResult.Success -> {
+                        AppLogger.i(TAG, "Profile deleted: ${profile.name}")
+                        loadProfilesForActiveController()
+                        _uiState.value = ControllerUiState.Success
+                    }
+                    is DataResult.Error -> {
+                        AppLogger.e(TAG, "Failed to delete profile: ${profile.name}")
+                        _uiState.value = ControllerUiState.Error("プロファイル削除エラー: ${result.error}")
+                    }
+                    is DataResult.Loading -> {
+                        // Should not happen for legacy Result conversion
+                    }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Exception deleting profile", e)
+                AppLogger.e(TAG, "Exception deleting profile", e)
                 _uiState.value = ControllerUiState.Error(e.message ?: "不明なエラー")
             }
         }
@@ -319,7 +338,7 @@ class ControllerViewModel @Inject constructor(
         }
 
         _editingProfile.value = current.copy(buttonMapping = defaultMapping)
-        Log.d(TAG, "Reset to ${controller.type} default mapping")
+        AppLogger.d(TAG, "Reset to ${controller.type} default mapping")
     }
 }
 

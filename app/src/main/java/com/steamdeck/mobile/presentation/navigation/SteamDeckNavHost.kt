@@ -12,7 +12,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.steamdeck.mobile.presentation.ui.auth.SteamLoginScreen
 import com.steamdeck.mobile.presentation.ui.download.DownloadScreen
 import com.steamdeck.mobile.presentation.ui.game.GameDetailScreen
 import com.steamdeck.mobile.presentation.ui.home.HomeScreen

@@ -2,6 +2,7 @@ package com.steamdeck.mobile.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.repository.GameRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,6 +19,10 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     private val gameRepository: GameRepository
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "HomeVM"
+    }
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -43,6 +48,7 @@ class HomeViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
+                AppLogger.e(TAG, "Failed to load games", e)
                 _uiState.value = HomeUiState.Error(e.message ?: "不明なエラー")
             }
         }
@@ -68,6 +74,7 @@ class HomeViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
+                AppLogger.e(TAG, "Game search failed: $query", e)
                 _uiState.value = HomeUiState.Error(e.message ?: "検索エラー")
             }
         }
@@ -80,8 +87,9 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 gameRepository.updateFavoriteStatus(gameId, isFavorite)
+                AppLogger.d(TAG, "Toggled favorite for game $gameId: $isFavorite")
             } catch (e: Exception) {
-                // エラーハンドリング
+                AppLogger.e(TAG, "Failed to toggle favorite for game $gameId", e)
             }
         }
     }
@@ -139,11 +147,11 @@ class HomeViewModel @Inject constructor(
                 // Android 10 (API 29) 以降では、content:// URIを推奨（Scoped Storage）
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     if (!executablePath.startsWith("content://")) {
-                        android.util.Log.w("HomeViewModel",
+                        AppLogger.w(TAG,
                             "Executable path should use content:// URI on Android 10+: $executablePath")
                     }
                     if (!installPath.startsWith("content://")) {
-                        android.util.Log.w("HomeViewModel",
+                        AppLogger.w(TAG,
                             "Install path should use content:// URI on Android 10+: $installPath")
                     }
                 }
@@ -180,10 +188,11 @@ class HomeViewModel @Inject constructor(
                 // 6. 挿入結果を検証
                 if (insertedId <= 0) {
                     _uiState.value = HomeUiState.Error("ゲームの追加に失敗しました（無効なID: $insertedId）")
+                    AppLogger.e(TAG, "Invalid game ID returned: $insertedId")
                     return@launch
                 }
 
-                android.util.Log.d("HomeViewModel", "Game added successfully with ID: $insertedId")
+                AppLogger.i(TAG, "Game added successfully: $name (ID: $insertedId)")
 
                 // 7. 追加後、リストを更新
                 // Note: Flowで自動更新されるが、明示的にrefresh()を呼ぶことで即座に反映
@@ -192,10 +201,10 @@ class HomeViewModel @Inject constructor(
             } catch (e: android.database.sqlite.SQLiteConstraintException) {
                 // データベース制約違反（UNIQUE制約等）
                 _uiState.value = HomeUiState.Error("ゲームが既に存在します")
-                android.util.Log.e("HomeViewModel", "SQLite constraint error", e)
+                AppLogger.e(TAG, "SQLite constraint error while adding game", e)
             } catch (e: Exception) {
                 _uiState.value = HomeUiState.Error("ゲームの追加に失敗しました: ${e.message}")
-                android.util.Log.e("HomeViewModel", "Error adding game", e)
+                AppLogger.e(TAG, "Error adding game: $name", e)
             }
         }
     }

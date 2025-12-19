@@ -1147,44 +1147,6 @@ private fun SteamClientContent(
                         }
                     }
 
-                    // Troubleshooting tips
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFF2A475E).copy(alpha = 0.3f)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = null,
-                                    tint = Color(0xFF66C0F4),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = "トラブルシューティング",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = Color(0xFF66C0F4)
-                                )
-                            }
-                            Text(
-                                text = "• ストレージ空き容量を確認してください（最低500MB必要）\n• アプリを再起動してください\n• 端末を再起動してください\n• それでも解決しない場合は、アプリデータをクリアしてください",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF8F98A0),
-                                lineHeight = 20.sp
-                            )
-                        }
-                    }
-
                     // Retry button
                     Button(
                         onClick = { onInstall(defaultContainerId) },

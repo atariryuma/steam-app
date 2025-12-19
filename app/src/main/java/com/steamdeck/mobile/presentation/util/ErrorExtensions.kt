@@ -70,7 +70,6 @@ fun SteamSyncError.toStringRes(): Int {
         is SteamSyncError.AuthFailed -> R.string.error_steam_auth_failed
         is SteamSyncError.NetworkTimeout -> R.string.error_steam_network_timeout
         is SteamSyncError.ApiError -> R.string.error_steam_api
-        is SteamSyncError.ApiKeyNotConfigured -> R.string.error_steam_api_key_not_configured
     }
 }
 
@@ -86,7 +85,6 @@ fun SteamSyncError.toUserMessage(context: Context): String {
         is SteamSyncError.AuthFailed -> context.getString(R.string.error_steam_auth_failed)
         is SteamSyncError.NetworkTimeout -> context.getString(R.string.error_steam_network_timeout)
         is SteamSyncError.ApiError -> context.getString(R.string.error_steam_api, errorMessage)
-        is SteamSyncError.ApiKeyNotConfigured -> context.getString(R.string.error_steam_api_key_not_configured)
     }
 }
 

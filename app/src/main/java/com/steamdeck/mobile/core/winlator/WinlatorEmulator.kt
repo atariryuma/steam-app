@@ -61,7 +61,7 @@ class WinlatorEmulator @Inject constructor(
         private const val TAG = "WinlatorEmulator"
 
         // Box64 assets
-        private const val BOX64_ASSET = "winlator/box64-0.3.6.txz"
+        private const val BOX64_ASSET = "winlator/box64-0.3.4.txz"  // Downgraded from v0.3.6 for stability
         private const val BOX64_RC_ASSET = "winlator/default.box64rc"
         private const val ENV_VARS_ASSET = "winlator/env_vars.json"
 
@@ -187,7 +187,7 @@ class WinlatorEmulator @Inject constructor(
                 progressCallback?.invoke(0.15f, "Extracting Box64 binary...")
 
                 // Extract box64.txz from assets
-                val box64TxzFile = File(box64Dir, "box64-0.3.6.txz")
+                val box64TxzFile = File(box64Dir, "box64-0.3.4.txz")
                 if (!box64TxzFile.exists()) {
                     extractAsset(BOX64_ASSET, box64TxzFile)
                     progressCallback?.invoke(0.17f, "Box64 asset copied")
@@ -465,7 +465,7 @@ class WinlatorEmulator @Inject constructor(
                 )
             }
 
-            // 2. Get Box64 binary (prefer rootfs copy)
+            // 2. Get Box64 binary
             val box64ToUse = getBox64Binary()
 
             if (!box64ToUse.exists()) {
@@ -480,11 +480,20 @@ class WinlatorEmulator @Inject constructor(
                 )
             }
 
+            // Get the rootfs linker to use as interpreter
+            val linker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
+            if (!linker.exists()) {
+                return@withContext Result.failure(
+                    EmulatorException("Rootfs linker not found: ${linker.absolutePath}")
+                )
+            }
+
             // 3. Build environment variables
             val environmentVars = buildEnvironmentVariables(container)
 
-            // 4. Build command - direct execution with proper library paths
+            // 4. Build command - invoke linker directly with Box64 as argument
             val command = buildList {
+                add(linker.absolutePath)
                 add(box64ToUse.absolutePath)
                 add(wineBinary.absolutePath)
                 add(executable.absolutePath)
@@ -496,7 +505,10 @@ class WinlatorEmulator @Inject constructor(
 
             // 5. Start process
             val processBuilder = ProcessBuilder(command)
-            processBuilder.environment().putAll(environmentVars)
+            // Clear environment and set only what we need
+            val env = processBuilder.environment()
+            env.clear()
+            env.putAll(environmentVars)
             processBuilder.redirectErrorStream(true)
 
             // Set working directory to executable's parent
@@ -692,93 +704,298 @@ class WinlatorEmulator @Inject constructor(
     // Helper functions
 
     /**
-     * Initializes Wine prefix by running `wineboot --init`.
+     * Builds environment variables for wineboot initialization with retry-specific settings.
      *
-     * This creates the necessary registry files and directory structure
-     * for Wine to function properly.
+     * Each retry attempt uses progressively more conservative Box64 and Wine settings
+     * to maximize stability at the cost of performance.
      *
-     * @param containerDir Container root directory
-     * @return Result indicating success or failure
+     * @param containerDir Container root directory for WINEPREFIX
+     * @param attemptNumber Retry attempt number (0-2)
+     * @return Map of environment variables optimized for the attempt
      */
-    private suspend fun initializeWinePrefix(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            // Get the Box64 binary (prefer rootfs copy)
-            val box64ToUse = getBox64Binary()
+    private fun buildWinebootEnvironmentVariables(
+        containerDir: File,
+        attemptNumber: Int = 0
+    ): Map<String, String> {
+        return buildMap {
+            put("WINEPREFIX", containerDir.absolutePath)
 
-            if (!box64ToUse.exists()) {
-                return@withContext Result.failure(Box64BinaryNotFoundException())
+            // CRITICAL: Reduce WINEDEBUG verbosity based on attempt
+            // Excessive logging (+all,+relay,+file) destabilizes Wine and causes SIGSEGV
+            when (attemptNumber) {
+                0 -> put("WINEDEBUG", "-all")              // Silent - fastest, most stable
+                1 -> put("WINEDEBUG", "warn")              // Warnings only
+                else -> put("WINEDEBUG", "+err,+fixme")    // Errors + fixme - full diagnostics
             }
 
-            if (!winebootBinary.exists()) {
-                return@withContext Result.failure(WineBinaryNotFoundException())
-            }
+            put("WINEARCH", "win64")
+            put("WINEFSYNC", "0")  // Disable FSync during initialization for stability
 
-            Log.i(TAG, "Initializing Wine prefix: ${containerDir.absolutePath}")
-            Log.i(TAG, "Using box64: ${box64ToUse.absolutePath}")
-            Log.i(TAG, "Using wineboot: ${winebootBinary.absolutePath}")
+            // Paths
+            put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}")
+            put("LD_LIBRARY_PATH", "${rootfsDir.absolutePath}/lib:${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu:${wineDir.absolutePath}/lib:${wineDir.absolutePath}/lib/wine/x86_64-unix")
+            put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/x86_64-windows")
 
-            // Build command - direct execution with proper library paths
-            val command = listOf(
-                box64ToUse.absolutePath,
-                winebootBinary.absolutePath,
-                "--init"
-            )
+            // Box64 library paths (critical for Android dlopen restrictions)
+            put("BOX64_LD_LIBRARY_PATH", "${rootfsDir.absolutePath}/lib:${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/x86_64-linux-gnu:${wineDir.absolutePath}/lib/wine/x86_64-unix")
+            put("BOX64_PATH", "${wineDir.absolutePath}/bin")
+            put("BOX64_EMULATED_LIBS", "libc.so.6:libpthread.so.0:libdl.so.2:librt.so.1:libm.so.6")
+            put("BOX64_ALLOWMISSINGLIBS", "1")
 
-            val environmentVars = mapOf(
-                "WINEPREFIX" to containerDir.absolutePath,
-                "WINEDEBUG" to "-all",
-                "WINEARCH" to "win64",
-                "PATH" to "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}",
-                "LD_LIBRARY_PATH" to "${rootfsDir.absolutePath}/lib:${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu"
-            )
-
-            val processBuilder = ProcessBuilder(command)
-            processBuilder.environment().putAll(environmentVars)
-            processBuilder.redirectErrorStream(true)
-
-            Log.d(TAG, "Running: ${command.joinToString(" ")}")
-
-            val process = processBuilder.start()
-
-            // Monitor output for debugging
-            val output = StringBuilder()
-            process.inputStream.bufferedReader().use { reader ->
-                reader.lineSequence().forEach { line ->
-                    Log.d(TAG, "[wineboot] $line")
-                    output.appendLine(line)
+            // Box64 dynarec settings per attempt - each attempt gets more conservative
+            when (attemptNumber) {
+                0 -> {
+                    // Attempt 1: MAXIMUM STABILITY preset (Winlator-based)
+                    // These settings prioritize correctness over performance
+                    put("BOX64_DYNAREC_BIGBLOCK", "0")      // Disable large block compilation
+                    put("BOX64_DYNAREC_STRONGMEM", "2")     // FIXED: Max valid value is 2, not 3!
+                    put("BOX64_DYNAREC_FASTNAN", "0")       // CRITICAL: Accurate NaN handling
+                    put("BOX64_DYNAREC_FASTROUND", "0")     // CRITICAL: Accurate rounding
+                    put("BOX64_DYNAREC_SAFEFLAGS", "2")     // CRITICAL: Full flag safety
+                    put("BOX64_DYNAREC_FORWARD", "128")     // ADDED: Conservative block forward (Winlator STABILITY)
+                    put("BOX64_DYNAREC_WAIT", "0")          // ADDED: Winlator STABILITY setting
+                    put("BOX64_DYNAREC_WEAKBARRIER", "0")   // Strong memory barriers
+                    put("BOX64_DYNAREC_X87DOUBLE", "1")     // Accurate x87 FPU emulation
+                    put("BOX64_LOG", "1")                   // Basic logging
+                    put("BOX64_NOBANNER", "0")              // Show banner for diagnostics
+                }
+                1 -> {
+                    // Attempt 2: ULTRA-CONSERVATIVE (disable optimizations)
+                    put("BOX64_DYNAREC_BIGBLOCK", "0")
+                    put("BOX64_DYNAREC_STRONGMEM", "2")     // FIXED: Max valid value is 2
+                    put("BOX64_DYNAREC_FASTNAN", "0")
+                    put("BOX64_DYNAREC_FASTROUND", "0")
+                    put("BOX64_DYNAREC_SAFEFLAGS", "2")
+                    put("BOX64_DYNAREC_WEAKBARRIER", "0")
+                    put("BOX64_DYNAREC_X87DOUBLE", "1")     // ADDED: Maintain FPU accuracy
+                    put("BOX64_DYNAREC_CALLRET", "0")       // Disable call/ret optimization
+                    put("BOX64_DYNAREC_FORWARD", "0")       // Disable forward optimization
+                    put("BOX64_DYNAREC_WAIT", "0")          // ADDED: Winlator setting
+                    put("BOX64_LOG", "2")                   // More verbose logging
+                    put("BOX64_NOBANNER", "0")
+                }
+                else -> {
+                    // Attempt 3: DISABLE DYNAREC (slowest but most stable)
+                    // Falls back to pure interpretation - ~10x slower but eliminates JIT bugs
+                    put("BOX64_DYNAREC", "0")               // COMPLETE DISABLE
+                    put("BOX64_LOG", "3")                   // Maximum logging
+                    put("BOX64_NOBANNER", "0")
                 }
             }
 
-            // Wait for completion with timeout (60 seconds)
-            val completed = kotlinx.coroutines.withTimeoutOrNull(60_000) {
-                process.waitFor()
-                true
-            }
-
-            if (completed == null) {
-                Log.w(TAG, "wineboot initialization timed out after 60 seconds")
-                process.destroyForcibly()
-                return@withContext Result.failure(
-                    WinePrefixException("Wine prefix initialization timed out")
-                )
-            }
-
-            val exitCode = process.exitValue()
-            if (exitCode != 0) {
-                Log.w(TAG, "wineboot exited with code $exitCode")
-                Log.d(TAG, "wineboot output: $output")
-                // Don't fail - some games might work without full init
-                return@withContext Result.failure(
-                    WinePrefixException("wineboot exited with code $exitCode")
-                )
-            }
-
-            Log.i(TAG, "Wine prefix initialized successfully")
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Log.e(TAG, "Wine prefix initialization failed", e)
-            Result.failure(WinePrefixException("Failed to initialize Wine prefix: ${e.message}", e))
+            // Android compatibility
+            put("MESA_EXTENSION_MAX_YEAR", "2003")
+            put("MESA_GL_VERSION_OVERRIDE", "4.6")
+            put("MESA_GLSL_VERSION_OVERRIDE", "460")
+            put("DISPLAY", ":0")
         }
+    }
+
+    /**
+     * Cleans up partial Wine prefix after failed initialization attempt.
+     *
+     * Removes potentially corrupted registry files and timestamps that could
+     * interfere with subsequent retry attempts.
+     *
+     * @param containerDir Container root directory to clean
+     */
+    private fun cleanupPartialPrefix(containerDir: File) {
+        try {
+            // Remove potentially corrupted registry files
+            val regFiles = listOf("system.reg", "user.reg", "userdef.reg")
+            regFiles.forEach { regFile ->
+                val file = File(containerDir, regFile)
+                if (file.exists()) {
+                    val deleted = file.delete()
+                    if (deleted) {
+                        Log.d(TAG, "Cleaned up partial registry: $regFile")
+                    } else {
+                        Log.w(TAG, "Failed to delete partial registry: $regFile")
+                    }
+                }
+            }
+
+            // Clean update timestamp
+            File(containerDir, ".update-timestamp").apply {
+                if (exists()) {
+                    val deleted = delete()
+                    if (deleted) {
+                        Log.d(TAG, "Cleaned up .update-timestamp")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to cleanup partial prefix", e)
+            // Don't propagate - cleanup is best-effort
+        }
+    }
+
+    /**
+     * Initializes Wine prefix by running `wineboot --init` with 3-tier retry mechanism.
+     *
+     * Uses progressively more conservative Box64/Wine settings across 3 attempts:
+     * - Attempt 1: Maximum stability (90s timeout)
+     * - Attempt 2: Ultra-conservative with disabled optimizations (120s timeout)
+     * - Attempt 3: Dynarec completely disabled - slowest but most stable (120s timeout)
+     *
+     * Between attempts, cleans up partial prefix corruption and uses exponential backoff.
+     *
+     * @param containerDir Container root directory
+     * @return Result indicating success or failure after all attempts
+     */
+    private suspend fun initializeWinePrefix(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
+        // Pre-flight checks
+        val box64ToUse = getBox64Binary()
+        if (!box64ToUse.exists()) {
+            return@withContext Result.failure(Box64BinaryNotFoundException())
+        }
+
+        if (!wineBinary.exists()) {
+            return@withContext Result.failure(WineBinaryNotFoundException())
+        }
+
+        val winebootExe = File(wineDir, "lib/wine/x86_64-windows/wineboot.exe")
+        if (!winebootExe.exists()) {
+            return@withContext Result.failure(
+                EmulatorException("wineboot.exe not found: ${winebootExe.absolutePath}")
+            )
+        }
+
+        val linker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
+        if (!linker.exists()) {
+            return@withContext Result.failure(
+                EmulatorException("Rootfs linker not found: ${linker.absolutePath}")
+            )
+        }
+
+        Log.i(TAG, "Initializing Wine prefix: ${containerDir.absolutePath}")
+        Log.i(TAG, "Using linker: ${linker.absolutePath}")
+        Log.i(TAG, "Using box64: ${box64ToUse.absolutePath}")
+        Log.i(TAG, "Using wine: ${wineBinary.absolutePath}")
+        Log.i(TAG, "Using wineboot.exe: ${winebootExe.absolutePath}")
+
+        // Build command (same for all attempts)
+        val command = listOf(
+            linker.absolutePath,
+            box64ToUse.absolutePath,
+            wineBinary.absolutePath,
+            winebootExe.absolutePath,
+            "--init"
+        )
+
+        // 3-tier retry loop
+        for (attemptNumber in 0 until 3) {
+            try {
+                Log.i(TAG, "=== Wine prefix initialization attempt ${attemptNumber + 1}/3 ===")
+
+                // Build environment variables specific to this attempt
+                val environmentVars = buildWinebootEnvironmentVariables(containerDir, attemptNumber)
+
+                // Log key settings for this attempt
+                Log.d(TAG, "Attempt $attemptNumber settings:")
+                Log.d(TAG, "  WINEDEBUG=${environmentVars["WINEDEBUG"]}")
+                Log.d(TAG, "  BOX64_DYNAREC=${environmentVars["BOX64_DYNAREC"] ?: "enabled"}")
+                Log.d(TAG, "  BOX64_DYNAREC_SAFEFLAGS=${environmentVars["BOX64_DYNAREC_SAFEFLAGS"] ?: "default"}")
+                Log.d(TAG, "  BOX64_DYNAREC_STRONGMEM=${environmentVars["BOX64_DYNAREC_STRONGMEM"] ?: "default"}")
+
+                val processBuilder = ProcessBuilder(command)
+                val env = processBuilder.environment()
+                env.clear()
+                env.putAll(environmentVars)
+                processBuilder.redirectErrorStream(true)
+
+                Log.d(TAG, "Running: ${command.joinToString(" ")}")
+
+                val process = processBuilder.start()
+
+                // Monitor output
+                val output = StringBuilder()
+                process.inputStream.bufferedReader().use { reader ->
+                    reader.lineSequence().forEach { line ->
+                        Log.d(TAG, "[wineboot] $line")
+                        output.appendLine(line)
+                    }
+                }
+
+                // Timeout: 90s for first attempt, 120s for retries
+                val timeoutMs = if (attemptNumber == 0) 90_000L else 120_000L
+                val completed = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
+                    process.waitFor()
+                    true
+                }
+
+                if (completed == null) {
+                    Log.w(TAG, "Attempt $attemptNumber: wineboot timed out after ${timeoutMs / 1000}s")
+                    process.destroyForcibly()
+
+                    // If last attempt, fail
+                    if (attemptNumber == 2) {
+                        return@withContext Result.failure(
+                            WinePrefixException("Wine prefix initialization timed out on all 3 attempts")
+                        )
+                    }
+
+                    // Cleanup and retry
+                    cleanupPartialPrefix(containerDir)
+                    val backoffMs = (attemptNumber + 1) * 2000L
+                    Log.i(TAG, "Waiting ${backoffMs / 1000}s before retry...")
+                    kotlinx.coroutines.delay(backoffMs)
+                    continue
+                }
+
+                val exitCode = process.exitValue()
+
+                if (exitCode == 0) {
+                    // SUCCESS!
+                    Log.i(TAG, "Wine prefix initialized successfully on attempt ${attemptNumber + 1}")
+                    return@withContext Result.success(Unit)
+                }
+
+                // Failed with non-zero exit code
+                val outputTail = output.takeLast(500).toString()
+                Log.w(TAG, "Attempt $attemptNumber: wineboot exited with code $exitCode")
+                Log.d(TAG, "Output (last 500 chars): $outputTail")
+
+                // Special handling for SIGSEGV (exit code 139)
+                if (exitCode == 139) {
+                    Log.e(TAG, "Attempt $attemptNumber: SIGSEGV detected (exit 139)")
+                }
+
+                // If last attempt, fail
+                if (attemptNumber == 2) {
+                    return@withContext Result.failure(
+                        WinePrefixException("wineboot failed on all 3 attempts. Last exit code: $exitCode. Output: $outputTail")
+                    )
+                }
+
+                // Cleanup and retry
+                cleanupPartialPrefix(containerDir)
+                val backoffMs = (attemptNumber + 1) * 2000L
+                Log.i(TAG, "Waiting ${backoffMs / 1000}s before retry...")
+                kotlinx.coroutines.delay(backoffMs)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Attempt $attemptNumber: Exception during Wine prefix initialization", e)
+
+                // If last attempt, fail
+                if (attemptNumber == 2) {
+                    return@withContext Result.failure(
+                        WinePrefixException("Failed to initialize Wine prefix after 3 attempts: ${e.message}", e)
+                    )
+                }
+
+                // Cleanup and retry
+                cleanupPartialPrefix(containerDir)
+                val backoffMs = (attemptNumber + 1) * 2000L
+                Log.i(TAG, "Waiting ${backoffMs / 1000}s before retry...")
+                kotlinx.coroutines.delay(backoffMs)
+            }
+        }
+
+        // Should never reach here, but safety fallback
+        return@withContext Result.failure(
+            WinePrefixException("Wine prefix initialization failed - all retry attempts exhausted")
+        )
     }
 
     /**
@@ -828,12 +1045,16 @@ class WinlatorEmulator @Inject constructor(
      */
     private fun buildEnvironmentVariables(container: EmulatorContainer): Map<String, String> {
         val config = container.config
-        val winePrefix = container.getWinePrefix()
+        // WINEPREFIX should be the container root, not rootPath/drive_c
+        // Wine creates drive_c automatically
+        val winePrefix = container.rootPath
 
         return buildMap {
             // Wine basic configuration
             put("WINEPREFIX", winePrefix.absolutePath)
-            put("WINEDEBUG", "-all") // Reduce log noise
+            // CRITICAL: Use minimal logging to prevent SIGSEGV crashes
+            // Excessive logging (+all,+relay,+file) destabilizes Wine execution
+            put("WINEDEBUG", "-all")  // Silent - most stable for game execution
             put("WINEARCH", "win64")
 
             // Graphics configuration
@@ -905,8 +1126,20 @@ class WinlatorEmulator @Inject constructor(
             val existingPath = System.getenv("PATH") ?: ""
             put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:$existingPath")
 
-            // Set LD_LIBRARY_PATH to rootfs libraries for Box64
-            put("LD_LIBRARY_PATH", "${rootfsDir.absolutePath}/lib:${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu")
+            // Set LD_LIBRARY_PATH to rootfs libraries + Wine libraries for Box64
+            put("LD_LIBRARY_PATH", "${rootfsDir.absolutePath}/lib:${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu:${wineDir.absolutePath}/lib:${wineDir.absolutePath}/lib/wine/x86_64-unix")
+
+            // Set Wine DLL path for Windows libraries
+            put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/x86_64-windows")
+
+            // Add Box64 library paths for better compatibility
+            put("BOX64_LD_LIBRARY_PATH", "${rootfsDir.absolutePath}/lib:${rootfsDir.absolutePath}/usr/lib:${rootfsDir.absolutePath}/usr/lib/x86_64-linux-gnu:${wineDir.absolutePath}/lib/wine/x86_64-unix")
+            put("BOX64_PATH", "${wineDir.absolutePath}/bin")
+
+            // Force Box64 to use its own library loader instead of system dlopen
+            // This bypasses Android SELinux restrictions on dlopen from app_data_file
+            put("BOX64_EMULATED_LIBS", "libc.so.6:libpthread.so.0:libdl.so.2:librt.so.1:libm.so.6")
+            put("BOX64_ALLOWMISSINGLIBS", "1")
         }
     }
 
@@ -927,26 +1160,22 @@ class WinlatorEmulator @Inject constructor(
 
     /**
      * Get the Box64 binary to use for execution.
-     * Prefers the rootfs copy if it exists, otherwise falls back to the extracted binary.
+     * Uses the extracted Box64 which has the hardcoded interpreter path.
+     * The setupHardcodedLinkerPath() function creates a symlink at the expected location.
      */
     private fun getBox64Binary(): File {
-        val rootfsBox64 = File(rootfsDir, "usr/local/bin/box64")
-        return if (rootfsBox64.exists()) {
-            rootfsBox64
-        } else {
-            box64Binary
-        }
+        return box64Binary
     }
 
     /**
      * Setup hardcoded linker path for Box64.
      * Box64 has hardcoded interpreter: /data/data/com.winlator/files/rootfs/lib/ld-linux-aarch64.so.1
      *
-     * Since we can't write to /data/data/com.winlator/, we copy Box64 into rootfs
-     * and patch it to use a relative path within rootfs.
+     * Since the path in our app is too long to patch, we create a symlink at rootfs/lib/ld-linux-aarch64.so.1
+     * that points to the actual linker at rootfs/usr/lib/ld-linux-aarch64.so.1.
      */
     private fun setupHardcodedLinkerPath() {
-        // The linker is at usr/lib/ld-linux-aarch64.so.1 in the rootfs
+        // The actual linker is at usr/lib/ld-linux-aarch64.so.1
         val actualLinker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
 
         if (!actualLinker.exists()) {
@@ -954,32 +1183,57 @@ class WinlatorEmulator @Inject constructor(
             return
         }
 
-        // Create a bin directory in rootfs for Box64
+        // Create the lib directory if it doesn't exist
+        val libDir = File(rootfsDir, "lib")
+        if (!libDir.exists()) {
+            libDir.mkdirs()
+            Log.d(TAG, "Created lib directory: ${libDir.absolutePath}")
+        }
+
+        // Create symlink at lib/ld-linux-aarch64.so.1 -> ../usr/lib/ld-linux-aarch64.so.1
+        val linkerSymlink = File(libDir, "ld-linux-aarch64.so.1")
+        try {
+            if (!linkerSymlink.exists()) {
+                // Use relative path for symlink
+                val symlinkTarget = "../usr/lib/ld-linux-aarch64.so.1"
+                ProcessBuilder("ln", "-s", symlinkTarget, linkerSymlink.absolutePath)
+                    .redirectErrorStream(true)
+                    .start()
+                    .apply {
+                        waitFor()
+                        val output = inputStream.bufferedReader().readText()
+                        if (exitValue() == 0) {
+                            Log.i(TAG, "Created linker symlink: ${linkerSymlink.absolutePath} -> $symlinkTarget")
+                        } else {
+                            Log.w(TAG, "Failed to create linker symlink: $output")
+                        }
+                    }
+            } else {
+                Log.d(TAG, "Linker symlink already exists: ${linkerSymlink.absolutePath}")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not create linker symlink: ${e.message}")
+        }
+
+        // Copy Box64 to rootfs and patch its interpreter to use Android system linker
         val rootfsBinDir = File(rootfsDir, "usr/local/bin")
         rootfsBinDir.mkdirs()
-
         val rootfsBox64 = File(rootfsBinDir, "box64")
 
         try {
-            // Copy Box64 to rootfs if not already there
             if (!rootfsBox64.exists() && box64Binary.exists()) {
                 box64Binary.copyTo(rootfsBox64, overwrite = true)
                 rootfsBox64.setExecutable(true, false)
                 Log.i(TAG, "Copied Box64 to rootfs: ${rootfsBox64.absolutePath}")
 
-                // Patch the copied Box64's interpreter path to use rootfs linker
-                val rootfsLinkerPath = "${rootfsDir.absolutePath}/usr/lib/ld-linux-aarch64.so.1"
-                val patchResult = ElfPatcher.patchInterpreterPath(rootfsBox64, rootfsLinkerPath)
-                if (patchResult.isSuccess) {
-                    Log.i(TAG, "Patched rootfs Box64 interpreter to: $rootfsLinkerPath")
-                } else {
-                    Log.w(TAG, "Failed to patch rootfs Box64 interpreter: ${patchResult.exceptionOrNull()?.message}")
-                }
+                // Note: Box64 interpreter path is hardcoded in the binary and too long to patch
+                // We handle this by invoking ld-linux directly when running Box64
+                Log.d(TAG, "Box64 will be invoked via explicit ld-linux interpreter")
             } else if (rootfsBox64.exists()) {
                 Log.d(TAG, "Box64 already exists in rootfs: ${rootfsBox64.absolutePath}")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Could not setup Box64 in rootfs: ${e.message}")
+            Log.w(TAG, "Could not copy Box64 to rootfs: ${e.message}")
         }
     }
 

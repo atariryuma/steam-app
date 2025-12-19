@@ -56,4 +56,79 @@
     <string name="error_steam_auth_failed">Steam API認証エラー。Steamプロフィールが非公開の可能性があります。Steamの設定で「ゲームの詳細」を公開にしてください。</string>
     <string name="error_steam_network_timeout">ネットワークタイムアウト。接続を確認してください。</string>
     <string name="error_steam_api">Steam APIエラー: %1$s</string>
+
+    <!-- ViewModel Error Messages -->
+    <!-- HomeViewModel -->
+    <string name="error_unknown_error">不明なエラー</string>
+    <string name="error_search_error">検索エラー</string>
+    <string name="error_game_name_required">ゲーム名を入力してください</string>
+    <string name="error_executable_required">実行ファイルを選択してください</string>
+    <string name="error_install_folder_required">インストールフォルダを選択してください</string>
+    <string name="error_invalid_executable_path">実行ファイルのパスが無効です</string>
+    <string name="error_invalid_install_path">インストールフォルダのパスが無効です</string>
+    <string name="error_duplicate_game_name">同じ名前のゲームが既に存在します: %1$s</string>
+    <string name="error_duplicate_executable">同じ実行ファイルが既に登録されています</string>
+    <string name="error_invalid_game_id">ゲームの追加に失敗しました（無効なID: %1$d）</string>
+    <string name="error_game_already_exists">ゲームが既に存在します</string>
+    <string name="error_game_add_failed">ゲームの追加に失敗しました: %1$s</string>
+
+    <!-- ControllerViewModel -->
+    <string name="error_controller_detection">コントローラー検出エラー</string>
+    <string name="error_profile_save">プロファイル保存エラー: %1$s</string>
+    <string name="error_profile_delete">プロファイル削除エラー: %1$s</string>
+
+    <!-- ContainerViewModel -->
+    <string name="error_container_load_failed">コンテナの読み込みに失敗しました</string>
+    <string name="error_container_create_failed">コンテナの作成に失敗しました</string>
+    <string name="error_container_delete_failed">コンテナの削除に失敗しました</string>
+
+    <!-- GameDetailViewModel -->
+    <string name="error_download_failed">ダウンロードに失敗しました: %1$s</string>
+    <string name="error_download_start_failed">ダウンロードの開始に失敗しました: %1$s</string>
+    <string name="error_game_info_load_failed">ゲーム情報の取得に失敗しました</string>
+    <string name="error_container_not_configured">コンテナが設定されていません。設定画面でコンテナを作成してください。</string>
+    <string name="error_steam_app_id_not_set">Steam App IDが設定されていません</string>
+    <string name="error_steam_launch_failed">Steam経由での起動に失敗しました</string>
+    <string name="error_steam_launch_unexpected">Steam起動中に予期しないエラーが発生しました</string>
+    <string name="error_steam_client_launch_failed">Steam Clientの起動に失敗しました</string>
+    <string name="error_steam_client_unexpected">Steam Client起動中に予期しないエラーが発生しました</string>
+
+    <!-- SettingsViewModel -->
+    <string name="error_steam_id_not_found">Steam IDが見つかりません。QRコードでログインしてください。</string>
+    <string name="error_api_key_required">API Keyを入力してください</string>
+    <string name="error_api_key_save_failed">API Keyの保存に失敗しました: %1$s</string>
+    <string name="error_clear_failed">クリアに失敗しました: %1$s</string>
+    <string name="error_install_status_check_failed">インストール状態の確認に失敗しました: %1$s</string>
+    <string name="error_install_failed">インストールに失敗しました: %1$s</string>
+    <string name="error_unexpected_error">予期しないエラーが発生しました: %1$s</string>
+    <string name="error_steam_launch_failed_detail">Steam Clientの起動に失敗しました: %1$s</string>
+    <string name="error_steam_client_launch_unexpected">Steam Client起動中に予期しないエラーが発生しました: %1$s</string>
+    <string name="error_uninstall_failed">アンインストールに失敗しました: %1$s</string>
+
+    <!-- SteamLoginViewModel -->
+    <string name="error_auth_session_invalid">認証セッションが無効です。もう一度ログインしてください。</string>
+    <string name="error_auth_steamid_failed">認証に失敗しました。SteamIDを取得できませんでした。</string>
+
+    <!-- WinlatorInitViewModel -->
+    <string name="error_init_failed">初期化に失敗しました</string>
+    <string name="error_init_unexpected">初期化中にエラーが発生しました</string>
+
+    <!-- Status Messages -->
+    <string name="status_syncing">同期を開始しています…</string>
+    <string name="status_syncing_progress">同期中…</string>
+    <string name="status_initializing">Winlatorを初期化中…</string>
+    <string name="status_not_synced">未同期</string>
+    <string name="status_synced_recently">1分以内</string>
+    <string name="status_synced_minutes">%1$d分前</string>
+    <string name="status_synced_hours">%1$d時間前</string>
+    <string name="status_synced_days">%1$d日前</string>
+
+    <!-- Success Messages -->
+    <string name="success_api_key_saved">API Keyを保存しました</string>
+    <string name="success_steam_settings_cleared">Steam設定をクリアしました</string>
+    <string name="success_steam_client_launched">Steam Clientを起動しました</string>
+    <string name="success_steam_uninstalled">Steam Clientはアンインストールされました</string>
+
+    <!-- Install Status -->
+    <string name="install_status_not_installed">Steam Clientはインストールされていません</string>
 </resources>

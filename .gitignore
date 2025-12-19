@@ -106,3 +106,4 @@ Desktop.ini
 CLAUDE.local.md
 .claude/commands/*.local.md
 nul
+.steam-api-key.local

@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +9,14 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
+
+// Read API Key from local.properties (development only)
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    FileInputStream(localPropertiesFile).use { localProperties.load(it) }
+}
+val steamApiKey = localProperties.getProperty("STEAM_API_KEY") ?: ""
 
 android {
     namespace = "com.steamdeck.mobile"
@@ -27,10 +38,10 @@ android {
             abiFilters += listOf("arm64-v8a")
         }
 
-        // Embedded Steam Web API Key
-        // Best Practice: Obfuscated by ProGuard in release builds
-        // Domain: localhost
-        buildConfigField("String", "STEAM_API_KEY", "\"6621A4942208F9FF09A63B8075D1B8B1\"")
+        // Development-only Steam Web API Key from local.properties
+        // Production: Users provide their own API keys in-app
+        // This is ONLY for development/testing convenience
+        buildConfigField("String", "DEV_STEAM_API_KEY", "\"$steamApiKey\"")
     }
 
     buildTypes {

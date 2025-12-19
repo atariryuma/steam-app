@@ -53,7 +53,6 @@ fun GameDetailScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showLaunchErrorDialog by remember { mutableStateOf(false) }
     var showSteamLaunchErrorDialog by remember { mutableStateOf(false) }
-    var showDownloadDialog by remember { mutableStateOf(false) }
     var launchErrorMessage by remember { mutableStateOf("") }
     var steamLaunchErrorMessage by remember { mutableStateOf("") }
 
@@ -99,7 +98,6 @@ fun GameDetailScreen(
                     onOpenSteamClient = { viewModel.openSteamClient(gameId) },
                     onNavigateBack = onNavigateBack,
                     onNavigateToSettings = onNavigateToSettings,
-                    onDownloadGame = { showDownloadDialog = true },
                     onToggleFavorite = { viewModel.toggleFavorite(state.game.id, !state.game.isFavorite) },
                     onDeleteGame = { showDeleteDialog = true }
                 )
@@ -113,21 +111,6 @@ fun GameDetailScreen(
                             showDeleteDialog = false
                         },
                         onDismiss = { showDeleteDialog = false }
-                    )
-                }
-
-                // ダウンロードダイアログ
-                if (showDownloadDialog) {
-                    SteamDownloadDialog(
-                        game = state.game,
-                        onDismiss = { showDownloadDialog = false },
-                        onNavigateToImport = {
-                            showDownloadDialog = false
-                            onNavigateToImport()
-                        },
-                        onStartDownload = { appId ->
-                            viewModel.startDownload(appId)
-                        }
                     )
                 }
 
@@ -181,7 +164,6 @@ fun GameDetailContent(
     onOpenSteamClient: () -> Unit,
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onDownloadGame: () -> Unit,
     onToggleFavorite: () -> Unit,
     onDeleteGame: () -> Unit,
     modifier: Modifier = Modifier
@@ -288,20 +270,50 @@ fun GameDetailContent(
             modifier = Modifier.padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // ダウンロードボタン（Steamゲーム & 未ダウンロードの場合のみ表示）
+            // Steam規約準拠: 公式Steamクライアント経由でのダウンロードを促す
             if (game.source == com.steamdeck.mobile.domain.model.GameSource.STEAM &&
                 game.executablePath.isBlank()
             ) {
-                Button(
-                    onClick = onDownloadGame,
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
                     )
                 ) {
-                    Icon(Icons.Outlined.Download, contentDescription = "ダウンロード")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("ゲームをダウンロード")
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Download,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                "ゲームダウンロード",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                        Text(
+                            "このゲームをプレイするには、Winlator内のSteam公式クライアントからダウンロードしてください。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Button(
+                            onClick = onOpenSteamClient,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary
+                            )
+                        ) {
+                            Text("Steam Clientを開く")
+                        }
+                    }
                 }
             }
 

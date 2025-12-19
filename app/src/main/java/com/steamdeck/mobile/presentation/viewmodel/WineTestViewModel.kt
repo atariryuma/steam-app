@@ -201,7 +201,7 @@ sealed class WineTestUiState {
     /**
      * Initial idle state.
      */
-    object Idle : WineTestUiState()
+    data object Idle : WineTestUiState()
 
     /**
      * Test is running.

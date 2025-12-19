@@ -15,12 +15,12 @@ sealed class AppError : Exception() {
      *
      * @param code HTTP status code or error code
      * @param originalException The original exception that caused this error
-     * @param isRetryable リトライ可能かどうか
+     * @param retryable リトライ可能かどうか
      */
     data class NetworkError(
         val code: Int,
         val originalException: Throwable? = null,
-        val isRetryable: Boolean = true
+        val retryable: Boolean = true
     ) : AppError() {
         override val message: String
             get() = when (code) {
@@ -45,6 +45,10 @@ sealed class AppError : Exception() {
     ) : AppError() {
         override val message: String
             get() = "認証エラー: $reason"
+
+        companion object {
+            val ApiKeyNotConfigured = AuthError("Steam API Key not configured")
+        }
     }
 
     /**
@@ -119,7 +123,7 @@ sealed class AppError : Exception() {
      * リトライ可能かどうかを判定
      */
     open fun isRetryable(): Boolean = when (this) {
-        is NetworkError -> isRetryable
+        is NetworkError -> retryable
         is TimeoutError -> true
         is DatabaseError -> false
         is AuthError -> false
@@ -141,7 +145,7 @@ sealed class AppError : Exception() {
                 is java.net.UnknownHostException -> NetworkError(
                     code = 0,
                     originalException = throwable,
-                    isRetryable = true
+                    retryable = true
                 )
                 is java.net.SocketTimeoutException -> TimeoutError(
                     operation = "Network request",
@@ -167,17 +171,17 @@ sealed class AppError : Exception() {
         fun fromHttpCode(code: Int, message: String = ""): AppError {
             return when (code) {
                 // 4xx Client Errors
-                400 -> NetworkError(code, Exception("Bad Request: $message"), isRetryable = false)
+                400 -> NetworkError(code, Exception("Bad Request: $message"), retryable = false)
                 401 -> AuthError("Unauthorized: $message")
                 403 -> AuthError("Forbidden: $message")
-                404 -> NetworkError(code, Exception("Not Found: $message"), isRetryable = false)
-                429 -> NetworkError(code, Exception("Rate Limited: $message"), isRetryable = true)
+                404 -> NetworkError(code, Exception("Not Found: $message"), retryable = false)
+                429 -> NetworkError(code, Exception("Rate Limited: $message"), retryable = true)
 
                 // 5xx Server Errors (retryable)
-                in 500..599 -> NetworkError(code, Exception("Server Error: $message"), isRetryable = true)
+                in 500..599 -> NetworkError(code, Exception("Server Error: $message"), retryable = true)
 
                 // Other
-                else -> NetworkError(code, Exception("HTTP Error $code: $message"), isRetryable = false)
+                else -> NetworkError(code, Exception("HTTP Error $code: $message"), retryable = false)
             }
         }
     }

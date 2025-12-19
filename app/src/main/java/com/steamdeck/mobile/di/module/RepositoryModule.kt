@@ -7,7 +7,6 @@ import com.steamdeck.mobile.data.repository.ControllerRepositoryImpl
 import com.steamdeck.mobile.data.repository.DownloadRepositoryImpl
 import com.steamdeck.mobile.data.repository.FileImportRepositoryImpl
 import com.steamdeck.mobile.data.repository.GameRepositoryImpl
-import com.steamdeck.mobile.data.repository.SteamAuthRepositoryImpl
 import com.steamdeck.mobile.data.repository.SteamRepositoryAdapter
 import com.steamdeck.mobile.data.repository.WinlatorContainerRepositoryImpl
 import com.steamdeck.mobile.domain.repository.ControllerRepository
@@ -16,7 +15,6 @@ import com.steamdeck.mobile.domain.repository.FileImportRepository
 import com.steamdeck.mobile.domain.repository.GameRepository
 import com.steamdeck.mobile.domain.repository.ISecurePreferences
 import com.steamdeck.mobile.domain.repository.ISteamRepository
-import com.steamdeck.mobile.domain.repository.SteamAuthRepository
 import com.steamdeck.mobile.domain.repository.WinlatorContainerRepository
 import dagger.Binds
 import dagger.Module
@@ -59,15 +57,6 @@ abstract class RepositoryModule {
     ): DownloadRepository
 
     /**
-     * SteamAuthRepositoryの実装をバインド
-     */
-    @Binds
-    @Singleton
-    abstract fun bindSteamAuthRepository(
-        steamAuthRepositoryImpl: SteamAuthRepositoryImpl
-    ): SteamAuthRepository
-
-    /**
      * FileImportRepositoryの実装をバインド
      */
     @Binds
@@ -76,14 +65,7 @@ abstract class RepositoryModule {
         fileImportRepositoryImpl: FileImportRepositoryImpl
     ): FileImportRepository
 
-    /**
-     * ControllerRepositoryの実装をバインド
-     */
-    @Binds
-    @Singleton
-    abstract fun bindControllerRepository(
-        controllerRepositoryImpl: ControllerRepositoryImpl
-    ): ControllerRepository
+    // ControllerRepository binding removed - provided by ControllerModule
 
     /**
      * ISecurePreferencesの実装をバインド
@@ -95,15 +77,7 @@ abstract class RepositoryModule {
         securePreferencesImpl: SecurePreferencesImpl
     ): ISecurePreferences
 
-    /**
-     * Data layer SteamRepositoryの実装をバインド
-     * This is the direct data layer implementation
-     */
-    @Binds
-    @Singleton
-    abstract fun bindSteamRepository(
-        steamRepositoryImpl: SteamRepositoryImpl
-    ): SteamRepository
+    // SteamRepository binding removed - provided by SteamModule in NetworkModule
 
     /**
      * ISteamRepositoryの実装をバインド

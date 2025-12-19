@@ -1,5 +1,8 @@
 package com.steamdeck.mobile.domain.usecase
 
+import com.steamdeck.mobile.core.error.AppError
+import com.steamdeck.mobile.core.logging.AppLogger
+import com.steamdeck.mobile.core.result.DataResult
 import com.steamdeck.mobile.core.winlator.LaunchResult
 import com.steamdeck.mobile.core.winlator.WinlatorEngine
 import com.steamdeck.mobile.domain.repository.GameRepository
@@ -8,6 +11,10 @@ import javax.inject.Inject
 
 /**
  * ゲームを起動するUseCase
+ *
+ * 2025 Best Practice:
+ * - DataResult<T> for type-safe error handling
+ * - AppLogger for centralized logging
  */
 class LaunchGameUseCase @Inject constructor(
     private val gameRepository: GameRepository,
@@ -19,16 +26,20 @@ class LaunchGameUseCase @Inject constructor(
      * @param gameId ゲームID
      * @return 起動結果
      */
-    suspend operator fun invoke(gameId: Long): Result<Int> {
+    suspend operator fun invoke(gameId: Long): DataResult<Int> {
         return try {
             // ゲーム情報を取得
             val game = gameRepository.getGameById(gameId)
-                ?: return Result.failure(IllegalArgumentException("ゲームが見つかりません"))
+                ?: return DataResult.Error(
+                    AppError.DatabaseError("ゲームが見つかりません", null)
+                )
 
             // コンテナ情報を取得（設定されている場合）
             val container = game.winlatorContainerId?.let { containerId ->
                 containerRepository.getContainerById(containerId)
             }
+
+            AppLogger.i(TAG, "Launching game: ${game.name} (ID: $gameId)")
 
             // ゲームを起動
             when (val result = winlatorEngine.launchGame(game, container)) {
@@ -39,17 +50,26 @@ class LaunchGameUseCase @Inject constructor(
                         gameRepository.updatePlayTime(gameId, 0, startTimestamp)
                     } catch (e: Exception) {
                         // プレイ時間の記録失敗はゲーム起動を妨げない
-                        android.util.Log.w("LaunchGameUseCase", "Failed to update play time", e)
+                        AppLogger.w(TAG, "Failed to update play time", e)
                     }
 
-                    Result.success(result.processId)
+                    AppLogger.i(TAG, "Game launched successfully: ${game.name} (PID: ${result.processId})")
+                    DataResult.Success(result.processId)
                 }
                 is LaunchResult.Error -> {
-                    Result.failure(Exception(result.message, result.cause))
+                    AppLogger.e(TAG, "Game launch failed: ${result.message}", result.cause)
+                    DataResult.Error(
+                        AppError.Unknown(Exception(result.message, result.cause))
+                    )
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            AppLogger.e(TAG, "Exception during game launch", e)
+            DataResult.Error(AppError.from(e))
         }
+    }
+
+    companion object {
+        private const val TAG = "LaunchGameUseCase"
     }
 }

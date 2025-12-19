@@ -3,7 +3,8 @@ package com.steamdeck.mobile.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.steamdeck.mobile.core.auth.SteamOpenIdAuthenticator
-import com.steamdeck.mobile.data.local.preferences.SecureSteamPreferences
+import com.steamdeck.mobile.core.logging.AppLogger
+import com.steamdeck.mobile.domain.repository.ISecurePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,16 +26,19 @@ import javax.inject.Inject
  * - Immutable UI state exposure
  * - Error handling with sealed class
  *
+ * Clean Architecture: Only depends on domain layer interfaces
+ *
  * 公式ドキュメント:
  * - https://partner.steamgames.com/doc/features/auth
  * - https://steamcommunity.com/dev
  */
 @HiltViewModel
 class SteamLoginViewModel @Inject constructor(
-    private val secureSteamPreferences: SecureSteamPreferences
+    private val securePreferences: ISecurePreferences
 ) : ViewModel() {
 
     companion object {
+        private const val TAG = "SteamLoginVM"
         private const val CALLBACK_URL = "steamdeckmobile://auth/callback"
         private const val REALM = "steamdeckmobile://"
     }
@@ -65,7 +69,7 @@ class SteamLoginViewModel @Inject constructor(
             )
         }
 
-        android.util.Log.d("SteamLoginViewModel", "OpenID auth URL generated: $authUrl")
+        AppLogger.d(TAG, "OpenID auth URL generated: $authUrl")
 
         return Pair(authUrl, state)
     }
@@ -94,19 +98,13 @@ class SteamLoginViewModel @Inject constructor(
 
             if (steamId != null && SteamOpenIdAuthenticator.isValidSteamId64(steamId)) {
                 // SteamID64を保存
-                secureSteamPreferences.setSteamId(steamId)
+                securePreferences.saveSteamId(steamId)
 
-                android.util.Log.i(
-                    "SteamLoginViewModel",
-                    "OpenID authentication successful. SteamID64: $steamId"
-                )
+                AppLogger.i(TAG, "OpenID authentication successful. SteamID64: $steamId")
 
                 _uiState.update { SteamLoginUiState.Success(steamId = steamId) }
             } else {
-                android.util.Log.w(
-                    "SteamLoginViewModel",
-                    "Failed to extract SteamID from callback: $callbackUrl"
-                )
+                AppLogger.w(TAG, "Failed to extract SteamID from callback: $callbackUrl")
 
                 _uiState.update {
                     SteamLoginUiState.Error("認証に失敗しました。SteamIDを取得できませんでした。")

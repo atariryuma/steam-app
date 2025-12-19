@@ -85,7 +85,7 @@ class ContainerViewModel @Inject constructor(
  */
 sealed class ContainerUiState {
     /** 読み込み中 */
-    object Loading : ContainerUiState()
+    data object Loading : ContainerUiState()
 
     /** 成功 */
     data class Success(val containers: List<EmulatorContainer>) : ContainerUiState()

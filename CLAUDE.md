@@ -29,31 +29,38 @@ com.steamdeck.mobile/
 │   ├── viewmodel/ (HomeVM, SettingsVM, GameDetailVM, DownloadVM, SteamLoginVM, ControllerVM, ContainerVM, WineTestVM, WinlatorInitVM)
 │   ├── navigation/ (SteamDeckNavHost, SteamDeckApp, Screen)
 │   ├── theme/ (Material3 dynamic colors)
+│   ├── util/ (ErrorExtensions - UI error mapping)
 │   └── MainActivity (Single Activity, immersive fullscreen)
 ├── domain/
 │   ├── model/ (Game, GameSource, Download, WinlatorContainer, Controller, ImportSource, SteamAuthResult)
-│   ├── repository/ (interfaces: GameRepository, WinlatorContainerRepository, DownloadRepository, FileImportRepository, SteamAuthRepository, ControllerRepository)
+│   ├── repository/ (interfaces: GameRepository, WinlatorContainerRepository, DownloadRepository, FileImportRepository, SteamAuthRepository, ControllerRepository, ISteamRepository, ISecurePreferences)
 │   ├── usecase/ (GetAllGamesUseCase, GetGameByIdUseCase, SearchGamesUseCase, AddGameUseCase, DeleteGameUseCase, ToggleFavoriteUseCase, UpdatePlayTimeUseCase, SyncSteamLibraryUseCase, LaunchGameUseCase)
+│   ├── error/ (SteamSyncError - domain-specific errors)
 │   └── emulator/WindowsEmulator (interface)
 ├── data/
 │   ├── local/
 │   │   ├── database/ (SteamDeckDatabase v4, Converters)
 │   │   │   ├── dao/ (GameDao, WinlatorContainerDao, DownloadDao, ControllerProfileDao, SteamInstallDao)
 │   │   │   └── entity/ (GameEntity, WinlatorContainerEntity, DownloadEntity, ControllerProfileEntity, SteamInstallEntity, SteamInstallStatus)
-│   │   └── preferences/SecureSteamPreferences (EncryptedSharedPreferences AES256-GCM)
+│   │   └── preferences/
+│   │       ├── SecureSteamPreferences (EncryptedSharedPreferences AES256-GCM)
+│   │       └── SecurePreferencesImpl (ISecurePreferences implementation)
 │   ├── remote/steam/ (SteamApiService Retrofit, SteamAuthenticationService, SteamRepositoryImpl, SteamCdnService, SteamCmdApiService)
-│   ├── repository/ (impls: GameRepositoryImpl, WinlatorContainerRepositoryImpl, DownloadRepositoryImpl, FileImportRepositoryImpl, SteamAuthRepositoryImpl, ControllerRepositoryImpl)
-│   └── mapper/ (GameMapper, WinlatorContainerMapper, DownloadMapper, ControllerMapper)
+│   ├── repository/ (impls: GameRepositoryImpl, WinlatorContainerRepositoryImpl, DownloadRepositoryImpl, FileImportRepositoryImpl, SteamAuthRepositoryImpl, ControllerRepositoryImpl, SteamRepositoryAdapter)
+│   └── mapper/ (GameMapper, WinlatorContainerMapper, DownloadMapper, ControllerMapper, SteamGameMapper)
 ├── core/
-│   ├── auth/ (SteamOpenIdAuthenticator OpenID 2.0, JwtDecoder)
+│   ├── auth/ (SteamOpenIdAuthenticator OpenID 2.0 + signature verification, JwtDecoder)
 │   ├── download/ (DownloadManager WorkManager 8MB chunks, SteamDownloadManager, ApiError)
+│   ├── error/ (AppError - unified error hierarchy)
+│   ├── result/ (DataResult<T> - type-safe result wrapper)
+│   ├── network/ (DataResultCallAdapter - Retrofit automatic error handling)
 │   ├── winlator/ (WinlatorEngine interface, WinlatorEngineImpl, WinlatorEmulator, WineContainer, WineLauncher, ProcessMonitor, PerformanceOptimizer, ZstdDecompressor, WinlatorExceptions)
 │   ├── steam/ (SteamLauncher, SteamSetupManager, SteamInstallerService, ProtonManager)
 │   ├── controller/ControllerManager
 │   ├── input/ (GameControllerManager InputDevice API, InputBridge button mapping)
 │   ├── fileimport/
 │   └── util/
-├── di/module/ (RepositoryModule @Binds, DatabaseModule, NetworkModule, WinlatorModule, FileImportModule, ControllerModule, EmulatorModule, InputModule, SteamAuthModule)
+├── di/module/ (RepositoryModule @Binds, DatabaseModule, NetworkModule + DataResultCallAdapter, WinlatorModule, FileImportModule, ControllerModule, EmulatorModule, InputModule, SteamAuthModule, AppModule)
 └── SteamDeckMobileApp (Application entry point)
 ```
 
@@ -108,10 +115,13 @@ abstract class RepositoryModule {
 - Max 3 concurrent downloads
 - Progress tracked in Room DownloadEntity
 
-### Auth (Steam OpenID 2.0)
-- `SteamOpenIdAuthenticator` with CSRF protection
+### Auth (Steam OpenID 2.0 + Security)
+
+- `SteamOpenIdAuthenticator` with CSRF protection (256-bit secure random state)
+- **NEW (2025)**: OpenID 2.0 signature verification (MITM attack prevention)
 - SteamID64 validation (range: 76561197960265728 ~ 76561202255233023)
-- Encrypted token storage via `SecureSteamPreferences`
+- **No embedded API keys**: Users provide their own Steam Web API Key
+- Encrypted token storage via `SecurePreferencesImpl` (AES256-GCM)
 - QR-based login (password login deprecated in UI)
 
 ## MANDATORY RULES
@@ -134,9 +144,15 @@ abstract class RepositoryModule {
 - NO business logic in Composables (use ViewModels)
 - State hoisting: stateless Composables + callbacks
 
-### Error Handling
-- Use `Result<T>` for fallible operations
-- Use sealed classes for complex state (Loading/Success/Error)
+### Error Handling (2025 Best Practice)
+
+- **NEW**: Use `DataResult<T>` for new code (type-safe Success/Error/Loading)
+- **Legacy**: `Result<T>` still supported (use `DataResult.fromResult()` for migration)
+- Domain errors: Sealed classes (e.g., `SteamSyncError`)
+- UI mapping: `AppError.toUserMessage(context)` extension functions
+- Retrofit: Automatic error wrapping via `DataResultCallAdapter`
+- HTTP errors: `AppError.fromHttpCode()` auto-mapping
+- Retryability: `AppError.isRetryable()` for smart retry logic
 - Log via `android.util.Log` with TAG
 - User messages in strings.xml (ja/en)
 
@@ -165,21 +181,48 @@ abstract class RepositoryModule {
 
 ## CURRENT STATE (git status)
 ```
-Modified: 13 files (AndroidManifest, DownloadManager, SteamDownloadManager, GameEntity, SteamInstallEntity, LaunchGameUseCase, SteamDeckNavHost, SettingsScreen, HomeViewModel, SettingsViewModel, SteamLoginViewModel, strings.xml)
-Deleted: QrCodeGenerator.kt
-Untracked: SteamOpenIdAuthenticator.kt, SteamOpenIdLoginScreen.kt, presentation/ui/common/, 9 screenshot PNGs
+Clean working directory (last commit: 5149617)
 ```
 
-## RECENT CHANGES (last commit 93e7218)
+## RECENT CHANGES (last commit 5149617 - 2025-12-19)
+
+### Security & Architecture Improvements
+
+- **Removed embedded Steam API key** (security & compliance)
+  - Users now provide their own API keys
+  - Updated `SyncSteamLibraryUseCase`, `AppModule`, `SteamAuthModule`
+- **Added OpenID 2.0 signature verification** (MITM attack prevention)
+  - `SteamOpenIdAuthenticator.kt` now verifies signatures via Steam provider
+  - CSRF protection with 256-bit secure random state
+- **Implemented unified error handling system**
+  - `DataResult<T>` sealed interface (Success/Error/Loading)
+  - `AppError` unified hierarchy (NetworkError, AuthError, etc.)
+  - `SteamSyncError` domain-specific errors
+  - Automatic Retrofit error wrapping via `DataResultCallAdapter`
+- **Added encrypted preferences**
+  - `SecurePreferencesImpl` with AES256-GCM
+  - `ISecurePreferences` domain interface
+
+### New Files (17 files, +1,209 lines)
+
+- `core/result/DataResult.kt` - Type-safe result wrapper
+- `core/error/AppError.kt` - Unified error hierarchy
+- `core/network/DataResultCallAdapter.kt` - Retrofit error adapter
+- `domain/error/SteamSyncError.kt` - Steam sync errors
+- `domain/repository/ISteamRepository.kt` - Steam API abstraction
+- `domain/repository/ISecurePreferences.kt` - Secure storage interface
+- `data/repository/SteamRepositoryAdapter.kt` - Domain/data bridge
+- `data/mapper/SteamGameMapper.kt` - Steam game mapping
+- `data/local/preferences/SecurePreferencesImpl.kt` - Encrypted prefs impl
+- `presentation/util/ErrorExtensions.kt` - UI error mapping
+- `test/**/DataResultTest.kt` - Unit tests (3 test files)
+
+### Previous Commit (93e7218)
+
 - Removed password login UI (QR only)
 - Added `SteamOpenIdAuthenticator.kt` (OpenID 2.0 + CSRF)
-- Added `SteamOpenIdLoginScreen.kt`
-- Simplified `SteamStyleLoginScreen.kt` (457→210 lines)
-- Enhanced `GameDetailScreen.kt` (550+ lines)
-- Expanded `SettingsScreen.kt` (707+ lines)
-- Added `ButtonFeedbackVisualization.kt` (controller UI)
-- Added Winlator assets: `dxvk.conf`, `performance.reg`
-- Added docs: `USER_MANUAL.md`, `JAVA_SETUP_README.md`, `SAMPLE_GAMES.md`
+- Enhanced GameDetailScreen, SettingsScreen
+- Added Winlator assets & documentation
 
 ## TESTING
 - JUnit 4, Mockito, Mockk 1.13.13

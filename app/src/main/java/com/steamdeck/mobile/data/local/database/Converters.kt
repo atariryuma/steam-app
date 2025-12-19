@@ -7,35 +7,35 @@ import com.steamdeck.mobile.data.local.database.entity.GameSource
 import com.steamdeck.mobile.data.local.database.entity.SteamInstallStatus
 
 /**
- * Room用の型変換クラス
- * Enumやカスタムクラスをデータベースのプリミティブ型に変換
+ * Room用 typeconversionclass
+ * Enum customclassdataベース プリミティブtype conversion
  */
 class Converters {
-    // GameSource converters
-    @TypeConverter
-    fun fromGameSource(value: GameSource): String = value.name
+ // GameSource converters
+ @TypeConverter
+ fun fromGameSource(value: GameSource): String = value.name
 
-    @TypeConverter
-    fun toGameSource(value: String): GameSource = GameSource.valueOf(value)
+ @TypeConverter
+ fun toGameSource(value: String): GameSource = GameSource.valueOf(value)
 
-    // Box64Preset converters
-    @TypeConverter
-    fun fromBox64Preset(value: Box64Preset): String = value.name
+ // Box64Preset converters
+ @TypeConverter
+ fun fromBox64Preset(value: Box64Preset): String = value.name
 
-    @TypeConverter
-    fun toBox64Preset(value: String): Box64Preset = Box64Preset.valueOf(value)
+ @TypeConverter
+ fun toBox64Preset(value: String): Box64Preset = Box64Preset.valueOf(value)
 
-    // DownloadStatus converters
-    @TypeConverter
-    fun fromDownloadStatus(value: DownloadStatus): String = value.name
+ // DownloadStatus converters
+ @TypeConverter
+ fun fromDownloadStatus(value: DownloadStatus): String = value.name
 
-    @TypeConverter
-    fun toDownloadStatus(value: String): DownloadStatus = DownloadStatus.valueOf(value)
+ @TypeConverter
+ fun toDownloadStatus(value: String): DownloadStatus = DownloadStatus.valueOf(value)
 
-    // SteamInstallStatus converters
-    @TypeConverter
-    fun fromSteamInstallStatus(value: SteamInstallStatus): String = value.name
+ // SteamInstallStatus converters
+ @TypeConverter
+ fun fromSteamInstallStatus(value: SteamInstallStatus): String = value.name
 
-    @TypeConverter
-    fun toSteamInstallStatus(value: String): SteamInstallStatus = SteamInstallStatus.valueOf(value)
+ @TypeConverter
+ fun toSteamInstallStatus(value: String): SteamInstallStatus = SteamInstallStatus.valueOf(value)
 }

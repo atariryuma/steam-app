@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 /**
- * ネットワーク関連の依存性注入モジュール
+ * network関連 依存性注入module
  *
  * Best Practice (2025):
  * - DataResultCallAdapterFactory for automatic error handling
@@ -35,100 +35,100 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    @Provides
-    @Singleton
-    fun provideGson(): Gson {
-        return GsonBuilder()
-            .setLenient()
-            .create()
+ @Provides
+ @Singleton
+ fun provideGson(): Gson {
+  return GsonBuilder()
+   .setLenient()
+   .create()
+ }
+
+ /**
+  * DataResult CallAdapter Factory
+  *
+  * 全て Retrofit APIコール 自動的 DataResult<T> ラップ
+  */
+ @Provides
+ @Singleton
+ fun provideDataResultCallAdapterFactory(): DataResultCallAdapterFactory {
+  return DataResultCallAdapterFactory()
+ }
+
+ @Provides
+ @Singleton
+ fun provideOkHttpClient(@ApplicationContext context: Context): OkHttpClient {
+  return OkHttpClient.Builder()
+   .apply {
+    // Performance optimization (2025 best practice):
+    // HTTP cache for 50-70% faster API calls
+    cache(Cache(
+     directory = File(context.cacheDir, "http_cache"),
+     maxSize = 10L * 1024L * 1024L // 10MB
+    ))
+
+    // Connection pooling for efficient connection reuse
+    connectionPool(ConnectionPool(
+     maxIdleConnections = 5,
+     keepAliveDuration = 5,
+     timeUnit = TimeUnit.MINUTES
+    ))
+
+    // User-Agent header for Steam API with compression support
+    addInterceptor { chain ->
+     val request = chain.request().newBuilder()
+      .header("User-Agent", "SteamDeckMobile/0.1.0 (Android)")
+      .header("Accept-Encoding", "gzip, deflate")
+      .build()
+     chain.proceed(request)
     }
 
-    /**
-     * DataResult CallAdapter Factory
-     *
-     * 全てのRetrofit APIコールで自動的にDataResult<T>でラップ
-     */
-    @Provides
-    @Singleton
-    fun provideDataResultCallAdapterFactory(): DataResultCallAdapterFactory {
-        return DataResultCallAdapterFactory()
+    // デバッグビルド みログ出力有効化（本番環境 無効）
+    // セキュリティBest practice: API Key Token ログ 露出しないよう do
+    if (com.steamdeck.mobile.BuildConfig.DEBUG) {
+     val loggingInterceptor = HttpLoggingInterceptor().apply {
+      level = HttpLoggingInterceptor.Level.BODY
+     }
+     addInterceptor(loggingInterceptor)
     }
+   }
+   // Timeoutsettings
+   .connectTimeout(30, TimeUnit.SECONDS)  // connectionTimeout
+   .readTimeout(60, TimeUnit.SECONDS)   // 読み取りTimeout
+   .writeTimeout(60, TimeUnit.SECONDS)  // 書き込みTimeout
+   // retrysettings
+   .retryOnConnectionFailure(true)   // connection失敗時 自動retry
+   .build()
+ }
 
-    @Provides
-    @Singleton
-    fun provideOkHttpClient(@ApplicationContext context: Context): OkHttpClient {
-        return OkHttpClient.Builder()
-            .apply {
-                // Performance optimization (2025 best practice):
-                // HTTP cache for 50-70% faster API calls
-                cache(Cache(
-                    directory = File(context.cacheDir, "http_cache"),
-                    maxSize = 10L * 1024L * 1024L  // 10MB
-                ))
+ @Provides
+ @Singleton
+ fun provideSteamApiService(
+  okHttpClient: OkHttpClient,
+  gson: Gson,
+  callAdapterFactory: DataResultCallAdapterFactory
+ ): SteamApiService {
+  return Retrofit.Builder()
+   .baseUrl(SteamApiService.BASE_URL)
+   .client(okHttpClient)
+   .addCallAdapterFactory(callAdapterFactory)
+   .addConverterFactory(GsonConverterFactory.create(gson))
+   .build()
+   .create(SteamApiService::class.java)
+ }
 
-                // Connection pooling for efficient connection reuse
-                connectionPool(ConnectionPool(
-                    maxIdleConnections = 5,
-                    keepAliveDuration = 5,
-                    timeUnit = TimeUnit.MINUTES
-                ))
-
-                // User-Agent header for Steam API with compression support
-                addInterceptor { chain ->
-                    val request = chain.request().newBuilder()
-                        .header("User-Agent", "SteamDeckMobile/0.1.0 (Android)")
-                        .header("Accept-Encoding", "gzip, deflate")
-                        .build()
-                    chain.proceed(request)
-                }
-
-                // デバッグビルドのみログ出力を有効化（本番環境では無効）
-                // セキュリティベストプラクティス: API KeyやTokenがログに露出しないようにする
-                if (com.steamdeck.mobile.BuildConfig.DEBUG) {
-                    val loggingInterceptor = HttpLoggingInterceptor().apply {
-                        level = HttpLoggingInterceptor.Level.BODY
-                    }
-                    addInterceptor(loggingInterceptor)
-                }
-            }
-            // タイムアウト設定
-            .connectTimeout(30, TimeUnit.SECONDS)      // 接続タイムアウト
-            .readTimeout(60, TimeUnit.SECONDS)         // 読み取りタイムアウト
-            .writeTimeout(60, TimeUnit.SECONDS)        // 書き込みタイムアウト
-            // リトライ設定
-            .retryOnConnectionFailure(true)            // 接続失敗時の自動リトライ
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideSteamApiService(
-        okHttpClient: OkHttpClient,
-        gson: Gson,
-        callAdapterFactory: DataResultCallAdapterFactory
-    ): SteamApiService {
-        return Retrofit.Builder()
-            .baseUrl(SteamApiService.BASE_URL)
-            .client(okHttpClient)
-            .addCallAdapterFactory(callAdapterFactory)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
-            .create(SteamApiService::class.java)
-    }
-
-    @Provides
-    @Singleton
-    fun provideWorkManager(@ApplicationContext context: Context): WorkManager {
-        return WorkManager.getInstance(context)
-    }
+ @Provides
+ @Singleton
+ fun provideWorkManager(@ApplicationContext context: Context): WorkManager {
+  return WorkManager.getInstance(context)
+ }
 }
 
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class SteamModule {
-    @Binds
-    @Singleton
-    abstract fun bindSteamRepository(
-        steamRepositoryImpl: SteamRepositoryImpl
-    ): SteamRepository
+ @Binds
+ @Singleton
+ abstract fun bindSteamRepository(
+  steamRepositoryImpl: SteamRepositoryImpl
+ ): SteamRepository
 }

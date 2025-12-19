@@ -6,43 +6,43 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * Steam Client インストール情報エンティティ
+ * Steam Client installationinformationエンティティ
  *
  * Best Practice: Room entity with @ColumnInfo for explicit column naming
  * Reference: https://developer.android.com/training/data-storage/room/defining-data
  */
 @Entity(
-    tableName = "steam_installations",
-    indices = [
-        Index(value = ["container_id"]),
-        Index(value = ["status"])
-    ]
+ tableName = "steam_installations",
+ indices = [
+  Index(value = ["container_id"]),
+  Index(value = ["status"])
+ ]
 )
 data class SteamInstallEntity(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
+ @PrimaryKey(autoGenerate = true)
+ val id: Long = 0,
 
-    /** Winlator コンテナ ID */
-    @ColumnInfo(name = "container_id")
-    val containerId: String,
+ /** Winlator container ID */
+ @ColumnInfo(name = "container_id")
+ val containerId: String,
 
-    /** インストールパス (例: C:\Program Files (x86)\Steam) */
-    @ColumnInfo(name = "install_path")
-    val installPath: String,
+ /** installationpath (Example: C:\Program Files (x86)\Steam) */
+ @ColumnInfo(name = "install_path")
+ val installPath: String,
 
-    /** インストール状態 */
-    @ColumnInfo(name = "status")
-    val status: SteamInstallStatus,
+ /** installationstate */
+ @ColumnInfo(name = "status")
+ val status: SteamInstallStatus,
 
-    /** Steam バージョン */
-    @ColumnInfo(name = "version")
-    val version: String? = null,
+ /** Steam バージョン */
+ @ColumnInfo(name = "version")
+ val version: String? = null,
 
-    /** インストール日時 (Unix timestamp) */
-    @ColumnInfo(name = "installed_at")
-    val installedAt: Long = System.currentTimeMillis(),
+ /** installationdate and time (Unix timestamp) */
+ @ColumnInfo(name = "installed_at")
+ val installedAt: Long = System.currentTimeMillis(),
 
-    /** 最終起動日時 (Unix timestamp) */
-    @ColumnInfo(name = "last_launched_at")
-    val lastLaunchedAt: Long? = null
+ /** 最終launchdate and time (Unix timestamp) */
+ @ColumnInfo(name = "last_launched_at")
+ val lastLaunchedAt: Long? = null
 )

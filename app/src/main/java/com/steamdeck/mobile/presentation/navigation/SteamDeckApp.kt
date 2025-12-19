@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.rememberNavController
 
 /**
- * SteamDeck Mobileアプリのメインコンポーネント
+ * SteamDeck Mobileアプリ メインコンポーネント
  *
  * Fullscreen mode for gaming/controller experience
  * No bottom navigation - maximizes screen space
@@ -18,15 +18,15 @@ import androidx.navigation.compose.rememberNavController
  */
 @Composable
 fun SteamDeckApp() {
-    val navController = rememberNavController()
+ val navController = rememberNavController()
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        SteamDeckNavHost(
-            navController = navController,
-            modifier = Modifier.fillMaxSize()
-        )
-    }
+ Surface(
+  modifier = Modifier.fillMaxSize(),
+  color = MaterialTheme.colorScheme.background
+ ) {
+  SteamDeckNavHost(
+   navController = navController,
+   modifier = Modifier.fillMaxSize()
+  )
+ }
 }

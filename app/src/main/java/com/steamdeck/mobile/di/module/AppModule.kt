@@ -24,35 +24,35 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
-    /**
-     * Coil ImageLoader with performance optimizations
-     *
-     * Performance improvements (2025 best practice):
-     * - Disk cache: 2% instead of default 50MB (appropriate for game banners/icons)
-     * - Memory cache: 15% instead of 25% (balanced for Android 8.0+)
-     * - Crossfade animations for smooth visual transitions
-     * - Respect cache headers for optimal network usage
-     *
-     * Expected improvement: 30-40% faster image loading
-     */
-    @Provides
-    @Singleton
-    fun provideImageLoader(@ApplicationContext context: Context): ImageLoader {
-        return ImageLoader.Builder(context)
-            .diskCache {
-                DiskCache.Builder()
-                    .directory(context.cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.02)  // 2% of available disk space
-                    .build()
-            }
-            .memoryCache {
-                MemoryCache.Builder(context)
-                    .maxSizePercent(0.15)  // 15% of available memory
-                    .strongReferencesEnabled(true)  // Keep strong references for better cache hits
-                    .build()
-            }
-            .crossfade(300)  // 300ms smooth transition
-            .respectCacheHeaders(true)  // Use HTTP cache headers
-            .build()
-    }
+ /**
+  * Coil ImageLoader with performance optimizations
+  *
+  * Performance improvements (2025 best practice):
+  * - Disk cache: 2% instead of default 50MB (appropriate for game banners/icons)
+  * - Memory cache: 15% instead of 25% (balanced for Android 8.0+)
+  * - Crossfade animations for smooth visual transitions
+  * - Respect cache headers for optimal network usage
+  *
+  * Expected improvement: 30-40% faster image loading
+  */
+ @Provides
+ @Singleton
+ fun provideImageLoader(@ApplicationContext context: Context): ImageLoader {
+  return ImageLoader.Builder(context)
+   .diskCache {
+    DiskCache.Builder()
+     .directory(context.cacheDir.resolve("image_cache"))
+     .maxSizePercent(0.02) // 2% of available disk space
+     .build()
+   }
+   .memoryCache {
+    MemoryCache.Builder(context)
+     .maxSizePercent(0.15) // 15% of available memory
+     .strongReferencesEnabled(true) // Keep strong references for better cache hits
+     .build()
+   }
+   .crossfade(300) // 300ms smooth transition
+   .respectCacheHeaders(true) // Use HTTP cache headers
+   .build()
+ }
 }

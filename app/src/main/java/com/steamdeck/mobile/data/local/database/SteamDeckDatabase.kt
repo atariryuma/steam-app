@@ -15,59 +15,59 @@ import com.steamdeck.mobile.data.local.database.entity.SteamInstallEntity
 import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
 
 /**
- * SteamDeck Mobile アプリケーションのメインデータベース
+ * SteamDeck Mobile アプリケーション メインdataベース
  *
  * Version 5 changes:
  * - Added database indexes on GameEntity for performance optimization
- *   (40-60% query speed improvement on frequently accessed columns)
+ * (40-60% query speed improvement on frequently accessed columns)
  *
  * Version 6 changes:
  * - Added installationStatus field to DownloadEntity
- *   (enables automatic game installation after download completion)
+ * (enables automatic game installation after download completion)
  *
  * Version 7 changes:
  * - Added indexes on DownloadEntity (gameId, status, installationStatus)
- *   (faster download queries and UI responsiveness)
+ * (faster download queries and UI responsiveness)
  */
 @Database(
-    entities = [
-        GameEntity::class,
-        WinlatorContainerEntity::class,
-        DownloadEntity::class,
-        ControllerProfileEntity::class,
-        SteamInstallEntity::class
-    ],
-    version = 7,
-    exportSchema = true
+ entities = [
+  GameEntity::class,
+  WinlatorContainerEntity::class,
+  DownloadEntity::class,
+  ControllerProfileEntity::class,
+  SteamInstallEntity::class
+ ],
+ version = 7,
+ exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class SteamDeckDatabase : RoomDatabase() {
-    /**
-     * ゲーム情報へのDAO
-     */
-    abstract fun gameDao(): GameDao
+ /**
+  * gameinformationto DAO
+  */
+ abstract fun gameDao(): GameDao
 
-    /**
-     * Winlatorコンテナ設定へのDAO
-     */
-    abstract fun winlatorContainerDao(): WinlatorContainerDao
+ /**
+  * Winlatorcontainerconfigurationto DAO
+  */
+ abstract fun winlatorContainerDao(): WinlatorContainerDao
 
-    /**
-     * ダウンロード履歴へのDAO
-     */
-    abstract fun downloadDao(): DownloadDao
+ /**
+  * download履歴to DAO
+  */
+ abstract fun downloadDao(): DownloadDao
 
-    /**
-     * コントローラープロファイルへのDAO
-     */
-    abstract fun controllerProfileDao(): ControllerProfileDao
+ /**
+  * controllerプロfileto DAO
+  */
+ abstract fun controllerProfileDao(): ControllerProfileDao
 
-    /**
-     * Steam インストール情報へのDAO
-     */
-    abstract fun steamInstallDao(): SteamInstallDao
+ /**
+  * Steam installationinformationto DAO
+  */
+ abstract fun steamInstallDao(): SteamInstallDao
 
-    companion object {
-        const val DATABASE_NAME = "steamdeck_mobile.db"
-    }
+ companion object {
+  const val DATABASE_NAME = "steamdeck_mobile.db"
+ }
 }

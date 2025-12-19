@@ -15,32 +15,32 @@ import javax.inject.Singleton
  */
 @Singleton
 class SteamRepositoryAdapter @Inject constructor(
-    private val steamRepository: SteamRepository
+ private val steamRepository: SteamRepository
 ) : ISteamRepository {
 
-    override suspend fun getUserLibrary(steamId: String, apiKey: String): Result<List<Game>> {
-        return steamRepository.getOwnedGames(apiKey, steamId)
-            .mapCatching { steamGames ->
-                steamGames.map { steamGame ->
-                    SteamGameMapper.toDomain(steamGame)
-                }
-            }
+ override suspend fun getUserLibrary(steamId: String, apiKey: String): Result<List<Game>> {
+  return steamRepository.getOwnedGames(apiKey, steamId)
+   .mapCatching { steamGames ->
+    steamGames.map { steamGame ->
+     SteamGameMapper.toDomain(steamGame)
     }
+   }
+ }
 
-    override suspend fun getGameDetails(appId: String): Result<Game?> {
-        // Note: Current SteamRepository doesn't have getGameDetails endpoint
-        // This would require extending SteamApiService with Steam Store API
-        return Result.success(null)
-    }
+ override suspend fun getGameDetails(appId: String): Result<Game?> {
+  // Note: Current SteamRepository doesn't have getGameDetails endpoint
+  // This would require extending SteamApiService with Steam Store API
+  return Result.success(null)
+ }
 
-    override suspend fun validateApiKey(apiKey: String): Result<Boolean> {
-        // Simple validation: Try to fetch player summary with dummy SteamID
-        // A valid API key will return proper response format even with invalid ID
-        return try {
-            val result = steamRepository.getPlayerSummary(apiKey, "76561197960435530")
-            Result.success(result.isSuccess)
-        } catch (e: Exception) {
-            Result.success(false)
-        }
-    }
+ override suspend fun validateApiKey(apiKey: String): Result<Boolean> {
+  // Simple validation: Try to fetch player summary with dummy SteamID
+  // A valid API key will return proper response format even with invalid ID
+  return try {
+   val result = steamRepository.getPlayerSummary(apiKey, "76561197960435530")
+   Result.success(result.isSuccess)
+  } catch (e: Exception) {
+   Result.success(false)
+  }
+ }
 }

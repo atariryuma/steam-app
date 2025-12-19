@@ -23,15 +23,15 @@ import javax.inject.Singleton
  * @Provides
  * @Singleton
  * fun provideWindowsEmulator(
- *     @ApplicationContext context: Context,
- *     zstdDecompressor: ZstdDecompressor,
- *     preferences: AppPreferences
+ *  @ApplicationContext context: Context,
+ *  zstdDecompressor: ZstdDecompressor,
+ *  preferences: AppPreferences
  * ): WindowsEmulator {
- *     return when (preferences.emulatorBackend) {
- *         EmulatorBackend.WINLATOR -> WinlatorEmulator(context, zstdDecompressor)
- *         EmulatorBackend.PROTON_FEX -> ProtonEmulator(context, zstdDecompressor)
- *         else -> WinlatorEmulator(context, zstdDecompressor) // Default
- *     }
+ *  return when (preferences.emulatorBackend) {
+ *   EmulatorBackend.WINLATOR -> WinlatorEmulator(context, zstdDecompressor)
+ *   EmulatorBackend.PROTON_FEX -> ProtonEmulator(context, zstdDecompressor)
+ *   else -> WinlatorEmulator(context, zstdDecompressor) // Default
+ *  }
  * }
  * ```
  */
@@ -39,25 +39,25 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object EmulatorModule {
 
-    /**
-     * Provides Windows emulator instance.
-     *
-     * Currently: Winlator
-     * Future: Configurable (Winlator/Proton/Mobox)
-     */
-    @Provides
-    @Singleton
-    fun provideProcessMonitor(): com.steamdeck.mobile.core.winlator.ProcessMonitor {
-        return com.steamdeck.mobile.core.winlator.ProcessMonitor()
-    }
+ /**
+  * Provides Windows emulator instance.
+  *
+  * Currently: Winlator
+  * Future: Configurable (Winlator/Proton/Mobox)
+  */
+ @Provides
+ @Singleton
+ fun provideProcessMonitor(): com.steamdeck.mobile.core.winlator.ProcessMonitor {
+  return com.steamdeck.mobile.core.winlator.ProcessMonitor()
+ }
 
-    @Provides
-    @Singleton
-    fun provideWindowsEmulator(
-        @ApplicationContext context: Context,
-        zstdDecompressor: ZstdDecompressor,
-        processMonitor: com.steamdeck.mobile.core.winlator.ProcessMonitor
-    ): WindowsEmulator {
-        return WinlatorEmulator(context, zstdDecompressor, processMonitor)
-    }
+ @Provides
+ @Singleton
+ fun provideWindowsEmulator(
+  @ApplicationContext context: Context,
+  zstdDecompressor: ZstdDecompressor,
+  processMonitor: com.steamdeck.mobile.core.winlator.ProcessMonitor
+ ): WindowsEmulator {
+  return WinlatorEmulator(context, zstdDecompressor, processMonitor)
+ }
 }

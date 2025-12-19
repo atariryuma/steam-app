@@ -5,7 +5,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * ゲーム情報を格納するエンティティ
+ * gameinformation格納doエンティティ
  *
  * Performance optimization (2025 best practice):
  * - Indexes on frequently queried columns for 40-60% query speed improvement
@@ -16,63 +16,63 @@ import androidx.room.PrimaryKey
  * - name: Index for search queries
  */
 @Entity(
-    tableName = "games",
-    indices = [
-        Index(value = ["lastPlayedTimestamp"], orders = [Index.Order.DESC]),
-        Index(value = ["isFavorite"]),
-        Index(value = ["steamAppId"], unique = true),
-        Index(value = ["source"]),
-        Index(value = ["name"])
-    ]
+ tableName = "games",
+ indices = [
+  Index(value = ["lastPlayedTimestamp"], orders = [Index.Order.DESC]),
+  Index(value = ["isFavorite"]),
+  Index(value = ["steamAppId"], unique = true),
+  Index(value = ["source"]),
+  Index(value = ["name"])
+ ]
 )
 data class GameEntity(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
+ @PrimaryKey(autoGenerate = true)
+ val id: Long = 0,
 
-    /** ゲーム名 */
-    val name: String,
+ /** game名 */
+ val name: String,
 
-    /** Steam App ID (Steam統合時に使用) */
-    val steamAppId: Long? = null,
+ /** Steam App ID (Steamintegration時 use) */
+ val steamAppId: Long? = null,
 
-    /** 実行可能ファイルのパス (.exe) */
-    val executablePath: String,
+ /** execution可能file path (.exe) */
+ val executablePath: String,
 
-    /** ゲームのインストールパス */
-    val installPath: String,
+ /** game installationpath */
+ val installPath: String,
 
-    /** ゲームのソース (STEAM / IMPORTED) */
-    val source: GameSource,
+ /** game ソース (STEAM / IMPORTED) */
+ val source: GameSource,
 
-    /** 関連するWinlatorコンテナID */
-    val winlatorContainerId: Long? = null,
+ /** 関連doWinlatorcontainerID */
+ val winlatorContainerId: Long? = null,
 
-    /** プレイ時間（分） */
-    val playTimeMinutes: Long = 0,
+ /** play time（minutes） */
+ val playTimeMinutes: Long = 0,
 
-    /** 最後にプレイした日時（Unix timestamp） */
-    val lastPlayedTimestamp: Long? = null,
+ /** 最後 プレイしたdate and time（Unix timestamp） */
+ val lastPlayedTimestamp: Long? = null,
 
-    /** ゲームアイコンのローカルパス */
-    val iconPath: String? = null,
+ /** gameアイコン ローカルpath */
+ val iconPath: String? = null,
 
-    /** ゲームバナーのローカルパス */
-    val bannerPath: String? = null,
+ /** gameバナー ローカルpath */
+ val bannerPath: String? = null,
 
-    /** 追加日時（Unix timestamp） */
-    val addedTimestamp: Long = System.currentTimeMillis(),
+ /** adddate and time（Unix timestamp） */
+ val addedTimestamp: Long = System.currentTimeMillis(),
 
-    /** お気に入りフラグ */
-    val isFavorite: Boolean = false
+ /** favoriteフラグ */
+ val isFavorite: Boolean = false
 )
 
 /**
- * ゲームのソース種別
+ * game ソース種別
  */
 enum class GameSource {
-    /** Steamライブラリから同期 */
-    STEAM,
+ /** Steamlibraryfrom同期 */
+ STEAM,
 
-    /** ユーザーが手動でインポート */
-    IMPORTED
+ /** ユーザー 手動 インポート */
+ IMPORTED
 }

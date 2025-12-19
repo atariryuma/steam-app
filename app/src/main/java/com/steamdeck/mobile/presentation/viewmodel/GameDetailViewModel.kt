@@ -1,6 +1,7 @@
 package com.steamdeck.mobile.presentation.viewmodel
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.steamdeck.mobile.core.logging.AppLogger
@@ -22,7 +23,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ゲーム詳細画面のViewModel
+ * game詳細画面 ViewModel
  *
  * 2025 Best Practice:
  * - DataResult<T> for type-safe error handling
@@ -31,250 +32,250 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class GameDetailViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val getGameByIdUseCase: GetGameByIdUseCase,
-    private val launchGameUseCase: LaunchGameUseCase,
-    private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
-    private val deleteGameUseCase: DeleteGameUseCase,
-    private val steamLauncher: SteamLauncher,
-    private val steamSetupManager: SteamSetupManager
+ @ApplicationContext private val context: Context,
+ private val getGameByIdUseCase: GetGameByIdUseCase,
+ private val launchGameUseCase: LaunchGameUseCase,
+ private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
+ private val deleteGameUseCase: DeleteGameUseCase,
+ private val steamLauncher: SteamLauncher,
+ private val steamSetupManager: SteamSetupManager
 ) : ViewModel() {
 
-    companion object {
-        private const val TAG = "GameDetailVM"
+ companion object {
+  private const val TAG = "GameDetailVM"
+ }
+
+ private val _uiState = MutableStateFlow<GameDetailUiState>(GameDetailUiState.Loading)
+ val uiState: StateFlow<GameDetailUiState> = _uiState.asStateFlow()
+
+ private val _launchState = MutableStateFlow<LaunchState>(LaunchState.Idle)
+ val launchState: StateFlow<LaunchState> = _launchState.asStateFlow()
+
+ private val _steamLaunchState = MutableStateFlow<SteamLaunchState>(SteamLaunchState.Idle)
+ val steamLaunchState: StateFlow<SteamLaunchState> = _steamLaunchState.asStateFlow()
+
+ private val _isSteamInstalled = MutableStateFlow(false)
+ val isSteamInstalled: StateFlow<Boolean> = _isSteamInstalled.asStateFlow()
+
+ init {
+  checkSteamInstallation()
+ }
+
+ /**
+  * game詳細読み込み
+  */
+ fun loadGame(gameId: Long) {
+  viewModelScope.launch {
+   try {
+    val game = getGameByIdUseCase(gameId)
+    _uiState.value = if (game != null) {
+     GameDetailUiState.Success(game)
+    } else {
+     GameDetailUiState.Error("game not found")
+    }
+   } catch (e: Exception) {
+    _uiState.value = GameDetailUiState.Error(e.message ?: "不明なエラー")
+   }
+  }
+ }
+
+ /**
+  * gamelaunch
+  */
+ fun launchGame(gameId: Long) {
+  viewModelScope.launch {
+   _launchState.value = LaunchState.Launching
+   when (val result = launchGameUseCase(gameId)) {
+    is DataResult.Success -> {
+     _launchState.value = LaunchState.Running(result.data)
+     AppLogger.i(TAG, "Game launched: PID ${result.data}")
+    }
+    is DataResult.Error -> {
+     val errorMessage = result.error.toUserMessage(context)
+     _launchState.value = LaunchState.Error(errorMessage)
+     AppLogger.e(TAG, "Launch failed: $errorMessage")
+    }
+    is DataResult.Loading -> {
+     // Loading handled by Launching state
+    }
+   }
+  }
+ }
+
+ /**
+  * favorite状態切り替え
+  */
+ fun toggleFavorite(gameId: Long, isFavorite: Boolean) {
+  viewModelScope.launch {
+   when (val result = toggleFavoriteUseCase(gameId, isFavorite)) {
+    is DataResult.Success -> {
+     // UI状態更新
+     val currentState = _uiState.value
+     if (currentState is GameDetailUiState.Success) {
+      _uiState.value = GameDetailUiState.Success(
+       currentState.game.copy(isFavorite = isFavorite)
+      )
+     }
+     AppLogger.d(TAG, "Favorite toggled: $isFavorite")
+    }
+    is DataResult.Error -> {
+     AppLogger.e(TAG, "Failed to toggle favorite: ${result.error.message}")
+    }
+    is DataResult.Loading -> {}
+   }
+  }
+ }
+
+ /**
+  * gamedelete
+  */
+ fun deleteGame(game: Game) {
+  viewModelScope.launch {
+   when (val result = deleteGameUseCase(game)) {
+    is DataResult.Success -> {
+     _uiState.value = GameDetailUiState.Deleted
+     AppLogger.i(TAG, "Game deleted: ${game.name}")
+    }
+    is DataResult.Error -> {
+     val errorMessage = result.error.toUserMessage(context)
+     _uiState.value = GameDetailUiState.Error(errorMessage)
+     AppLogger.e(TAG, "Delete failed: $errorMessage")
+    }
+    is DataResult.Loading -> {}
+   }
+  }
+ }
+
+ /**
+  * Steaminstallation状態check
+  */
+ fun checkSteamInstallation() {
+  viewModelScope.launch {
+   try {
+    val isInstalled = steamSetupManager.isSteamInstalled()
+    _isSteamInstalled.value = isInstalled
+    AppLogger.d(TAG, "Steam installation status: $isInstalled")
+   } catch (e: Exception) {
+    AppLogger.e(TAG, "Failed to check Steam installation", e)
+    _isSteamInstalled.value = false
+   }
+  }
+ }
+
+ /**
+  * Steam Clientvia gamelaunch
+  */
+ fun launchGameViaSteam(gameId: Long) {
+  viewModelScope.launch {
+   try {
+    _steamLaunchState.value = SteamLaunchState.Launching
+
+    // 現在 game情報retrieve
+    val currentState = _uiState.value
+    if (currentState !is GameDetailUiState.Success) {
+     _steamLaunchState.value = SteamLaunchState.Error("game情報 retrieve failed")
+     return@launch
     }
 
-    private val _uiState = MutableStateFlow<GameDetailUiState>(GameDetailUiState.Loading)
-    val uiState: StateFlow<GameDetailUiState> = _uiState.asStateFlow()
+    val game = currentState.game
 
-    private val _launchState = MutableStateFlow<LaunchState>(LaunchState.Idle)
-    val launchState: StateFlow<LaunchState> = _launchState.asStateFlow()
-
-    private val _steamLaunchState = MutableStateFlow<SteamLaunchState>(SteamLaunchState.Idle)
-    val steamLaunchState: StateFlow<SteamLaunchState> = _steamLaunchState.asStateFlow()
-
-    private val _isSteamInstalled = MutableStateFlow(false)
-    val isSteamInstalled: StateFlow<Boolean> = _isSteamInstalled.asStateFlow()
-
-    init {
-        checkSteamInstallation()
+    // コンテナID Steam App IDcheck
+    if (game.winlatorContainerId == null) {
+     _steamLaunchState.value = SteamLaunchState.Error(
+      "コンテナ settingsされていません。settings画面 コンテナcreateplease。"
+     )
+     return@launch
     }
 
-    /**
-     * ゲーム詳細を読み込み
-     */
-    fun loadGame(gameId: Long) {
-        viewModelScope.launch {
-            try {
-                val game = getGameByIdUseCase(gameId)
-                _uiState.value = if (game != null) {
-                    GameDetailUiState.Success(game)
-                } else {
-                    GameDetailUiState.Error("ゲームが見つかりません")
-                }
-            } catch (e: Exception) {
-                _uiState.value = GameDetailUiState.Error(e.message ?: "不明なエラー")
-            }
-        }
+    if (game.steamAppId == null) {
+     _steamLaunchState.value = SteamLaunchState.Error(
+      "Steam App ID settingsされていません"
+     )
+     return@launch
     }
 
-    /**
-     * ゲームを起動
-     */
-    fun launchGame(gameId: Long) {
-        viewModelScope.launch {
-            _launchState.value = LaunchState.Launching
-            when (val result = launchGameUseCase(gameId)) {
-                is DataResult.Success -> {
-                    _launchState.value = LaunchState.Running(result.data)
-                    AppLogger.i(TAG, "Game launched: PID ${result.data}")
-                }
-                is DataResult.Error -> {
-                    val errorMessage = result.error.toUserMessage(context)
-                    _launchState.value = LaunchState.Error(errorMessage)
-                    AppLogger.e(TAG, "Launch failed: $errorMessage")
-                }
-                is DataResult.Loading -> {
-                    // Loading handled by Launching state
-                }
-            }
-        }
+    // Steam Clientvia launch
+    val result = steamLauncher.launchGameViaSteam(
+     containerId = game.winlatorContainerId.toString(),
+     appId = game.steamAppId
+    )
+
+    result
+     .onSuccess {
+      _steamLaunchState.value = SteamLaunchState.Running(game.steamAppId.toInt())
+      AppLogger.i(TAG, "Game launched via Steam: appId=${game.steamAppId}")
+     }
+     .onFailure { error ->
+      _steamLaunchState.value = SteamLaunchState.Error(
+       error.message ?: "Steamvia launch failed"
+      )
+      AppLogger.e(TAG, "Failed to launch game via Steam", error)
+     }
+
+   } catch (e: Exception) {
+    _steamLaunchState.value = SteamLaunchState.Error(
+     e.message ?: "Steamlaunchin 予期しないエラー 発生しました"
+    )
+    AppLogger.e(TAG, "Exception during Steam launch", e)
+   }
+  }
+ }
+
+ /**
+  * Steam Clientopen
+  */
+ fun openSteamClient(gameId: Long) {
+  viewModelScope.launch {
+   try {
+    _steamLaunchState.value = SteamLaunchState.Launching
+
+    // 現在 game情報retrieve
+    val currentState = _uiState.value
+    if (currentState !is GameDetailUiState.Success) {
+     _steamLaunchState.value = SteamLaunchState.Error("game情報 retrieve failed")
+     return@launch
     }
 
-    /**
-     * お気に入り状態を切り替え
-     */
-    fun toggleFavorite(gameId: Long, isFavorite: Boolean) {
-        viewModelScope.launch {
-            when (val result = toggleFavoriteUseCase(gameId, isFavorite)) {
-                is DataResult.Success -> {
-                    // UI状態を更新
-                    val currentState = _uiState.value
-                    if (currentState is GameDetailUiState.Success) {
-                        _uiState.value = GameDetailUiState.Success(
-                            currentState.game.copy(isFavorite = isFavorite)
-                        )
-                    }
-                    AppLogger.d(TAG, "Favorite toggled: $isFavorite")
-                }
-                is DataResult.Error -> {
-                    AppLogger.e(TAG, "Failed to toggle favorite: ${result.error.message}")
-                }
-                is DataResult.Loading -> {}
-            }
-        }
+    val game = currentState.game
+
+    // コンテナIDcheck
+    if (game.winlatorContainerId == null) {
+     _steamLaunchState.value = SteamLaunchState.Error(
+      "コンテナ settingsされていません。settings画面 コンテナcreateplease。"
+     )
+     return@launch
     }
 
-    /**
-     * ゲームを削除
-     */
-    fun deleteGame(game: Game) {
-        viewModelScope.launch {
-            when (val result = deleteGameUseCase(game)) {
-                is DataResult.Success -> {
-                    _uiState.value = GameDetailUiState.Deleted
-                    AppLogger.i(TAG, "Game deleted: ${game.name}")
-                }
-                is DataResult.Error -> {
-                    val errorMessage = result.error.toUserMessage(context)
-                    _uiState.value = GameDetailUiState.Error(errorMessage)
-                    AppLogger.e(TAG, "Delete failed: $errorMessage")
-                }
-                is DataResult.Loading -> {}
-            }
-        }
-    }
+    // Steam Clientlaunch
+    val result = steamLauncher.launchSteamClient(game.winlatorContainerId.toString())
 
-    /**
-     * Steamインストール状態をチェック
-     */
-    fun checkSteamInstallation() {
-        viewModelScope.launch {
-            try {
-                val isInstalled = steamSetupManager.isSteamInstalled()
-                _isSteamInstalled.value = isInstalled
-                AppLogger.d(TAG, "Steam installation status: $isInstalled")
-            } catch (e: Exception) {
-                AppLogger.e(TAG, "Failed to check Steam installation", e)
-                _isSteamInstalled.value = false
-            }
-        }
-    }
+    result
+     .onSuccess {
+      _steamLaunchState.value = SteamLaunchState.Running(0)
+      AppLogger.i(TAG, "Steam Client opened successfully")
+     }
+     .onFailure { error ->
+      _steamLaunchState.value = SteamLaunchState.Error(
+       error.message ?: "Steam Client launch failed"
+      )
+      AppLogger.e(TAG, "Failed to open Steam Client", error)
+     }
 
-    /**
-     * Steam Client経由でゲームを起動
-     */
-    fun launchGameViaSteam(gameId: Long) {
-        viewModelScope.launch {
-            try {
-                _steamLaunchState.value = SteamLaunchState.Launching
+   } catch (e: Exception) {
+    _steamLaunchState.value = SteamLaunchState.Error(
+     e.message ?: "Steam Clientlaunchin 予期しないエラー 発生しました"
+    )
+    AppLogger.e(TAG, "Exception while opening Steam Client", e)
+   }
+  }
+ }
 
-                // 現在のゲーム情報を取得
-                val currentState = _uiState.value
-                if (currentState !is GameDetailUiState.Success) {
-                    _steamLaunchState.value = SteamLaunchState.Error("ゲーム情報の取得に失敗しました")
-                    return@launch
-                }
-
-                val game = currentState.game
-
-                // コンテナIDとSteam App IDをチェック
-                if (game.winlatorContainerId == null) {
-                    _steamLaunchState.value = SteamLaunchState.Error(
-                        "コンテナが設定されていません。設定画面でコンテナを作成してください。"
-                    )
-                    return@launch
-                }
-
-                if (game.steamAppId == null) {
-                    _steamLaunchState.value = SteamLaunchState.Error(
-                        "Steam App IDが設定されていません"
-                    )
-                    return@launch
-                }
-
-                // Steam Client経由で起動
-                val result = steamLauncher.launchGameViaSteam(
-                    containerId = game.winlatorContainerId.toString(),
-                    appId = game.steamAppId
-                )
-
-                result
-                    .onSuccess {
-                        _steamLaunchState.value = SteamLaunchState.Running(game.steamAppId.toInt())
-                        AppLogger.i(TAG, "Game launched via Steam: appId=${game.steamAppId}")
-                    }
-                    .onFailure { error ->
-                        _steamLaunchState.value = SteamLaunchState.Error(
-                            error.message ?: "Steam経由での起動に失敗しました"
-                        )
-                        AppLogger.e(TAG, "Failed to launch game via Steam", error)
-                    }
-
-            } catch (e: Exception) {
-                _steamLaunchState.value = SteamLaunchState.Error(
-                    e.message ?: "Steam起動中に予期しないエラーが発生しました"
-                )
-                AppLogger.e(TAG, "Exception during Steam launch", e)
-            }
-        }
-    }
-
-    /**
-     * Steam Clientを開く
-     */
-    fun openSteamClient(gameId: Long) {
-        viewModelScope.launch {
-            try {
-                _steamLaunchState.value = SteamLaunchState.Launching
-
-                // 現在のゲーム情報を取得
-                val currentState = _uiState.value
-                if (currentState !is GameDetailUiState.Success) {
-                    _steamLaunchState.value = SteamLaunchState.Error("ゲーム情報の取得に失敗しました")
-                    return@launch
-                }
-
-                val game = currentState.game
-
-                // コンテナIDをチェック
-                if (game.winlatorContainerId == null) {
-                    _steamLaunchState.value = SteamLaunchState.Error(
-                        "コンテナが設定されていません。設定画面でコンテナを作成してください。"
-                    )
-                    return@launch
-                }
-
-                // Steam Clientを起動
-                val result = steamLauncher.launchSteamClient(game.winlatorContainerId.toString())
-
-                result
-                    .onSuccess {
-                        _steamLaunchState.value = SteamLaunchState.Running(0)
-                        AppLogger.i(TAG, "Steam Client opened successfully")
-                    }
-                    .onFailure { error ->
-                        _steamLaunchState.value = SteamLaunchState.Error(
-                            error.message ?: "Steam Clientの起動に失敗しました"
-                        )
-                        AppLogger.e(TAG, "Failed to open Steam Client", error)
-                    }
-
-            } catch (e: Exception) {
-                _steamLaunchState.value = SteamLaunchState.Error(
-                    e.message ?: "Steam Client起動中に予期しないエラーが発生しました"
-                )
-                AppLogger.e(TAG, "Exception while opening Steam Client", e)
-            }
-        }
-    }
-
-    /**
-     * Steam起動状態をリセット
-     */
-    fun resetSteamLaunchState() {
-        _steamLaunchState.value = SteamLaunchState.Idle
-    }
+ /**
+  * Steamlaunch状態リセット
+  */
+ fun resetSteamLaunchState() {
+  _steamLaunchState.value = SteamLaunchState.Idle
+ }
 
 }
 
@@ -283,21 +284,21 @@ class GameDetailViewModel @Inject constructor(
  */
 @Immutable
 sealed class GameDetailUiState {
-    /** Loading */
-    @Immutable
-    data object Loading : GameDetailUiState()
+ /** Loading */
+ @Immutable
+ data object Loading : GameDetailUiState()
 
-    /** Success */
-    @Immutable
-    data class Success(val game: Game) : GameDetailUiState()
+ /** Success */
+ @Immutable
+ data class Success(val game: Game) : GameDetailUiState()
 
-    /** Deleted */
-    @Immutable
-    data object Deleted : GameDetailUiState()
+ /** Deleted */
+ @Immutable
+ data object Deleted : GameDetailUiState()
 
-    /** Error */
-    @Immutable
-    data class Error(val message: String) : GameDetailUiState()
+ /** Error */
+ @Immutable
+ data class Error(val message: String) : GameDetailUiState()
 }
 
 /**
@@ -305,21 +306,21 @@ sealed class GameDetailUiState {
  */
 @Immutable
 sealed class LaunchState {
-    /** Idle state */
-    @Immutable
-    data object Idle : LaunchState()
+ /** Idle state */
+ @Immutable
+ data object Idle : LaunchState()
 
-    /** Launching */
-    @Immutable
-    data object Launching : LaunchState()
+ /** Launching */
+ @Immutable
+ data object Launching : LaunchState()
 
-    /** Running */
-    @Immutable
-    data class Running(val processId: Int) : LaunchState()
+ /** Running */
+ @Immutable
+ data class Running(val processId: Int) : LaunchState()
 
-    /** Error */
-    @Immutable
-    data class Error(val message: String) : LaunchState()
+ /** Error */
+ @Immutable
+ data class Error(val message: String) : LaunchState()
 }
 
 /**
@@ -327,27 +328,27 @@ sealed class LaunchState {
  */
 @Immutable
 sealed class SteamLaunchState {
-    /** Idle state */
-    @Immutable
-    data object Idle : SteamLaunchState()
+ /** Idle state */
+ @Immutable
+ data object Idle : SteamLaunchState()
 
-    /** Checking installation */
-    @Immutable
-    data object CheckingInstallation : SteamLaunchState()
+ /** Checking installation */
+ @Immutable
+ data object CheckingInstallation : SteamLaunchState()
 
-    /** Launching */
-    @Immutable
-    data object Launching : SteamLaunchState()
+ /** Launching */
+ @Immutable
+ data object Launching : SteamLaunchState()
 
-    /** Running */
-    @Immutable
-    data class Running(val processId: Int) : SteamLaunchState()
+ /** Running */
+ @Immutable
+ data class Running(val processId: Int) : SteamLaunchState()
 
-    /** Error */
-    @Immutable
-    data class Error(val message: String) : SteamLaunchState()
+ /** Error */
+ @Immutable
+ data class Error(val message: String) : SteamLaunchState()
 
-    /** Not installed */
-    @Immutable
-    data class NotInstalled(val message: String) : SteamLaunchState()
+ /** Not installed */
+ @Immutable
+ data class NotInstalled(val message: String) : SteamLaunchState()
 }

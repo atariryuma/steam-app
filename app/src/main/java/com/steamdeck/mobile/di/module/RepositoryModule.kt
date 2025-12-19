@@ -23,69 +23,69 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * リポジトリの依存性注入モジュール
+ * リポジトリ 依存性注入module
  * Clean Architecture: Domain interfaces bound to data layer implementations
  */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
-    /**
-     * GameRepositoryの実装をバインド
-     */
-    @Binds
-    @Singleton
-    abstract fun bindGameRepository(
-        gameRepositoryImpl: GameRepositoryImpl
-    ): GameRepository
+ /**
+  * GameRepository implementationbind
+  */
+ @Binds
+ @Singleton
+ abstract fun bindGameRepository(
+  gameRepositoryImpl: GameRepositoryImpl
+ ): GameRepository
 
-    /**
-     * WinlatorContainerRepositoryの実装をバインド
-     */
-    @Binds
-    @Singleton
-    abstract fun bindWinlatorContainerRepository(
-        winlatorContainerRepositoryImpl: WinlatorContainerRepositoryImpl
-    ): WinlatorContainerRepository
+ /**
+  * WinlatorContainerRepository implementationbind
+  */
+ @Binds
+ @Singleton
+ abstract fun bindWinlatorContainerRepository(
+  winlatorContainerRepositoryImpl: WinlatorContainerRepositoryImpl
+ ): WinlatorContainerRepository
 
-    /**
-     * DownloadRepositoryの実装をバインド
-     */
-    @Binds
-    @Singleton
-    abstract fun bindDownloadRepository(
-        downloadRepositoryImpl: DownloadRepositoryImpl
-    ): DownloadRepository
+ /**
+  * DownloadRepository implementationbind
+  */
+ @Binds
+ @Singleton
+ abstract fun bindDownloadRepository(
+  downloadRepositoryImpl: DownloadRepositoryImpl
+ ): DownloadRepository
 
-    /**
-     * FileImportRepositoryの実装をバインド
-     */
-    @Binds
-    @Singleton
-    abstract fun bindFileImportRepository(
-        fileImportRepositoryImpl: FileImportRepositoryImpl
-    ): FileImportRepository
+ /**
+  * FileImportRepository implementationbind
+  */
+ @Binds
+ @Singleton
+ abstract fun bindFileImportRepository(
+  fileImportRepositoryImpl: FileImportRepositoryImpl
+ ): FileImportRepository
 
-    // ControllerRepository binding removed - provided by ControllerModule
+ // ControllerRepository binding removed - provided by ControllerModule
 
-    /**
-     * ISecurePreferencesの実装をバインド
-     * Clean Architecture: Domain interface for secure storage
-     */
-    @Binds
-    @Singleton
-    abstract fun bindSecurePreferences(
-        securePreferencesImpl: SecurePreferencesImpl
-    ): ISecurePreferences
+ /**
+  * ISecurePreferences implementationbind
+  * Clean Architecture: Domain interface for secure storage
+  */
+ @Binds
+ @Singleton
+ abstract fun bindSecurePreferences(
+  securePreferencesImpl: SecurePreferencesImpl
+ ): ISecurePreferences
 
-    // SteamRepository binding removed - provided by SteamModule in NetworkModule
+ // SteamRepository binding removed - provided by SteamModule in NetworkModule
 
-    /**
-     * ISteamRepositoryの実装をバインド
-     * Clean Architecture: Domain interface adapter for Steam operations
-     */
-    @Binds
-    @Singleton
-    abstract fun bindISteamRepository(
-        steamRepositoryAdapter: SteamRepositoryAdapter
-    ): ISteamRepository
+ /**
+  * ISteamRepository implementationbind
+  * Clean Architecture: Domain interface adapter for Steam operations
+  */
+ @Binds
+ @Singleton
+ abstract fun bindISteamRepository(
+  steamRepositoryAdapter: SteamRepositoryAdapter
+ ): ISteamRepository
 }

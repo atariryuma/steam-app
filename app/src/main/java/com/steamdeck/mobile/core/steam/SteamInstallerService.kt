@@ -14,130 +14,130 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Steam Client インストーラーサービス
+ * Steam Client インストーラーservice
  *
- * Steamインストーラーのダウンロードと検証を管理します
+ * Steamインストーラー download verificationmanagementdo
  */
 @Singleton
 class SteamInstallerService @Inject constructor(
-    private val context: Context,
-    private val downloadManager: DownloadManager,
-    private val database: SteamDeckDatabase,
-    private val okHttpClient: OkHttpClient
+ private val context: Context,
+ private val downloadManager: DownloadManager,
+ private val database: SteamDeckDatabase,
+ private val okHttpClient: OkHttpClient
 ) {
-    companion object {
-        private const val TAG = "SteamInstallerService"
-        private const val STEAM_INSTALLER_URL = "https://steamcdn-a.akamaihd.net/client/installer/SteamSetup.exe"
-        private const val INSTALLER_FILENAME = "SteamSetup.exe"
+ companion object {
+  private const val TAG = "SteamInstallerService"
+  private const val STEAM_INSTALLER_URL = "https://steamcdn-a.akamaihd.net/client/installer/SteamSetup.exe"
+  private const val INSTALLER_FILENAME = "SteamSetup.exe"
+ }
+
+ /**
+  * Steam installerdownload
+  */
+ suspend fun downloadInstaller(): Result<File> = withContext(Dispatchers.IO) {
+  try {
+   val downloadDir = File(context.cacheDir, "steam")
+   if (!downloadDir.exists()) {
+    downloadDir.mkdirs()
+   }
+
+   val installerFile = File(downloadDir, INSTALLER_FILENAME)
+
+   // 既 existdocase delete
+   if (installerFile.exists()) {
+    installerFile.delete()
+   }
+
+   Log.i(TAG, "Downloading Steam installer from $STEAM_INSTALLER_URL")
+
+   // OkHttp directlydownload (シンプル版)
+   val request = okhttp3.Request.Builder()
+    .url(STEAM_INSTALLER_URL)
+    .build()
+
+   val response = okHttpClient.newCall(request).execute()
+
+   if (!response.isSuccessful) {
+    return@withContext Result.failure(
+     Exception("Failed to download: HTTP ${response.code}")
+    )
+   }
+
+   response.body?.byteStream()?.use { input ->
+    installerFile.outputStream().use { output ->
+     input.copyTo(output)
     }
+   }
 
-    /**
-     * Steam インストーラーをダウンロード
-     */
-    suspend fun downloadInstaller(): Result<File> = withContext(Dispatchers.IO) {
-        try {
-            val downloadDir = File(context.cacheDir, "steam")
-            if (!downloadDir.exists()) {
-                downloadDir.mkdirs()
-            }
+   Log.i(TAG, "Steam installer downloaded: ${installerFile.absolutePath}")
+   Result.success(installerFile)
 
-            val installerFile = File(downloadDir, INSTALLER_FILENAME)
+  } catch (e: Exception) {
+   Log.e(TAG, "Failed to download Steam installer", e)
+   Result.failure(e)
+  }
+ }
 
-            // 既に存在する場合は削除
-            if (installerFile.exists()) {
-                installerFile.delete()
-            }
+ /**
+  * Steam installationinformationsave
+  *
+  * existinginstallationinformation あるcase update、なければ新規create (UPSERT)
+  */
+ suspend fun saveInstallation(
+  containerId: String,
+  installPath: String,
+  status: SteamInstallStatus
+ ): Result<Long> = withContext(Dispatchers.IO) {
+  try {
+   // existinginstallationinformationconfirmation
+   val existing = database.steamInstallDao().getInstallationByContainerId(containerId)
 
-            Log.i(TAG, "Downloading Steam installer from $STEAM_INSTALLER_URL")
+   if (existing != null) {
+    // 既存レコードupdate
+    val updatedEntity = existing.copy(
+     installPath = installPath,
+     status = status,
+     installedAt = System.currentTimeMillis()
+    )
+    database.steamInstallDao().update(updatedEntity)
+    Log.i(TAG, "Updated existing installation for container: $containerId")
+    Result.success(existing.id)
+   } else {
+    // 新規レコードcreate
+    val entity = SteamInstallEntity(
+     containerId = containerId,
+     installPath = installPath,
+     status = status
+    )
+    val id = database.steamInstallDao().insert(entity)
+    Log.i(TAG, "Created new installation record for container: $containerId")
+    Result.success(id)
+   }
 
-            // OkHttp で直接ダウンロード (シンプル版)
-            val request = okhttp3.Request.Builder()
-                .url(STEAM_INSTALLER_URL)
-                .build()
+  } catch (e: Exception) {
+   Log.e(TAG, "Failed to save installation", e)
+   Result.failure(e)
+  }
+ }
 
-            val response = okHttpClient.newCall(request).execute()
+ /**
+  * Steam installationinformationupdate
+  */
+ suspend fun updateInstallation(entity: SteamInstallEntity): Result<Unit> =
+  withContext(Dispatchers.IO) {
+   try {
+    database.steamInstallDao().update(entity)
+    Result.success(Unit)
+   } catch (e: Exception) {
+    Log.e(TAG, "Failed to update installation", e)
+    Result.failure(e)
+   }
+  }
 
-            if (!response.isSuccessful) {
-                return@withContext Result.failure(
-                    Exception("Failed to download: HTTP ${response.code}")
-                )
-            }
-
-            response.body?.byteStream()?.use { input ->
-                installerFile.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-
-            Log.i(TAG, "Steam installer downloaded: ${installerFile.absolutePath}")
-            Result.success(installerFile)
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to download Steam installer", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Steam インストール情報を保存
-     *
-     * 既存のインストール情報がある場合は更新、なければ新規作成 (UPSERT)
-     */
-    suspend fun saveInstallation(
-        containerId: String,
-        installPath: String,
-        status: SteamInstallStatus
-    ): Result<Long> = withContext(Dispatchers.IO) {
-        try {
-            // 既存のインストール情報を確認
-            val existing = database.steamInstallDao().getInstallationByContainerId(containerId)
-
-            if (existing != null) {
-                // 既存レコードを更新
-                val updatedEntity = existing.copy(
-                    installPath = installPath,
-                    status = status,
-                    installedAt = System.currentTimeMillis()
-                )
-                database.steamInstallDao().update(updatedEntity)
-                Log.i(TAG, "Updated existing installation for container: $containerId")
-                Result.success(existing.id)
-            } else {
-                // 新規レコードを作成
-                val entity = SteamInstallEntity(
-                    containerId = containerId,
-                    installPath = installPath,
-                    status = status
-                )
-                val id = database.steamInstallDao().insert(entity)
-                Log.i(TAG, "Created new installation record for container: $containerId")
-                Result.success(id)
-            }
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to save installation", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Steam インストール情報を更新
-     */
-    suspend fun updateInstallation(entity: SteamInstallEntity): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            try {
-                database.steamInstallDao().update(entity)
-                Result.success(Unit)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to update installation", e)
-                Result.failure(e)
-            }
-        }
-
-    /**
-     * Steam インストール情報を取得
-     */
-    suspend fun getInstallation(): SteamInstallEntity? = withContext(Dispatchers.IO) {
-        database.steamInstallDao().getInstallation()
-    }
+ /**
+  * Steam installationinformationretrieve
+  */
+ suspend fun getInstallation(): SteamInstallEntity? = withContext(Dispatchers.IO) {
+  database.steamInstallDao().getInstallation()
+ }
 }

@@ -1,5 +1,6 @@
 package com.steamdeck.mobile.presentation.viewmodel
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
@@ -13,71 +14,71 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * コンテナ管理のViewModel
+ * コンテナ管理 ViewModel
  */
 @HiltViewModel
 class ContainerViewModel @Inject constructor(
-    private val winlatorEmulator: WinlatorEmulator
+ private val winlatorEmulator: WinlatorEmulator
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<ContainerUiState>(ContainerUiState.Loading)
-    val uiState: StateFlow<ContainerUiState> = _uiState.asStateFlow()
+ private val _uiState = MutableStateFlow<ContainerUiState>(ContainerUiState.Loading)
+ val uiState: StateFlow<ContainerUiState> = _uiState.asStateFlow()
 
-    /**
-     * コンテナ一覧を読み込み
-     */
-    fun loadContainers() {
-        viewModelScope.launch {
-            _uiState.value = ContainerUiState.Loading
+ /**
+  * コンテナlist読み込み
+  */
+ fun loadContainers() {
+  viewModelScope.launch {
+   _uiState.value = ContainerUiState.Loading
 
-            val result = winlatorEmulator.listContainers()
+   val result = winlatorEmulator.listContainers()
 
-            _uiState.value = if (result.isSuccess) {
-                ContainerUiState.Success(result.getOrThrow())
-            } else {
-                ContainerUiState.Error(
-                    result.exceptionOrNull()?.message ?: "コンテナの読み込みに失敗しました"
-                )
-            }
-        }
-    }
+   _uiState.value = if (result.isSuccess) {
+    ContainerUiState.Success(result.getOrThrow())
+   } else {
+    ContainerUiState.Error(
+     result.exceptionOrNull()?.message ?: "コンテナ 読み込み failed"
+    )
+   }
+  }
+ }
 
-    /**
-     * 新しいコンテナを作成
-     */
-    fun createContainer(name: String) {
-        viewModelScope.launch {
-            val config = EmulatorContainerConfig(name = name)
-            val result = winlatorEmulator.createContainer(config)
+ /**
+  * 新しいコンテナcreate
+  */
+ fun createContainer(name: String) {
+  viewModelScope.launch {
+   val config = EmulatorContainerConfig(name = name)
+   val result = winlatorEmulator.createContainer(config)
 
-            if (result.isSuccess) {
-                // Reload containers after creation
-                loadContainers()
-            } else {
-                _uiState.value = ContainerUiState.Error(
-                    result.exceptionOrNull()?.message ?: "コンテナの作成に失敗しました"
-                )
-            }
-        }
-    }
+   if (result.isSuccess) {
+    // Reload containers after creation
+    loadContainers()
+   } else {
+    _uiState.value = ContainerUiState.Error(
+     result.exceptionOrNull()?.message ?: "コンテナ create failed"
+    )
+   }
+  }
+ }
 
-    /**
-     * コンテナを削除
-     */
-    fun deleteContainer(containerId: String) {
-        viewModelScope.launch {
-            val result = winlatorEmulator.deleteContainer(containerId)
+ /**
+  * コンテナdelete
+  */
+ fun deleteContainer(containerId: String) {
+  viewModelScope.launch {
+   val result = winlatorEmulator.deleteContainer(containerId)
 
-            if (result.isSuccess) {
-                // Reload containers after deletion
-                loadContainers()
-            } else {
-                _uiState.value = ContainerUiState.Error(
-                    result.exceptionOrNull()?.message ?: "コンテナの削除に失敗しました"
-                )
-            }
-        }
-    }
+   if (result.isSuccess) {
+    // Reload containers after deletion
+    loadContainers()
+   } else {
+    _uiState.value = ContainerUiState.Error(
+     result.exceptionOrNull()?.message ?: "コンテナ delete failed"
+    )
+   }
+  }
+ }
 }
 
 /**
@@ -85,15 +86,15 @@ class ContainerViewModel @Inject constructor(
  */
 @Immutable
 sealed class ContainerUiState {
-    /** Loading */
-    @Immutable
-    data object Loading : ContainerUiState()
+ /** Loading */
+ @Immutable
+ data object Loading : ContainerUiState()
 
-    /** Success */
-    @Immutable
-    data class Success(val containers: List<EmulatorContainer>) : ContainerUiState()
+ /** Success */
+ @Immutable
+ data class Success(val containers: List<EmulatorContainer>) : ContainerUiState()
 
-    /** Error */
-    @Immutable
-    data class Error(val message: String) : ContainerUiState()
+ /** Error */
+ @Immutable
+ data class Error(val message: String) : ContainerUiState()
 }

@@ -5,49 +5,49 @@ import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Winlatorコンテナ設定へのデータアクセスオブジェクト
+ * Winlatorcontainerconfigurationto dataアクセスobject
  */
 @Dao
 interface WinlatorContainerDao {
-    /**
-     * すべてのコンテナを取得
-     */
-    @Query("SELECT * FROM winlator_containers ORDER BY createdTimestamp DESC")
-    fun getAllContainers(): Flow<List<WinlatorContainerEntity>>
+ /**
+  * all containerretrieve
+  */
+ @Query("SELECT * FROM winlator_containers ORDER BY createdTimestamp DESC")
+ fun getAllContainers(): Flow<List<WinlatorContainerEntity>>
 
-    /**
-     * コンテナIDでコンテナを取得
-     */
-    @Query("SELECT * FROM winlator_containers WHERE id = :containerId")
-    suspend fun getContainerById(containerId: Long): WinlatorContainerEntity?
+ /**
+  * containerID containerretrieve
+  */
+ @Query("SELECT * FROM winlator_containers WHERE id = :containerId")
+ suspend fun getContainerById(containerId: Long): WinlatorContainerEntity?
 
-    /**
-     * コンテナ名でコンテナを検索
-     */
-    @Query("SELECT * FROM winlator_containers WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
-    fun searchContainers(query: String): Flow<List<WinlatorContainerEntity>>
+ /**
+  * container名 container検索
+  */
+ @Query("SELECT * FROM winlator_containers WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
+ fun searchContainers(query: String): Flow<List<WinlatorContainerEntity>>
 
-    /**
-     * コンテナを挿入
-     */
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertContainer(container: WinlatorContainerEntity): Long
+ /**
+  * container挿入
+  */
+ @Insert(onConflict = OnConflictStrategy.REPLACE)
+ suspend fun insertContainer(container: WinlatorContainerEntity): Long
 
-    /**
-     * コンテナを更新
-     */
-    @Update
-    suspend fun updateContainer(container: WinlatorContainerEntity)
+ /**
+  * containerupdate
+  */
+ @Update
+ suspend fun updateContainer(container: WinlatorContainerEntity)
 
-    /**
-     * コンテナを削除
-     */
-    @Delete
-    suspend fun deleteContainer(container: WinlatorContainerEntity)
+ /**
+  * containerdelete
+  */
+ @Delete
+ suspend fun deleteContainer(container: WinlatorContainerEntity)
 
-    /**
-     * すべてのコンテナを削除
-     */
-    @Query("DELETE FROM winlator_containers")
-    suspend fun deleteAllContainers()
+ /**
+  * all containerdelete
+  */
+ @Query("DELETE FROM winlator_containers")
+ suspend fun deleteAllContainers()
 }

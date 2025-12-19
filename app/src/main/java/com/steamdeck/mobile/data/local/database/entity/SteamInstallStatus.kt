@@ -1,18 +1,18 @@
 package com.steamdeck.mobile.data.local.database.entity
 
 /**
- * Steam Client インストール状態
+ * Steam Client installationstate
  */
 enum class SteamInstallStatus {
-    /** インストール中 */
-    INSTALLING,
+ /** installationin */
+ INSTALLING,
 
-    /** インストール完了 */
-    INSTALLED,
+ /** installationcompleted */
+ INSTALLED,
 
-    /** インストール失敗 */
-    FAILED,
+ /** installationfailure */
+ FAILED,
 
-    /** アンインストール済み */
-    UNINSTALLED
+ /** アンinstallation済み */
+ UNINSTALLED
 }

@@ -6,12 +6,12 @@ import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 /**
- * すべてのゲームを取得するUseCase
+ * all gameretrievedoUseCase
  */
 class GetAllGamesUseCase @Inject constructor(
-    private val gameRepository: GameRepository
+ private val gameRepository: GameRepository
 ) {
-    operator fun invoke(): Flow<List<Game>> {
-        return gameRepository.getAllGames()
-    }
+ operator fun invoke(): Flow<List<Game>> {
+  return gameRepository.getAllGames()
+ }
 }

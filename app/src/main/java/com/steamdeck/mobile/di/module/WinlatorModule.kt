@@ -9,17 +9,17 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Winlatorエンジンの依存性注入モジュール
+ * Winlatorエンジン 依存性注入module
  */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class WinlatorModule {
-    /**
-     * WinlatorEngineの実装をバインド
-     */
-    @Binds
-    @Singleton
-    abstract fun bindWinlatorEngine(
-        winlatorEngineImpl: WinlatorEngineImpl
-    ): WinlatorEngine
+ /**
+  * WinlatorEngine implementationbind
+  */
+ @Binds
+ @Singleton
+ abstract fun bindWinlatorEngine(
+  winlatorEngineImpl: WinlatorEngineImpl
+ ): WinlatorEngine
 }

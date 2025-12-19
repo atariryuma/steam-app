@@ -121,7 +121,11 @@
       "Bash(adb pull:*)",
       "Bash(/c/Projects/steam-app/gradlew.bat:*)",
       "Bash(call build-apk.bat)",
-      "Bash(./install-debug.bat)"
+      "Bash(./install-debug.bat)",
+      "Bash(for file in app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/ContainerViewModel.kt app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/ControllerViewModel.kt app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/GameDetailViewModel.kt app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/SettingsViewModel.kt app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/SteamLoginViewModel.kt app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/WineTestViewModel.kt app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/WinlatorInitViewModel.kt)",
+      "Bash(do if ! grep -q \"import androidx.compose.runtime.Immutable\" \"$file\")",
+      "Bash(then sed -i '1a import androidx.compose.runtime.Immutable' \"$file\")",
+      "Bash(fi)"
     ]
   }
 }

@@ -10,17 +10,17 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * 入力（コントローラー）関連のDIモジュール
+ * 入力（controller）関連 DImodule
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object InputModule {
 
-    @Provides
-    @Singleton
-    fun provideGameControllerManager(
-        @ApplicationContext context: Context
-    ): GameControllerManager {
-        return GameControllerManager(context)
-    }
+ @Provides
+ @Singleton
+ fun provideGameControllerManager(
+  @ApplicationContext context: Context
+ ): GameControllerManager {
+  return GameControllerManager(context)
+ }
 }

@@ -9,15 +9,15 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * ファイルインポート関連の依存性注入モジュール
+ * fileインポート関連 依存性注入module
  */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class FileImportModule {
 
-    @Binds
-    @Singleton
-    abstract fun bindFileImportRepository(
-        impl: FileImportRepositoryImpl
-    ): FileImportRepository
+ @Binds
+ @Singleton
+ abstract fun bindFileImportRepository(
+  impl: FileImportRepositoryImpl
+ ): FileImportRepository
 }

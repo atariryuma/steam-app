@@ -5,7 +5,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * ダウンロード履歴・状態を格納するエンティティ
+ * download履歴・state格納doエンティティ
  *
  * Performance optimization (2025 best practice):
  * - Added installationStatus for automatic game installation
@@ -13,117 +13,117 @@ import androidx.room.PrimaryKey
  * - Indexes on frequently queried columns for faster lookups
  */
 @Entity(
-    tableName = "downloads",
-    indices = [
-        Index(value = ["gameId"]),
-        Index(value = ["status"]),
-        Index(value = ["installationStatus"])
-    ]
+ tableName = "downloads",
+ indices = [
+  Index(value = ["gameId"]),
+  Index(value = ["status"]),
+  Index(value = ["installationStatus"])
+ ]
 )
 data class DownloadEntity(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
+ @PrimaryKey(autoGenerate = true)
+ val id: Long = 0,
 
-    /** 関連するゲームID */
-    val gameId: Long? = null,
+ /** 関連dogameID */
+ val gameId: Long? = null,
 
-    /** ファイル名 */
-    val fileName: String,
+ /** File name */
+ val fileName: String,
 
-    /** ダウンロードURL */
-    val url: String,
+ /** downloadURL */
+ val url: String,
 
-    /** ダウンロード状態 */
-    val status: DownloadStatus,
+ /** downloadstate */
+ val status: DownloadStatus,
 
-    /** インストール状態 (ダウンロード完了後の処理) */
-    val installationStatus: InstallationStatus = InstallationStatus.NOT_INSTALLED,
+ /** installationstate (downloadcompleted後 processing) */
+ val installationStatus: InstallationStatus = InstallationStatus.NOT_INSTALLED,
 
-    /** 進捗率（0-100） */
-    val progress: Int = 0,
+ /** progress率（0-100） */
+ val progress: Int = 0,
 
-    /** ダウンロード済みバイト数 */
-    val downloadedBytes: Long = 0,
+ /** download済みバイト数 */
+ val downloadedBytes: Long = 0,
 
-    /** 総ファイルサイズ（バイト） */
-    val totalBytes: Long = 0,
+ /** 総fileサイズ（バイト） */
+ val totalBytes: Long = 0,
 
-    /** ダウンロード速度（バイト/秒） */
-    val speedBytesPerSecond: Long = 0,
+ /** download速度（バイト/秒） */
+ val speedBytesPerSecond: Long = 0,
 
-    /** 保存先パス */
-    val destinationPath: String = "",
+ /** Destination path */
+ val destinationPath: String = "",
 
-    /**
-     * ダウンロード開始日時（Unix timestamp）
-     *
-     * 注意: デフォルト値として System.currentTimeMillis() を使用していますが、
-     * 実際の利用時には明示的に値を渡すことを推奨します。
-     */
-    val startedTimestamp: Long = System.currentTimeMillis(),
+ /**
+  * downloadstartdate and time（Unix timestamp）
+  *
+  * Note: defaultvalue して System.currentTimeMillis() useしています 、
+  * 実際 利用時 明示的 value渡すこ 推奨do。
+  */
+ val startedTimestamp: Long = System.currentTimeMillis(),
 
-    /**
-     * 作成日時（Unix timestamp）
-     *
-     * 注意: デフォルト値として System.currentTimeMillis() を使用していますが、
-     * 実際の利用時には明示的に値を渡すことを推奨します。
-     */
-    val createdAt: Long = System.currentTimeMillis(),
+ /**
+  * createdate and time（Unix timestamp）
+  *
+  * Note: defaultvalue して System.currentTimeMillis() useしています 、
+  * 実際 利用時 明示的 value渡すこ 推奨do。
+  */
+ val createdAt: Long = System.currentTimeMillis(),
 
-    /**
-     * 更新日時（Unix timestamp）
-     *
-     * 注意: デフォルト値として System.currentTimeMillis() を使用していますが、
-     * 実際の利用時には明示的に値を渡すことを推奨します。
-     */
-    val updatedAt: Long = System.currentTimeMillis(),
+ /**
+  * updatedate and time（Unix timestamp）
+  *
+  * Note: defaultvalue して System.currentTimeMillis() useしています 、
+  * 実際 利用時 明示的 value渡すこ 推奨do。
+  */
+ val updatedAt: Long = System.currentTimeMillis(),
 
-    /** ダウンロード完了日時（Unix timestamp） */
-    val completedTimestamp: Long? = null,
+ /** downloadcompleteddate and time（Unix timestamp） */
+ val completedTimestamp: Long? = null,
 
-    /** エラーメッセージ */
-    val errorMessage: String? = null
+ /** errorメッセージ */
+ val errorMessage: String? = null
 )
 
 /**
- * ダウンロード状態
+ * downloadstate
  */
 enum class DownloadStatus {
-    /** ダウンロード待機中 */
-    PENDING,
+ /** downloadwaiting */
+ PENDING,
 
-    /** ダウンロード中 */
-    DOWNLOADING,
+ /** downloadin */
+ DOWNLOADING,
 
-    /** 一時停止中 */
-    PAUSED,
+ /** pausein */
+ PAUSED,
 
-    /** 完了 */
-    COMPLETED,
+ /** completed */
+ COMPLETED,
 
-    /** エラー */
-    FAILED,
+ /** error */
+ FAILED,
 
-    /** キャンセル */
-    CANCELLED
+ /** cancel */
+ CANCELLED
 }
 
 /**
- * インストール状態 (ダウンロード完了後)
+ * installationstate (downloadcompleted後)
  */
 enum class InstallationStatus {
-    /** 未インストール (ダウンロードのみ完了) */
-    NOT_INSTALLED,
+ /** 未installation (download みcompleted) */
+ NOT_INSTALLED,
 
-    /** インストール待機中 */
-    PENDING,
+ /** installationwaiting */
+ PENDING,
 
-    /** インストール中 */
-    INSTALLING,
+ /** installationin */
+ INSTALLING,
 
-    /** インストール完了 */
-    INSTALLED,
+ /** installationcompleted */
+ INSTALLED,
 
-    /** インストール失敗 */
-    FAILED
+ /** installationfailure */
+ FAILED
 }

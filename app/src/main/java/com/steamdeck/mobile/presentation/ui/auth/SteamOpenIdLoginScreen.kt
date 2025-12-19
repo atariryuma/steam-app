@@ -20,111 +20,111 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
 
 /**
- * Steam OpenID認証画面（公式規約準拠）
+ * Steam OpenIDauthentication画面（公式規約準拠）
  *
- * Valve公式のOpenID 2.0認証を使用
- * - QRコード認証と異なり、規約準拠の安全な方法
- * - WebViewでsteamcommunity.comの公式ログインページを表示
- * - コールバックURLでSteamID64を取得
+ * Valve公式 OpenID 2.0authenticationuse
+ * - QRコードauthentication 異なり、規約準拠 安全な方法
+ * - WebView steamcommunity.com 公式ログインページ表示
+ * - コールバックURL SteamID64retrieve
  *
  * 公式ドキュメント:
  * - https://partner.steamgames.com/doc/features/auth
  * - https://steamcommunity.com/dev
  *
  * Best Practice:
- * - JavaScript有効化（Steamログインフォーム動作に必要）
+ * - JavaScript有効化（Steamログインフォーム動作 必要）
  * - DOM Storage有効化（セッション管理）
- * - リダイレクトをインターセプトしてコールバック処理
+ * - リダイレクトインターセプトしてコールバック処理
  */
 @Composable
 fun SteamOpenIdLoginScreen(
-    authUrl: String,
-    callbackScheme: String = "steamdeckmobile",
-    onAuthCallback: (String) -> Unit,
-    onError: (String) -> Unit = {}
+ authUrl: String,
+ callbackScheme: String = "steamdeckmobile",
+ onAuthCallback: (String) -> Unit,
+ onError: (String) -> Unit = {}
 ) {
-    var isLoading by remember { mutableStateOf(true) }
-    var loadProgress by remember { mutableStateOf(0) }
+ var isLoading by remember { mutableStateOf(true) }
+ var loadProgress by remember { mutableStateOf(0) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF1B2838)) // Steam dark blue
-    ) {
-        // WebView（フルスクリーン）
-        AndroidView(
-            factory = { context ->
-                WebView(context).apply {
-                    settings.apply {
-                        javaScriptEnabled = true // Steamログインフォームに必要
-                        domStorageEnabled = true // セッション管理
-                        setSupportMultipleWindows(false)
-                        loadWithOverviewMode = true
-                        useWideViewPort = true
-                    }
+ Box(
+  modifier = Modifier
+   .fillMaxSize()
+   .background(Color(0xFF1B2838)) // Steam dark blue
+ ) {
+  // WebView（フルスクリーン）
+  AndroidView(
+   factory = { context ->
+    WebView(context).apply {
+     settings.apply {
+      javaScriptEnabled = true // Steamログインフォーム 必要
+      domStorageEnabled = true // セッション管理
+      setSupportMultipleWindows(false)
+      loadWithOverviewMode = true
+      useWideViewPort = true
+     }
 
-                    webViewClient = object : WebViewClient() {
-                        override fun shouldOverrideUrlLoading(
-                            view: WebView?,
-                            request: WebResourceRequest?
-                        ): Boolean {
-                            val url = request?.url.toString()
+     webViewClient = object : WebViewClient() {
+      override fun shouldOverrideUrlLoading(
+       view: WebView?,
+       request: WebResourceRequest?
+      ): Boolean {
+       val url = request?.url.toString()
 
-                            // コールバックURLの検出
-                            if (url.startsWith("$callbackScheme://")) {
-                                onAuthCallback(url)
-                                return true
-                            }
+       // コールバックURL 検出
+       if (url.startsWith("$callbackScheme://")) {
+        onAuthCallback(url)
+        return true
+       }
 
-                            return false
-                        }
+       return false
+      }
 
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            super.onPageFinished(view, url)
-                            isLoading = false
-                        }
+      override fun onPageFinished(view: WebView?, url: String?) {
+       super.onPageFinished(view, url)
+       isLoading = false
+      }
 
-                        override fun onReceivedError(
-                            view: WebView?,
-                            errorCode: Int,
-                            description: String?,
-                            failingUrl: String?
-                        ) {
-                            super.onReceivedError(view, errorCode, description, failingUrl)
-                            onError("ページ読み込みエラー: $description")
-                        }
-                    }
+      override fun onReceivedError(
+       view: WebView?,
+       errorCode: Int,
+       description: String?,
+       failingUrl: String?
+      ) {
+       super.onReceivedError(view, errorCode, description, failingUrl)
+       onError("ページ読み込みエラー: $description")
+      }
+     }
 
-                    // 認証URL読み込み
-                    loadUrl(authUrl)
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // プログレスバー（上部に表示）
-        if (isLoading) {
-            LinearProgressIndicator(
-                progress = { loadProgress / 100f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter),
-                color = Color(0xFF66C0F4)
-            )
-        }
-
-        // ローディングオーバーレイ（初回読み込み時のみ）
-        if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF1B2838).copy(alpha = 0.9f)),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = Color(0xFF66C0F4)
-                )
-            }
-        }
+     // authenticationURL読み込み
+     loadUrl(authUrl)
     }
+   },
+   modifier = Modifier.fillMaxSize()
+  )
+
+  // プログレスバー（上部 表示）
+  if (isLoading) {
+   LinearProgressIndicator(
+    progress = { loadProgress / 100f },
+    modifier = Modifier
+     .fillMaxWidth()
+     .align(Alignment.TopCenter),
+    color = Color(0xFF66C0F4)
+   )
+  }
+
+  // ローディングオーバーレイ（初回読み込み時 み）
+  if (isLoading) {
+   Box(
+    modifier = Modifier
+     .fillMaxSize()
+     .background(Color(0xFF1B2838).copy(alpha = 0.9f)),
+    contentAlignment = Alignment.Center
+   ) {
+    CircularProgressIndicator(
+     color = Color(0xFF66C0F4)
+    )
+   }
+  }
+ }
 }

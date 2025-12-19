@@ -19,20 +19,20 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object ControllerModule {
 
-    @Provides
-    @Singleton
-    fun provideControllerProfileDao(
-        database: SteamDeckDatabase
-    ): ControllerProfileDao {
-        return database.controllerProfileDao()
-    }
+ @Provides
+ @Singleton
+ fun provideControllerProfileDao(
+  database: SteamDeckDatabase
+ ): ControllerProfileDao {
+  return database.controllerProfileDao()
+ }
 
-    @Provides
-    @Singleton
-    fun provideControllerRepository(
-        @ApplicationContext context: Context,
-        controllerProfileDao: ControllerProfileDao
-    ): ControllerRepository {
-        return ControllerRepositoryImpl(context, controllerProfileDao)
-    }
+ @Provides
+ @Singleton
+ fun provideControllerRepository(
+  @ApplicationContext context: Context,
+  controllerProfileDao: ControllerProfileDao
+ ): ControllerRepository {
+  return ControllerRepositoryImpl(context, controllerProfileDao)
+ }
 }

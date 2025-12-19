@@ -4,33 +4,33 @@ import com.steamdeck.mobile.data.remote.steam.model.SteamGame
 import com.steamdeck.mobile.data.remote.steam.model.SteamPlayer
 
 /**
- * Steam関連データ操作のリポジトリインターフェース
+ * Steam関連data操作 リポジトリinterface
  */
 interface SteamRepository {
-    /**
-     * ユーザーが所有するゲーム一覧を取得
-     *
-     * @param apiKey Steam Web API Key
-     * @param steamId Steam ID
-     * @return ゲーム一覧
-     */
-    suspend fun getOwnedGames(apiKey: String, steamId: String): Result<List<SteamGame>>
+ /**
+  * ユーザー 所有dogamelistretrieve
+  *
+  * @param apiKey Steam Web API Key
+  * @param steamId Steam ID
+  * @return gamelist
+  */
+ suspend fun getOwnedGames(apiKey: String, steamId: String): Result<List<SteamGame>>
 
-    /**
-     * ユーザーのプロフィール情報を取得
-     *
-     * @param apiKey Steam Web API Key
-     * @param steamId Steam ID
-     * @return プレイヤー情報
-     */
-    suspend fun getPlayerSummary(apiKey: String, steamId: String): Result<SteamPlayer>
+ /**
+  * ユーザー プロフィールinformationretrieve
+  *
+  * @param apiKey Steam Web API Key
+  * @param steamId Steam ID
+  * @return プレイヤーinformation
+  */
+ suspend fun getPlayerSummary(apiKey: String, steamId: String): Result<SteamPlayer>
 
-    /**
-     * ゲーム画像をダウンロード
-     *
-     * @param url 画像URL
-     * @param destinationPath 保存先パス
-     * @return 保存成功可否
-     */
-    suspend fun downloadGameImage(url: String, destinationPath: String): Result<Unit>
+ /**
+  * game画像download
+  *
+  * @param url 画像URL
+  * @param destinationPath Destination path
+  * @return savesuccess可否
+  */
+ suspend fun downloadGameImage(url: String, destinationPath: String): Result<Unit>
 }

@@ -9,22 +9,22 @@ import javax.inject.Inject
 @HiltAndroidApp
 class SteamDeckMobileApp : Application(), Configuration.Provider {
 
-    @Inject
-    lateinit var workerFactory: HiltWorkerFactory
+ @Inject
+ lateinit var workerFactory: HiltWorkerFactory
 
-    override fun onCreate() {
-        super.onCreate()
-        // アプリケーション初期化処理
-    }
+ override fun onCreate() {
+  super.onCreate()
+  // アプリケーション初期化処理
+ }
 
-    /**
-     * WorkManager 2.9.0+ では Configuration.Provider の実装が
-     * getWorkManagerConfiguration() メソッドから workManagerConfiguration プロパティに変更された。
-     * Hilt を使用する場合、workerFactory が注入される前にアクセスされるクラッシュを防ぐため、
-     * getter を使用して遅延初期化を行う。
-     */
-    override val workManagerConfiguration: Configuration
-        get() = Configuration.Builder()
-            .setWorkerFactory(workerFactory)
-            .build()
+ /**
+  * WorkManager 2.9.0+ Configuration.Provider 実装 
+  * getWorkManagerConfiguration() メソッド from workManagerConfiguration プロパティ 変更された。
+  * Hilt usedo場合、workerFactory 注入される前 アクセスされるクラッシュ防ぐため、
+  * getter useして遅延初期化行う。
+  */
+ override val workManagerConfiguration: Configuration
+  get() = Configuration.Builder()
+   .setWorkerFactory(workerFactory)
+   .build()
 }

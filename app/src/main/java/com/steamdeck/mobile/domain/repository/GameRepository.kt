@@ -5,71 +5,71 @@ import com.steamdeck.mobile.domain.model.GameSource
 import kotlinx.coroutines.flow.Flow
 
 /**
- * ゲーム情報管理リポジトリのインターフェース
+ * gameinformationmanagementリポジトリ interface
  */
 interface GameRepository {
-    /**
-     * すべてのゲームを取得
-     */
-    fun getAllGames(): Flow<List<Game>>
+ /**
+  * all gameretrieve
+  */
+ fun getAllGames(): Flow<List<Game>>
 
-    /**
-     * お気に入りゲームを取得
-     */
-    fun getFavoriteGames(): Flow<List<Game>>
+ /**
+  * favoritegameretrieve
+  */
+ fun getFavoriteGames(): Flow<List<Game>>
 
-    /**
-     * ゲームIDでゲームを取得
-     */
-    suspend fun getGameById(gameId: Long): Game?
+ /**
+  * gameID gameretrieve
+  */
+ suspend fun getGameById(gameId: Long): Game?
 
-    /**
-     * Steam App IDでゲームを取得
-     */
-    suspend fun getGameBySteamAppId(steamAppId: Long): Game?
+ /**
+  * Steam App ID gameretrieve
+  */
+ suspend fun getGameBySteamAppId(steamAppId: Long): Game?
 
-    /**
-     * ゲーム名で検索
-     */
-    fun searchGames(query: String): Flow<List<Game>>
+ /**
+  * game名 検索
+  */
+ fun searchGames(query: String): Flow<List<Game>>
 
-    /**
-     * ソース別にゲームを取得
-     */
-    fun getGamesBySource(source: GameSource): Flow<List<Game>>
+ /**
+  * ソース別 gameretrieve
+  */
+ fun getGamesBySource(source: GameSource): Flow<List<Game>>
 
-    /**
-     * ゲームを追加
-     */
-    suspend fun insertGame(game: Game): Long
+ /**
+  * gameadd
+  */
+ suspend fun insertGame(game: Game): Long
 
-    /**
-     * 複数のゲームを追加
-     */
-    suspend fun insertGames(games: List<Game>)
+ /**
+  * 複数 gameadd
+  */
+ suspend fun insertGames(games: List<Game>)
 
-    /**
-     * ゲームを更新
-     */
-    suspend fun updateGame(game: Game)
+ /**
+  * gameupdate
+  */
+ suspend fun updateGame(game: Game)
 
-    /**
-     * ゲームを削除
-     */
-    suspend fun deleteGame(game: Game)
+ /**
+  * gamedelete
+  */
+ suspend fun deleteGame(game: Game)
 
-    /**
-     * プレイ時間を更新
-     */
-    suspend fun updatePlayTime(gameId: Long, additionalMinutes: Long, timestamp: Long)
+ /**
+  * play timeupdate
+  */
+ suspend fun updatePlayTime(gameId: Long, additionalMinutes: Long, timestamp: Long)
 
-    /**
-     * お気に入り状態を切り替え
-     */
-    suspend fun updateFavoriteStatus(gameId: Long, isFavorite: Boolean)
+ /**
+  * favoritestate切り替え
+  */
+ suspend fun updateFavoriteStatus(gameId: Long, isFavorite: Boolean)
 
-    /**
-     * すべてのゲームを削除
-     */
-    suspend fun deleteAllGames()
+ /**
+  * all gamedelete
+  */
+ suspend fun deleteAllGames()
 }

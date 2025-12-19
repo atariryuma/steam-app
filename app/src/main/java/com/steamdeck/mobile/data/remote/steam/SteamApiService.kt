@@ -7,57 +7,57 @@ import retrofit2.http.GET
 import retrofit2.http.Query
 
 /**
- * Steam Web API サービス
+ * Steam Web API service
  *
- * API Key取得: https://steamcommunity.com/dev/apikey
+ * API Keyretrieve: https://steamcommunity.com/dev/apikey
  * API ドキュメント: https://developer.valvesoftware.com/wiki/Steam_Web_API
  */
 interface SteamApiService {
-    /**
-     * ユーザーが所有するゲーム一覧を取得
-     *
-     * @param key Steam Web API Key
-     * @param steamId ユーザーのSteam ID
-     * @param includeAppInfo アプリ情報を含めるか（名前、アイコンURL等）
-     * @param includePlayedFreeGames 無料ゲームを含めるか
-     */
-    @GET("IPlayerService/GetOwnedGames/v0001/")
-    suspend fun getOwnedGames(
-        @Query("key") key: String,
-        @Query("steamid") steamId: String,
-        @Query("include_appinfo") includeAppInfo: Int = 1,
-        @Query("include_played_free_games") includePlayedFreeGames: Int = 1,
-        @Query("format") format: String = "json"
-    ): Response<GetOwnedGamesResponse>
+ /**
+  * ユーザー 所有dogamelistretrieve
+  *
+  * @param key Steam Web API Key
+  * @param steamId ユーザー Steam ID
+  * @param includeAppInfo アプリinformation含めるか（名前、アイコンURLetc）
+  * @param includePlayedFreeGames 無料game含めるか
+  */
+ @GET("IPlayerService/GetOwnedGames/v0001/")
+ suspend fun getOwnedGames(
+  @Query("key") key: String,
+  @Query("steamid") steamId: String,
+  @Query("include_appinfo") includeAppInfo: Int = 1,
+  @Query("include_played_free_games") includePlayedFreeGames: Int = 1,
+  @Query("format") format: String = "json"
+ ): Response<GetOwnedGamesResponse>
 
-    /**
-     * ユーザーのプロフィール情報を取得
-     *
-     * @param key Steam Web API Key
-     * @param steamIds Steam IDのカンマ区切りリスト
-     */
-    @GET("ISteamUser/GetPlayerSummaries/v0002/")
-    suspend fun getPlayerSummaries(
-        @Query("key") key: String,
-        @Query("steamids") steamIds: String,
-        @Query("format") format: String = "json"
-    ): Response<GetPlayerSummariesResponse>
+ /**
+  * ユーザー プロフィールinformationretrieve
+  *
+  * @param key Steam Web API Key
+  * @param steamIds Steam ID カンマ区切りリスト
+  */
+ @GET("ISteamUser/GetPlayerSummaries/v0002/")
+ suspend fun getPlayerSummaries(
+  @Query("key") key: String,
+  @Query("steamids") steamIds: String,
+  @Query("format") format: String = "json"
+ ): Response<GetPlayerSummariesResponse>
 
-    /**
-     * アプリ詳細情報を取得 (Store API)
-     *
-     * Note: これはSteam Web APIではなく、Steam Store APIを使用
-     * URL: https://store.steampowered.com/api/appdetails
-     *
-     * @param appIds App IDのカンマ区切りリスト
-     */
-    @GET("https://store.steampowered.com/api/appdetails")
-    suspend fun getAppDetails(
-        @Query("appids") appIds: String,
-        @Query("filters") filters: String = "basic"
-    ): Response<Map<String, Any>>
+ /**
+  * アプリdetailsinformationretrieve (Store API)
+  *
+  * Note: これ Steam Web API なく、Steam Store APIuse
+  * URL: https://store.steampowered.com/api/appdetails
+  *
+  * @param appIds App ID カンマ区切りリスト
+  */
+ @GET("https://store.steampowered.com/api/appdetails")
+ suspend fun getAppDetails(
+  @Query("appids") appIds: String,
+  @Query("filters") filters: String = "basic"
+ ): Response<Map<String, Any>>
 
-    companion object {
-        const val BASE_URL = "https://api.steampowered.com/"
-    }
+ companion object {
+  const val BASE_URL = "https://api.steampowered.com/"
+ }
 }

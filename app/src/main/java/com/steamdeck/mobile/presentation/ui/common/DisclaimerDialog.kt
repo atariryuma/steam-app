@@ -26,110 +26,110 @@ import androidx.compose.ui.unit.dp
 /**
  * 免責事項ダイアログ
  *
- * Steam利用規約違反リスクについてユーザーに警告
+ * Steam利用規約違反リスク ついてユーザー 警告
  *
  * Best Practice:
- * - 初回起動時に表示（DataStoreでフラグ管理）
- * - 同意しない場合はアプリを終了
- * - 重要な法的情報のため、スクロール可能に
+ * - 初回launch時 表示（DataStore フラグ管理）
+ * - 同意しない場合 アプリend
+ * - 重要な法的情報 ため、スクロール可能 
  */
 @Composable
 fun DisclaimerDialog(
-    onAccept: () -> Unit,
-    onDecline: () -> Unit,
-    modifier: Modifier = Modifier
+ onAccept: () -> Unit,
+ onDecline: () -> Unit,
+ modifier: Modifier = Modifier
 ) {
-    AlertDialog(
-        onDismissRequest = { /* ダイアログ外タップ無効 */ },
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = null,
-                tint = Color(0xFFFF9800) // Orange warning
-            )
-        },
-        title = {
-            Text(
-                text = "重要な法的通知",
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Bold
-                )
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Text(
-                    text = "本アプリケーションはValve Corporationと提携、承認、または推奨されていません。",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = MaterialTheme.colorScheme.error
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Steam®、Steamロゴ、Steam Deck™、および関連するマークは、" +
-                            "米国およびその他の国におけるValve Corporationの商標および/または" +
-                            "登録商標です。",
-                    style = MaterialTheme.typography.bodySmall
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "本アプリを使用することで、以下を認識したとみなされます:",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val risks = listOf(
-                    "これは非公式のサードパーティアプリケーションです",
-                    "Steam利用規約に違反する可能性があります",
-                    "Steamアカウントが停止またはBANされる可能性があります",
-                    "全てのリスクはユーザー自身が負うものとします"
-                )
-
-                risks.forEach { risk ->
-                    Text(
-                        text = "• $risk",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 8.dp, top = 4.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "本アプリは「現状のまま」提供され、いかなる保証もありません。",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onAccept,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error
-                )
-            ) {
-                Text("リスクを理解し同意します")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDecline) {
-                Text("同意しない")
-            }
-        },
-        modifier = modifier
+ AlertDialog(
+  onDismissRequest = { /* ダイアログ外タップ無効 */ },
+  icon = {
+   Icon(
+    imageVector = Icons.Default.Warning,
+    contentDescription = null,
+    tint = Color(0xFFFF9800) // Orange warning
+   )
+  },
+  title = {
+   Text(
+    text = "重要な法的通知",
+    style = MaterialTheme.typography.headlineSmall.copy(
+     fontWeight = FontWeight.Bold
     )
+   )
+  },
+  text = {
+   Column(
+    modifier = Modifier
+     .fillMaxWidth()
+     .verticalScroll(rememberScrollState())
+   ) {
+    Text(
+     text = "本アプリケーション Valve Corporation 提携、承認、また 推奨されていません。",
+     style = MaterialTheme.typography.bodyMedium.copy(
+      fontWeight = FontWeight.Bold
+     ),
+     color = MaterialTheme.colorScheme.error
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    Text(
+     text = "Steam®、Steamロゴ、Steam Deck™、および関連doマーク 、" +
+       "米国およびそ 他 国 おけるValve Corporation 商標および/また " +
+       "登録商標 す。",
+     style = MaterialTheme.typography.bodySmall
+    )
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    Text(
+     text = "本アプリusedoこ 、以下認識した みなされます:",
+     style = MaterialTheme.typography.bodyMedium.copy(
+      fontWeight = FontWeight.Bold
+     )
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    val risks = listOf(
+     "これ 非公式 サードパーティアプリケーション す",
+     "Steam利用規約 違反do可能性 あります",
+     "Steamアカウント stopまた BANされる可能性 あります",
+     "全て リスク ユーザー自身 負うも します"
+    )
+
+    risks.forEach { risk ->
+     Text(
+      text = "• $risk",
+      style = MaterialTheme.typography.bodySmall,
+      modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+     )
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    Text(
+     text = "本アプリ 「現状 まま」提供され、いかなる保証もありません。",
+     style = MaterialTheme.typography.bodySmall.copy(
+      fontWeight = FontWeight.Bold
+     )
+    )
+   }
+  },
+  confirmButton = {
+   Button(
+    onClick = onAccept,
+    colors = ButtonDefaults.buttonColors(
+     containerColor = MaterialTheme.colorScheme.error
+    )
+   ) {
+    Text("リスク理解し同意します")
+   }
+  },
+  dismissButton = {
+   TextButton(onClick = onDecline) {
+    Text("同意しない")
+   }
+  },
+  modifier = modifier
+ )
 }

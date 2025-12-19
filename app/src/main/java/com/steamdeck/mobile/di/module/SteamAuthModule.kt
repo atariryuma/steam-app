@@ -17,7 +17,7 @@ import okhttp3.OkHttpClient
 import javax.inject.Singleton
 
 /**
- * Steamモジュール
+ * Steammodule
  *
  * Best Practice: Hilt dependency injection
  * Reference: https://developer.android.com/training/dependency-injection/hilt-android
@@ -26,81 +26,81 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object SteamAuthModule {
 
-    /**
-     * Steam Installer Service
-     *
-     * Steamインストーラーのダウンロード・検証を管理します
-     */
-    @Provides
-    @Singleton
-    fun provideSteamInstallerService(
-        @ApplicationContext context: Context,
-        downloadManager: DownloadManager,
-        database: SteamDeckDatabase,
-        okHttpClient: OkHttpClient
-    ): SteamInstallerService {
-        return SteamInstallerService(
-            context = context,
-            downloadManager = downloadManager,
-            database = database,
-            okHttpClient = okHttpClient
-        )
-    }
+ /**
+  * Steam Installer Service
+  *
+  * Steamインストーラー download・verify管理します
+  */
+ @Provides
+ @Singleton
+ fun provideSteamInstallerService(
+  @ApplicationContext context: Context,
+  downloadManager: DownloadManager,
+  database: SteamDeckDatabase,
+  okHttpClient: OkHttpClient
+ ): SteamInstallerService {
+  return SteamInstallerService(
+   context = context,
+   downloadManager = downloadManager,
+   database = database,
+   okHttpClient = okHttpClient
+  )
+ }
 
-    /**
-     * Steam Setup Manager
-     *
-     * Winlatorコンテナ内でのSteamインストールを管理します
-     */
-    @Provides
-    @Singleton
-    fun provideSteamSetupManager(
-        @ApplicationContext context: Context,
-        winlatorEmulator: WinlatorEmulator,
-        steamInstallerService: SteamInstallerService,
-        database: SteamDeckDatabase
-    ): SteamSetupManager {
-        return SteamSetupManager(
-            context = context,
-            winlatorEmulator = winlatorEmulator,
-            steamInstallerService = steamInstallerService,
-            database = database
-        )
-    }
+ /**
+  * Steam Setup Manager
+  *
+  * Winlatorコンテナ内 Steaminstallation管理します
+  */
+ @Provides
+ @Singleton
+ fun provideSteamSetupManager(
+  @ApplicationContext context: Context,
+  winlatorEmulator: WinlatorEmulator,
+  steamInstallerService: SteamInstallerService,
+  database: SteamDeckDatabase
+ ): SteamSetupManager {
+  return SteamSetupManager(
+   context = context,
+   winlatorEmulator = winlatorEmulator,
+   steamInstallerService = steamInstallerService,
+   database = database
+  )
+ }
 
-    /**
-     * Steam Launcher
-     *
-     * Steam Client経由でゲームを起動します
-     */
-    @Provides
-    @Singleton
-    fun provideSteamLauncher(
-        @ApplicationContext context: Context,
-        winlatorEmulator: WinlatorEmulator,
-        database: SteamDeckDatabase
-    ): SteamLauncher {
-        return SteamLauncher(
-            context = context,
-            winlatorEmulator = winlatorEmulator,
-            database = database
-        )
-    }
+ /**
+  * Steam Launcher
+  *
+  * Steam Clientvia gamelaunchします
+  */
+ @Provides
+ @Singleton
+ fun provideSteamLauncher(
+  @ApplicationContext context: Context,
+  winlatorEmulator: WinlatorEmulator,
+  database: SteamDeckDatabase
+ ): SteamLauncher {
+  return SteamLauncher(
+   context = context,
+   winlatorEmulator = winlatorEmulator,
+   database = database
+  )
+ }
 
-    /**
-     * Proton Manager
-     *
-     * Steam Play (Proton) の設定を管理します
-     */
-    @Provides
-    @Singleton
-    fun provideProtonManager(
-        @ApplicationContext context: Context,
-        database: SteamDeckDatabase
-    ): ProtonManager {
-        return ProtonManager(
-            context = context,
-            database = database
-        )
-    }
+ /**
+  * Proton Manager
+  *
+  * Steam Play (Proton) settings管理します
+  */
+ @Provides
+ @Singleton
+ fun provideProtonManager(
+  @ApplicationContext context: Context,
+  database: SteamDeckDatabase
+ ): ProtonManager {
+  return ProtonManager(
+   context = context,
+   database = database
+  )
+ }
 }

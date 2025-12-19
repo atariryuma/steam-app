@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ダウンロード画面のViewModel
+ * download画面 ViewModel
  *
  * Best Practices:
  * - StateFlow for UI state management
@@ -25,124 +25,124 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class DownloadViewModel @Inject constructor(
-    private val downloadManager: DownloadManager,
-    private val downloadDao: DownloadDao
+ private val downloadManager: DownloadManager,
+ private val downloadDao: DownloadDao
 ) : ViewModel() {
 
-    /**
-     * 全ダウンロード一覧（リアルタイム更新）
-     */
-    val downloads: StateFlow<List<DownloadEntity>> = downloadDao.getAllDownloads()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+ /**
+  * 全downloadlist（リアルタイム更新）
+  */
+ val downloads: StateFlow<List<DownloadEntity>> = downloadDao.getAllDownloads()
+  .stateIn(
+   scope = viewModelScope,
+   started = SharingStarted.WhileSubscribed(5000),
+   initialValue = emptyList()
+  )
 
-    /**
-     * 進行中ダウンロード数
-     */
-    val activeDownloads: StateFlow<Int> = downloads
-        .map { list ->
-            list.count { download ->
-                download.status == DownloadStatus.DOWNLOADING ||
-                        download.status == DownloadStatus.PENDING
-            }
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = 0
-        )
+ /**
+  * 進行indownload数
+  */
+ val activeDownloads: StateFlow<Int> = downloads
+  .map { list ->
+   list.count { download ->
+    download.status == DownloadStatus.DOWNLOADING ||
+      download.status == DownloadStatus.PENDING
+   }
+  }
+  .stateIn(
+   scope = viewModelScope,
+   started = SharingStarted.WhileSubscribed(5000),
+   initialValue = 0
+  )
 
-    /**
-     * ダウンロード一時停止
-     */
-    fun pauseDownload(downloadId: Long) {
-        viewModelScope.launch {
-            downloadManager.pauseDownload(downloadId)
-        }
-    }
+ /**
+  * download一時stop
+  */
+ fun pauseDownload(downloadId: Long) {
+  viewModelScope.launch {
+   downloadManager.pauseDownload(downloadId)
+  }
+ }
 
-    /**
-     * ダウンロード再開
-     */
-    fun resumeDownload(downloadId: Long) {
-        viewModelScope.launch {
-            downloadManager.resumeDownload(downloadId)
-        }
-    }
+ /**
+  * download再開
+  */
+ fun resumeDownload(downloadId: Long) {
+  viewModelScope.launch {
+   downloadManager.resumeDownload(downloadId)
+  }
+ }
 
-    /**
-     * ダウンロードキャンセル
-     */
-    fun cancelDownload(downloadId: Long) {
-        viewModelScope.launch {
-            downloadManager.cancelDownload(downloadId)
-        }
-    }
+ /**
+  * downloadcancel
+  */
+ fun cancelDownload(downloadId: Long) {
+  viewModelScope.launch {
+   downloadManager.cancelDownload(downloadId)
+  }
+ }
 
-    /**
-     * ダウンロード再試行
-     */
-    fun retryDownload(downloadId: Long) {
-        viewModelScope.launch {
-            // Retry logic: resume download
-            downloadManager.resumeDownload(downloadId)
-        }
-    }
+ /**
+  * downloadretry
+  */
+ fun retryDownload(downloadId: Long) {
+  viewModelScope.launch {
+   // Retry logic: resume download
+   downloadManager.resumeDownload(downloadId)
+  }
+ }
 
-    /**
-     * 完了済みダウンロードをクリア
-     */
-    fun clearCompleted() {
-        viewModelScope.launch {
-            val completedDownloads = downloads.value.filter { it.status == DownloadStatus.COMPLETED }
-            completedDownloads.forEach { download ->
-                downloadDao.deleteDownload(download.id)
-            }
-        }
-    }
+ /**
+  * 完了済みdownloadクリア
+  */
+ fun clearCompleted() {
+  viewModelScope.launch {
+   val completedDownloads = downloads.value.filter { it.status == DownloadStatus.COMPLETED }
+   completedDownloads.forEach { download ->
+    downloadDao.deleteDownload(download.id)
+   }
+  }
+ }
 
-    /**
-     * ダウンロード開始（外部から呼び出し用）
-     */
-    fun startDownload(
-        url: String,
-        fileName: String,
-        destinationPath: String,
-        gameId: Long? = null
-    ) {
-        viewModelScope.launch {
-            val currentTime = System.currentTimeMillis()
+ /**
+  * downloadstart（外部 from 呼び出し用）
+  */
+ fun startDownload(
+  url: String,
+  fileName: String,
+  destinationPath: String,
+  gameId: Long? = null
+ ) {
+  viewModelScope.launch {
+   val currentTime = System.currentTimeMillis()
 
-            // Insert download record
-            val downloadId = downloadDao.insertDownload(
-                DownloadEntity(
-                    id = 0, // Auto-generated
-                    gameId = gameId,
-                    fileName = fileName,
-                    url = url,
-                    status = DownloadStatus.PENDING,
-                    downloadedBytes = 0L,
-                    totalBytes = 0L,
-                    speedBytesPerSecond = 0L,
-                    destinationPath = destinationPath,
-                    startedTimestamp = currentTime,
-                    createdAt = currentTime,
-                    updatedAt = currentTime,
-                    completedTimestamp = null,
-                    errorMessage = null
-                )
-            )
+   // Insert download record
+   val downloadId = downloadDao.insertDownload(
+    DownloadEntity(
+     id = 0, // Auto-generated
+     gameId = gameId,
+     fileName = fileName,
+     url = url,
+     status = DownloadStatus.PENDING,
+     downloadedBytes = 0L,
+     totalBytes = 0L,
+     speedBytesPerSecond = 0L,
+     destinationPath = destinationPath,
+     startedTimestamp = currentTime,
+     createdAt = currentTime,
+     updatedAt = currentTime,
+     completedTimestamp = null,
+     errorMessage = null
+    )
+   )
 
-            // Start WorkManager download
-            downloadManager.startDownload(
-                downloadId = downloadId,
-                url = url,
-                destinationPath = destinationPath,
-                fileName = fileName
-            )
-        }
-    }
+   // Start WorkManager download
+   downloadManager.startDownload(
+    downloadId = downloadId,
+    url = url,
+    destinationPath = destinationPath,
+    fileName = fileName
+   )
+  }
+ }
 }

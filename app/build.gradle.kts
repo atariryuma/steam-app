@@ -172,6 +172,9 @@ dependencies {
     // Security
     implementation(libs.androidx.security.crypto)
 
+    // Browser (Custom Tabs for OAuth/OpenID - RFC 8252 best practices)
+    implementation(libs.androidx.browser)
+
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)

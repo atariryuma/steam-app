@@ -15,10 +15,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Steam OpenIDLoginViewModel（規約準拠版）
+ * Steam OpenIDログインViewModel（規約準拠版）
  *
  * ⚠️ 変更内容:
- * - QRコードLogindelete（Steam規約違反リスク ため）
+ * - QRコードログインdelete（Steam規約違反リスク ため）
  * - Steam OpenID 2.0authentication 移行（Valve公式推奨）
  *
  * Best Practices:
@@ -40,8 +40,10 @@ class SteamLoginViewModel @Inject constructor(
 
  companion object {
   private const val TAG = "SteamLoginVM"
-  private const val CALLBACK_URL = "steamdeckmobile://auth/callback"
-  private const val REALM = "steamdeckmobile://"
+  // Use oob (out-of-band) callback - WebView intercepts before network request
+  // This is the safest approach for mobile apps without running a server
+  private const val CALLBACK_URL = "http://127.0.0.1:8080/auth/callback"
+  private const val REALM = "http://127.0.0.1:8080/"
  }
 
  private val _uiState = MutableStateFlow<SteamLoginUiState>(SteamLoginUiState.Initial)
@@ -87,7 +89,7 @@ class SteamLoginViewModel @Inject constructor(
    val expectedState = currentState
    if (expectedState == null) {
     _uiState.update {
-     SteamLoginUiState.Error("authenticationセッション Disabled す。もう一度Loginplease。")
+     SteamLoginUiState.Error("Authentication session is invalid. Please login again.")
     }
     return@launch
    }
@@ -108,14 +110,14 @@ class SteamLoginViewModel @Inject constructor(
     AppLogger.w(TAG, "Failed to extract SteamID from callback: $callbackUrl")
 
     _uiState.update {
-     SteamLoginUiState.Error("authentication failed。SteamIDretrieve きません した。")
+     SteamLoginUiState.Error("Authentication failed. Could not retrieve Steam ID.")
     }
    }
   }
  }
 
  /**
-  * Error状態クリア
+  * エラー状態クリア
   */
  fun clearError() {
   _uiState.update { SteamLoginUiState.Initial }

@@ -1,12 +1,16 @@
 package com.steamdeck.mobile.domain.usecase
 
+import android.content.Context
 import com.steamdeck.mobile.core.error.AppError
 import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.result.DataResult
+import com.steamdeck.mobile.data.mapper.SteamGameMapper
+import com.steamdeck.mobile.data.remote.steam.SteamRepository
 import com.steamdeck.mobile.domain.error.SteamSyncError
 import com.steamdeck.mobile.domain.repository.GameRepository
 import com.steamdeck.mobile.domain.repository.ISecurePreferences
 import com.steamdeck.mobile.domain.repository.ISteamRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -28,7 +32,9 @@ import javax.inject.Inject
  * - No Android dependencies in domain layer (no Context)
  */
 class SyncSteamLibraryUseCase @Inject constructor(
+ @ApplicationContext private val context: Context,
  private val steamRepository: ISteamRepository,
+ private val steamRepositoryImpl: SteamRepository,
  private val gameRepository: GameRepository,
  private val securePreferences: ISecurePreferences
 ) {
@@ -50,8 +56,8 @@ class SyncSteamLibraryUseCase @Inject constructor(
 
    AppLogger.d(TAG, "Using user-provided API Key for Steam ID: $steamId")
 
-   // Steam APIfromgamelistretrieve
-   val steamGamesResult = steamRepository.getUserLibrary(steamId, apiKey)
+   // Steam APIfromgamelistretrieve (use direct repository to get SteamGame objects)
+   val steamGamesResult = steamRepositoryImpl.getOwnedGames(apiKey, steamId)
    if (steamGamesResult.isFailure) {
     val error = steamGamesResult.exceptionOrNull()
     AppLogger.e(TAG, "GetOwnedGames failed for Steam ID: $steamId", error)
@@ -63,23 +69,34 @@ class SyncSteamLibraryUseCase @Inject constructor(
 
    AppLogger.d(TAG, "Successfully fetched games from Steam API")
 
-   val games = steamGamesResult.getOrNull() ?: emptyList()
-   if (games.isEmpty()) {
+   val steamGames = steamGamesResult.getOrNull() ?: emptyList()
+   if (steamGames.isEmpty()) {
     AppLogger.i(TAG, "No games found for Steam ID: $steamId")
     return DataResult.Success(0)
    }
 
    // 並列processing game同期（高速化）
    val syncedCount = coroutineScope {
-    val syncJobs = games.mapIndexed { index, game ->
+    val syncJobs = steamGames.mapIndexed { index, steamGame ->
      async {
       try {
+       // Download game images
+       val imagesDir = context.getExternalFilesDir("game_images")
+       val iconPath = downloadGameIcon(steamGame, imagesDir?.absolutePath ?: "")
+       val bannerPath = downloadGameBanner(steamGame, imagesDir?.absolutePath ?: "")
+
+       // Convert to domain model with image paths
+       val game = SteamGameMapper.toDomain(steamGame).copy(
+        iconPath = iconPath,
+        bannerPath = bannerPath
+       )
+
        // gameDB add
        gameRepository.insertGame(game)
-       AppLogger.d(TAG, "Synced [${index + 1}/${games.size}]: ${game.name}")
+       AppLogger.d(TAG, "Synced [${index + 1}/${steamGames.size}]: ${game.name}")
        true
       } catch (e: Exception) {
-       AppLogger.e(TAG, "Failed to sync game: ${game.name}", e)
+       AppLogger.e(TAG, "Failed to sync game: ${steamGame.name}", e)
        false
       }
      }
@@ -90,12 +107,56 @@ class SyncSteamLibraryUseCase @Inject constructor(
     results.count { it }
    }
 
-   AppLogger.i(TAG, "Sync completed - $syncedCount/${games.size} games synced successfully")
+   AppLogger.i(TAG, "Sync completed - $syncedCount/${steamGames.size} games synced successfully")
    DataResult.Success(syncedCount)
 
   } catch (e: Exception) {
    AppLogger.e(TAG, "Sync failed with exception", e)
    DataResult.Error(AppError.from(e))
+  }
+ }
+
+ /**
+  * Download game icon image
+  */
+ private suspend fun downloadGameIcon(steamGame: com.steamdeck.mobile.data.remote.steam.model.SteamGame, imagesDir: String): String? {
+  return try {
+   val iconUrl = steamGame.getHeaderUrl() // Use header image (460x215) for better quality
+   val iconFileName = "icon_${steamGame.appId}.jpg"
+   val iconPath = "$imagesDir/$iconFileName"
+
+   val result = steamRepositoryImpl.downloadGameImage(iconUrl, iconPath)
+   if (result.isSuccess) {
+    iconPath
+   } else {
+    AppLogger.w(TAG, "Failed to download icon for ${steamGame.name}")
+    null
+   }
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Exception downloading icon for ${steamGame.name}", e)
+   null
+  }
+ }
+
+ /**
+  * Download game banner image
+  */
+ private suspend fun downloadGameBanner(steamGame: com.steamdeck.mobile.data.remote.steam.model.SteamGame, imagesDir: String): String? {
+  return try {
+   val bannerUrl = steamGame.getLibraryAssetUrl() // Use library asset (600x900) for banner
+   val bannerFileName = "banner_${steamGame.appId}.jpg"
+   val bannerPath = "$imagesDir/$bannerFileName"
+
+   val result = steamRepositoryImpl.downloadGameImage(bannerUrl, bannerPath)
+   if (result.isSuccess) {
+    bannerPath
+   } else {
+    AppLogger.w(TAG, "Failed to download banner for ${steamGame.name}")
+    null
+   }
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Exception downloading banner for ${steamGame.name}", e)
+   null
   }
  }
 

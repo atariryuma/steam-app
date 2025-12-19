@@ -349,7 +349,7 @@ class FileImportRepositoryImpl @Inject constructor(
    emit(ImportProgress.Success(destFile.absolutePath))
   } catch (e: Exception) {
    Log.e(TAG, "Failed to import file", e)
-   emit(ImportProgress.Error("インポート failuredid: ${e.message}", e))
+   emit(ImportProgress.Error("Import failed: ${e.message}", e))
   }
  }.flowOn(Dispatchers.IO)
 

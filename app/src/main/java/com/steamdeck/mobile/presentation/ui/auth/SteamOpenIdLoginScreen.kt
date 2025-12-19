@@ -24,7 +24,7 @@ import androidx.compose.ui.viewinterop.AndroidView
  *
  * Valve公式 OpenID 2.0authenticationuse
  * - QRコードauthentication 異なり、規約準拠 安全な方法
- * - WebView steamcommunity.com 公式Loginページ表示
+ * - WebView steamcommunity.com 公式ログインページ表示
  * - コールバックURL SteamID64retrieve
  *
  * 公式ドキュメント:
@@ -32,14 +32,14 @@ import androidx.compose.ui.viewinterop.AndroidView
  * - https://steamcommunity.com/dev
  *
  * Best Practice:
- * - JavaScriptEnabled化（SteamLoginフォーム動作 必要）
- * - DOM StorageEnabled化（セッション管理）
+ * - JavaScript有効化（Steamログインフォーム動作 必要）
+ * - DOM Storage有効化（セッション管理）
  * - リダイレクトインターセプトしてコールバック処理
  */
 @Composable
 fun SteamOpenIdLoginScreen(
  authUrl: String,
- callbackScheme: String = "steamdeckmobile",
+ callbackUrl: String = "http://127.0.0.1:8080/auth/callback",
  onAuthCallback: (String) -> Unit,
  onError: (String) -> Unit = {}
 ) {
@@ -56,7 +56,7 @@ fun SteamOpenIdLoginScreen(
    factory = { context ->
     WebView(context).apply {
      settings.apply {
-      javaScriptEnabled = true // SteamLoginフォーム 必要
+      javaScriptEnabled = true // Steamログインフォーム 必要
       domStorageEnabled = true // セッション管理
       setSupportMultipleWindows(false)
       loadWithOverviewMode = true
@@ -69,11 +69,15 @@ fun SteamOpenIdLoginScreen(
        request: WebResourceRequest?
       ): Boolean {
        val url = request?.url.toString()
+       android.util.Log.d("SteamOpenIdLogin", "URL redirect: $url")
 
-       // コールバックURL 検出
-       if (url.startsWith("$callbackScheme://")) {
+       // コールバックURL 検出 (localhost/127.0.0.1 callback interception)
+       // Check both localhost and 127.0.0.1 for compatibility
+       if (url.contains("127.0.0.1:8080/auth/callback") ||
+           url.contains("localhost:8080/auth/callback")) {
+        android.util.Log.i("SteamOpenIdLogin", "✅ Callback detected: $url")
         onAuthCallback(url)
-        return true
+        return true // Prevent WebView from trying to load localhost
        }
 
        return false
@@ -91,7 +95,7 @@ fun SteamOpenIdLoginScreen(
        failingUrl: String?
       ) {
        super.onReceivedError(view, errorCode, description, failingUrl)
-       onError("ページ読み込みError: $description")
+       onError("ページ読み込みエラー: $description")
       }
      }
 

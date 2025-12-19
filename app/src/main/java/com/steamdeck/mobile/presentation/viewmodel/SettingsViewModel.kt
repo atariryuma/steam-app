@@ -57,20 +57,39 @@ class SettingsViewModel @Inject constructor(
  init {
   loadSettings()
   checkSteamInstallation()
-  // autoConfigureDevApiKey() - REMOVED for security (no hardcoded API keys)
+  autoConfigureDevApiKey() // Auto-configure API key from BuildConfig for development
  }
 
  /**
-  * REMOVED: Development API Key Auto-Configuration
+  * Development API Key Auto-Configuration
   *
-  * Security Note: Hardcoded API keys were removed to prevent extraction via APK decompilation.
-  * Users must obtain their own Steam Web API Key from https://steamcommunity.com/dev/apikey
-  * and enter it manually in the settings.
+  * Automatically configures Steam API Key from BuildConfig for development builds
+  * if the user hasn't set one yet.
   *
-  * For development testing, use local.properties (not committed to git):
-  * - Add: DEV_STEAM_API_KEY=your_key_here
-  * - Access via BuildConfig if needed for local testing only
+  * Security Note:
+  * - DEV_STEAM_API_KEY is loaded from local.properties (not committed to git)
+  * - Only available in debug builds
+  * - For production, users must obtain their own API key from:
+  *   https://steamcommunity.com/dev/apikey
   */
+ private fun autoConfigureDevApiKey() {
+  viewModelScope.launch {
+   try {
+    val existingKey = securePreferences.getSteamApiKey()
+    if (existingKey.isNullOrBlank()) {
+     val devKey = com.steamdeck.mobile.BuildConfig.DEV_STEAM_API_KEY
+     if (devKey.isNotBlank()) {
+      securePreferences.saveSteamApiKey(devKey)
+      AppLogger.d(TAG, "Auto-configured development API key from BuildConfig")
+     } else {
+      AppLogger.w(TAG, "DEV_STEAM_API_KEY not found in BuildConfig. Add to local.properties: STEAM_API_KEY=your_key")
+     }
+    }
+   } catch (e: Exception) {
+    AppLogger.e(TAG, "Failed to auto-configure API key", e)
+   }
+  }
+ }
 
  /**
   * settingsデータロード
@@ -131,11 +150,11 @@ class SettingsViewModel @Inject constructor(
 
    if (steamId.isNullOrBlank()) {
     AppLogger.w(TAG, "Sync attempted without Steam ID")
-    _syncState.value = SyncState.Error("Steam ID not found。QRコード Loginplease。")
+    _syncState.value = SyncState.Error("Steam ID not found. Please login.")
     return@launch
    }
 
-   _syncState.value = SyncState.Syncing(progress = 0f, message = "Syncstartしています...")
+   _syncState.value = SyncState.Syncing(progress = 0f, message = "Starting sync...")
    AppLogger.i(TAG, "Starting library sync for Steam ID: $steamId")
 
    // DataResult<Int>useした型安全なErrorハンドリング
@@ -156,7 +175,7 @@ class SettingsViewModel @Inject constructor(
      // 進捗Update（将来的 ProgressBar 対応）
      _syncState.value = SyncState.Syncing(
       progress = result.progress ?: 0f,
-      message = "Syncin..."
+      message = "Syncing..."
      )
     }
    }

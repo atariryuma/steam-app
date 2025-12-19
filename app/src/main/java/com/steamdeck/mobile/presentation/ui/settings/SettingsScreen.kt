@@ -450,11 +450,11 @@ private fun SteamAuthContent(
   ) {
    SteamOpenIdLoginScreen(
     authUrl = authUrl,
-    callbackScheme = "steamdeckmobile",
-    onAuthCallback = { callbackUrl -> 
+    callbackUrl = "http://127.0.0.1:8080/auth/callback",
+    onAuthCallback = { callbackUrl ->
      steamLoginViewModel.handleCallback(callbackUrl)
     },
-    onError = { errorMessage -> 
+    onError = { errorMessage ->
      android.util.Log.e("SteamAuth", "OpenID error: $errorMessage")
     }
    )

@@ -45,7 +45,7 @@ fun ControllerSettingsScreen(
  var showDeleteConfirmation by remember { mutableStateOf<ControllerProfile?>(null) }
 
  Column(modifier = Modifier.fillMaxSize()) {
-  // BackboneOne風customヘッダー
+  // BackboneOne-style custom header
   Row(
    modifier = Modifier
     .fillMaxWidth()
@@ -65,7 +65,7 @@ fun ControllerSettingsScreen(
      )
     }
     Text(
-     text = "controllersettings",
+     text = "Controller Settings",
      style = MaterialTheme.typography.headlineMedium,
      fontWeight = FontWeight.Bold,
      color = MaterialTheme.colorScheme.primary
@@ -81,7 +81,7 @@ fun ControllerSettingsScreen(
    }
   }
 
-  // コンテンツエリア
+  // Content area
   Box(modifier = Modifier.fillMaxSize()) {
    when {
     uiState is ControllerUiState.Loading -> {
@@ -340,7 +340,7 @@ private fun ControllerCard(
    if (isActive) {
     Icon(
      Icons.Default.Check,
-     contentDescription = "アクティブ",
+     contentDescription = "Active",
      tint = MaterialTheme.colorScheme.primary
     )
    }
@@ -459,7 +459,7 @@ private fun ProfileCard(
    }
 
    IconButton(onClick = onDelete) {
-    Icon(Icons.Default.Delete, contentDescription = "delete")
+    Icon(Icons.Default.Delete, contentDescription = "Delete")
    }
   }
  }
@@ -484,7 +484,7 @@ private fun ProfileEditorDialog(
    ) {
     item {
      Text(
-      "ボタンマッピング",
+      "Button Mapping",
       style = MaterialTheme.typography.titleSmall,
       fontWeight = FontWeight.Bold
      )
@@ -502,7 +502,7 @@ private fun ProfileEditorDialog(
 
     item {
      Text(
-      "Vibrationsettings",
+      "Vibration Settings",
       style = MaterialTheme.typography.titleSmall,
       fontWeight = FontWeight.Bold
      )
@@ -514,7 +514,7 @@ private fun ProfileEditorDialog(
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically
      ) {
-      Text("VibrationEnabled化")
+      Text("Enable Vibration")
       Switch(
        checked = profile.vibrationEnabled,
        onCheckedChange = onUpdateVibration
@@ -528,7 +528,7 @@ private fun ProfileEditorDialog(
 
     item {
      Text(
-      "Deadzonesettings",
+      "Deadzone Settings",
       style = MaterialTheme.typography.titleSmall,
       fontWeight = FontWeight.Bold
      )
@@ -552,12 +552,12 @@ private fun ProfileEditorDialog(
   },
   confirmButton = {
    Button(onClick = onSave) {
-    Text("save")
+    Text("Save")
    }
   },
   dismissButton = {
    TextButton(onClick = onDismiss) {
-    Text("cancel")
+    Text("Cancel")
    }
   }
  )
@@ -587,7 +587,7 @@ private fun ErrorMessage(
    color = MaterialTheme.colorScheme.error
   )
   Button(onClick = onRetry) {
-   Text("retry")
+   Text("Retry")
   }
  }
 }
@@ -601,18 +601,18 @@ private fun NoControllersMessage(modifier: Modifier = Modifier) {
  ) {
   Icon(
    Icons.Default.Info,
-   contentDescription = "情報",
+   contentDescription = "Info",
    modifier = Modifier.size(64.dp),
    tint = MaterialTheme.colorScheme.outline
   )
   Text(
-   text = "controller 検出されません した",
+   text = "No controller detected",
    style = MaterialTheme.typography.titleLarge,
    fontWeight = FontWeight.Bold,
    color = MaterialTheme.colorScheme.outline
   )
   Text(
-   text = "controllerconnectionして「Update」ボタンタップplease",
+   text = "Connect a controller and tap the Update button",
    style = MaterialTheme.typography.bodyMedium,
    color = MaterialTheme.colorScheme.onSurfaceVariant
   )

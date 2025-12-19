@@ -202,7 +202,7 @@ private fun CompactStatusRow(uiState: WineTestUiState) {
     Text(
      text = when (uiState) {
       is WineTestUiState.Idle -> "Ready"
-      is WineTestUiState.Testing -> "実行in..."
+      is WineTestUiState.Testing -> "Running..."
       is WineTestUiState.Success -> "Available"
       is WineTestUiState.Error -> "Error"
      },

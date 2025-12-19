@@ -133,7 +133,7 @@ private fun EmptyDownloadsPlaceholder() {
   ) {
    Icon(
     imageVector = Icons.Default.Info,
-    contentDescription = "情報",
+    contentDescription = "Info",
     modifier = Modifier.size(64.dp),
     tint = MaterialTheme.colorScheme.outline
    )
@@ -274,7 +274,7 @@ private fun DownloadItem(
       TextButton(onClick = onRetry) {
        Icon(Icons.Default.Refresh, contentDescription = "retry")
        Spacer(modifier = Modifier.width(4.dp))
-       Text("retry")
+       Text("Retry")
       }
       IconButton(onClick = onCancel) {
        Icon(Icons.Default.Delete, contentDescription = "delete")

@@ -30,7 +30,7 @@ import com.steamdeck.mobile.presentation.viewmodel.LaunchState
 import com.steamdeck.mobile.presentation.viewmodel.SteamLaunchState
 
 /**
- * game詳細画面 - BackboneOnestyle design
+ * Game Details画面 - BackboneOnestyle design
  *
  * Best Practices:
  * - No TopAppBar for immersive full-screen experience
@@ -60,7 +60,7 @@ fun GameDetailScreen(
  var launchErrorMessage by remember { mutableStateOf("") }
  var steamLaunchErrorMessage by remember { mutableStateOf("") }
 
- // game詳細読み込み
+ // Game Details読み込み
  LaunchedEffect(gameId) {
   viewModel.loadGame(gameId)
  }
@@ -516,7 +516,7 @@ fun LaunchErrorDialog(
 ) {
  AlertDialog(
   onDismissRequest = onDismiss,
-  icon = { Icon(Icons.Default.Info, contentDescription = "情報") },
+  icon = { Icon(Icons.Default.Info, contentDescription = "Info") },
   title = { Text("gamelaunch きません") },
   text = { Text(message) },
   confirmButton = {
@@ -720,7 +720,7 @@ fun SplitLaunchButton(
     DropdownMenuItem(
      text = {
       Column {
-       Text("Steam Clientopen")
+       Text("Open Steam Client")
        if (!isSteamInstalled) {
         Text(
          text = "(Not Installed)",

@@ -119,7 +119,7 @@ fun SteamDownloadDialog(
       Text("ファイルImport")
      }
      TextButton(onClick = onDismiss) {
-      Text("cancel")
+      Text("Cancel")
      }
     }
    }

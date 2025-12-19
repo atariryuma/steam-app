@@ -216,7 +216,7 @@ private fun SettingsNavigationRail(
   modifier = Modifier.fillMaxHeight(),
   containerColor = MaterialTheme.colorScheme.surfaceVariant,
   header = {
-   // returnボタン
+   // Back button
    IconButton(
     onClick = onNavigateBack,
     modifier = Modifier.padding(vertical = 8.dp)
@@ -231,7 +231,7 @@ private fun SettingsNavigationRail(
  ) {
   Spacer(modifier = Modifier.height(16.dp))
 
-  // Steamauthentication
+  // Steam Authentication
   NavigationRailItem(
    selected = selectedSection == 0,
    onClick = { onSectionSelected(0) },
@@ -257,27 +257,27 @@ private fun SettingsNavigationRail(
    label = { Text("Client") }
   )
 
-  // library sync
+  // Library Sync
   NavigationRailItem(
    selected = selectedSection == 2,
    onClick = { onSectionSelected(2) },
    icon = {
     Icon(
      imageVector = Icons.Default.Refresh,
-     contentDescription = "library"
+     contentDescription = "Library"
     )
    },
    label = { Text("Sync") }
   )
 
-  // controller
+  // Controller
   NavigationRailItem(
    selected = selectedSection == 3,
    onClick = { onSectionSelected(3) },
    icon = {
     Icon(
      imageVector = Icons.Default.SportsEsports,
-     contentDescription = "controller"
+     contentDescription = "Controller"
     )
    },
    label = { Text("Control") }
@@ -296,7 +296,7 @@ private fun SettingsNavigationRail(
    label = { Text("Wine") }
   )
 
-  // アプリsettings
+  // App Settings
   NavigationRailItem(
    selected = selectedSection == 5,
    onClick = { onSectionSelected(5) },

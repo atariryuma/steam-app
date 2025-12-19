@@ -777,19 +777,12 @@ class WinlatorEmulator @Inject constructor(
 
    put("WINEARCH", "win64")
    put("WINELOADERNOEXEC", "1")
-   put("WINESERVER", wineserverBinary.absolutePath)
+   put("WINESERVER", File(wineDir, "bin/wineserver_wrapper").absolutePath)
    put("WINEFSYNC", "0") // Disable FSync during initialization for stability
 
-   // Paths
+   // Paths - DO NOT set LD_LIBRARY_PATH here, as it breaks Android shell
+   // when running wineserver_wrapper. Box64 uses BOX64_LD_LIBRARY_PATH instead.
    put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}")
-   put(
-    "LD_LIBRARY_PATH",
-    "${rootfsDir.absolutePath}/lib:" +
-     "${rootfsDir.absolutePath}/usr/lib:" +
-     "${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu:" +
-     "${wineDir.absolutePath}/lib:" +
-     "${wineDir.absolutePath}/lib/wine/x86_64-unix"
-   )
    put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/x86_64-windows")
 
    // Box64 library paths (critical for Android dlopen restrictions)
@@ -928,6 +921,9 @@ class WinlatorEmulator @Inject constructor(
    )
   }
 
+  // Create wrappers for internal processes (wineserver)
+  createWrappers()
+
   Log.i(TAG, "Initializing Wine prefix: ${containerDir.absolutePath}")
   Log.i(TAG, "Using linker: ${linker.absolutePath}")
   Log.i(TAG, "Using box64: ${box64ToUse.absolutePath}")
@@ -938,9 +934,18 @@ class WinlatorEmulator @Inject constructor(
   )
 
   // Build command (same for all attempts)
+  // We use linker's --library-path instead of LD_LIBRARY_PATH because:
+  // 1. LD_LIBRARY_PATH breaks Android shell when running wineserver_wrapper
+  // 2. BOX64_LD_LIBRARY_PATH only works after Box64 starts
+  // 3. The linker itself needs library paths to load Box64's dependencies (libc.so.6, etc.)
+  val libraryPath = "${rootfsDir.absolutePath}/lib:" +
+   "${rootfsDir.absolutePath}/usr/lib:" +
+   "${rootfsDir.absolutePath}/usr/lib/aarch64-linux-gnu"
+
   val command = if (useWinebootBinary) {
    listOf(
     linker.absolutePath,
+    "--library-path", libraryPath,
     box64ToUse.absolutePath,
     winebootBinary.absolutePath,
     "-i"
@@ -948,6 +953,7 @@ class WinlatorEmulator @Inject constructor(
   } else {
    listOf(
     linker.absolutePath,
+    "--library-path", libraryPath,
     box64ToUse.absolutePath,
     wineBinary.absolutePath,
     winebootExe.absolutePath,
@@ -1133,7 +1139,7 @@ class WinlatorEmulator @Inject constructor(
    put("WINEDEBUG", "-all") // Silent - most stable for game execution
    put("WINEARCH", "win64")
    put("WINELOADERNOEXEC", "1")
-   put("WINESERVER", wineserverBinary.absolutePath)
+   put("WINESERVER", File(wineDir, "bin/wineserver_wrapper").absolutePath)
 
    // Graphics configuration
    when (config.directXWrapper) {
@@ -1335,6 +1341,33 @@ class WinlatorEmulator @Inject constructor(
    }
   } catch (e: Exception) {
    Log.w(TAG, "Could not copy Box64 to rootfs: ${e.message}")
+  }
+ }
+
+ private fun createWrappers() {
+  val linker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
+  if (!linker.exists()) {
+   Log.w(TAG, "Cannot create wrappers: linker not found at ${linker.absolutePath}")
+   return
+  }
+
+  // wineserver wrapper - explicitly invokes linker with Box64 to bypass hardcoded interpreter path
+  val wrapperDir = File(wineDir, "bin")
+  wrapperDir.mkdirs()
+  val wrapper = File(wrapperDir, "wineserver_wrapper")
+
+  val content = """
+   #!/system/bin/sh
+   unset LD_LIBRARY_PATH
+   exec ${linker.absolutePath} ${box64Binary.absolutePath} ${wineserverBinary.absolutePath} "${'$'}@"
+  """.trimIndent()
+
+  try {
+   wrapper.writeText(content)
+   wrapper.setExecutable(true, false)
+   Log.d(TAG, "Created/Updated wineserver wrapper at ${wrapper.absolutePath}")
+  } catch (e: Exception) {
+   Log.e(TAG, "Failed to create wineserver wrapper", e)
   }
  }
 

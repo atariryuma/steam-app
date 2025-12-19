@@ -153,7 +153,7 @@ fun ContainerScreen(
        color = MaterialTheme.colorScheme.error
       )
       Button(onClick = { viewModel.loadContainers() }) {
-       Text("retry")
+       Text("Retry")
       }
      }
     }
@@ -334,7 +334,7 @@ private fun CreateContainerDialog(
   },
   dismissButton = {
    TextButton(onClick = onDismiss) {
-    Text("cancel")
+    Text("Cancel")
    }
   }
  )
@@ -355,9 +355,9 @@ private fun DeleteContainerDialog(
     tint = MaterialTheme.colorScheme.error
    )
   },
-  title = { Text("Containerdelete") },
+  title = { Text("Delete Container") },
   text = {
-   Text("「$containerName」deleteしますか？\n\nこ 操作 取り消せません。")
+   Text("Delete \"$containerName\"?\n\nThis action cannot be undone.")
   },
   confirmButton = {
    Button(
@@ -366,12 +366,12 @@ private fun DeleteContainerDialog(
      containerColor = MaterialTheme.colorScheme.error
     )
    ) {
-    Text("delete")
+    Text("Delete")
    }
   },
   dismissButton = {
    TextButton(onClick = onDismiss) {
-    Text("cancel")
+    Text("Cancel")
    }
   }
  )

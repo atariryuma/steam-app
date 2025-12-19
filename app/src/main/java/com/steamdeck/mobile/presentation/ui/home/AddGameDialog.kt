@@ -141,7 +141,7 @@ fun AddGameDialog(
       .padding(24.dp),
      verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-     // game名入力カード
+     // Game Name入力カード
      Card(
       modifier = Modifier.fillMaxWidth(),
       colors = CardDefaults.cardColors(

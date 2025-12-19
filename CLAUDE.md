@@ -175,10 +175,52 @@ abstract class RepositoryModule {
 - Screens: `*Screen.kt`
 
 ### Build
+
+#### Build Stability (CRITICAL - READ FIRST)
+**ALWAYS use these commands for reliable builds:**
+
+```batch
+# Normal development build
+quick-build.bat
+
+# When changes don't reflect (stale code)
+clean-build.bat
+
+# When build hangs or errors persist
+restart-gradle.bat
+```
+
+**Build system configuration (gradle.properties):**
+- ❌ Configuration Cache **DISABLED** (KSP incompatibility with Gradle 8.7)
+- ❌ KSP incremental compilation **DISABLED** (Hilt/Room cache corruption)
+- ❌ Gradle build cache **DISABLED** (metadata inconsistency)
+- ✅ Gradle daemon **ENABLED** (performance, but restart via `gradlew.bat --stop` if unstable)
+
+**Root causes of build instability:**
+1. Configuration Cache + KSP (Hilt/Room) = cache corruption, stale generated code
+2. Gradle daemon memory leaks after long runtime (2GB heap + parallel builds)
+3. Incremental KSP builds leave outdated Hilt/Room metadata in `.gradle/caches/` and `.kotlin/`
+4. Windows file locking prevents proper cleanup during builds
+
+**When build fails or changes don't reflect:**
+1. Stop daemon: `gradlew.bat --stop`
+2. Clear caches: Delete `.gradle\caches\`, `.kotlin\`, `app\build\`
+3. Clean: `gradlew.bat clean --no-configuration-cache`
+4. Build: `gradlew.bat assembleDebug --no-configuration-cache`
+
+**NEVER manually enable:**
+- `org.gradle.configuration-cache=true` (breaks KSP)
+- `ksp.incremental=true` (causes stale code)
+- `org.gradle.caching=true` (metadata corruption)
+
+See `BUILD-STABILITY.md` for detailed troubleshooting.
+
+#### General Build Rules
 - Use version catalog: `libs.androidx.core.ktx`
 - Add deps to `gradle/libs.versions.toml` first
 - Release build: R8, shrinkResources, ProGuard
 - Target: <80MB APK (ARM64 only)
+- **Always** use `--no-configuration-cache` flag when running gradlew commands directly
 
 ## CURRENT STATE (git status)
 ```
@@ -309,6 +351,37 @@ Modified files (Steam ToS compliance refactoring - 2025-12-19)
 3. Document if major dependency
 4. Consider APK size impact
 
+### When Building
+**CRITICAL: Use provided batch scripts for stability**
+
+1. **Normal development build:**
+   ```batch
+   quick-build.bat
+   ```
+
+2. **When changes don't reflect (stale Hilt/Room code):**
+   ```batch
+   clean-build.bat
+   ```
+
+3. **When build hangs or daemon is unstable:**
+   ```batch
+   restart-gradle.bat
+   ```
+
+4. **Manual gradlew commands MUST include:**
+   - `--no-configuration-cache` flag (Configuration Cache breaks KSP)
+   - Example: `gradlew.bat assembleDebug --no-configuration-cache`
+
+5. **NEVER manually run:**
+   - `gradlew.bat` without `--no-configuration-cache` (causes stale code)
+   - Build commands without first reading Build Stability section above
+
+6. **If build fails or shows old code after changes:**
+   - Stop daemon: `gradlew.bat --stop`
+   - Delete: `.gradle\caches\`, `.kotlin\`, `app\build\`
+   - Run: `clean-build.bat`
+
 ### File Operations
 - ALWAYS use Read before Edit/Write
 - ALWAYS prefer Edit over Write for existing files
@@ -400,4 +473,4 @@ android {
 - Reference external docs where possible
 - Update as codebase evolves
 
-**Last updated**: 2025-12-19 (Added SELinux workaround documentation)
+**Last updated**: 2025-12-20 (Added build stability configuration and troubleshooting)

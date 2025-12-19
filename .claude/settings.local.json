@@ -125,7 +125,16 @@
       "Bash(for file in app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/ContainerViewModel.kt app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/ControllerViewModel.kt app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/GameDetailViewModel.kt app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/SettingsViewModel.kt app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/SteamLoginViewModel.kt app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/WineTestViewModel.kt app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/WinlatorInitViewModel.kt)",
       "Bash(do if ! grep -q \"import androidx.compose.runtime.Immutable\" \"$file\")",
       "Bash(then sed -i '1a import androidx.compose.runtime.Immutable' \"$file\")",
-      "Bash(fi)"
+      "Bash(fi)",
+      "Bash(timeout /t 15 /nobreak)",
+      "Bash(git reflog:*)",
+      "Bash(git restore:*)",
+      "Bash(call gradlew.bat clean assembleDebug)",
+      "Bash(timeout /t 30 /nobreak)",
+      "Bash(call C:/Projects/steam-app/build-apk.bat)",
+      "Bash(sort:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(git rm:*)"
     ]
   }
 }

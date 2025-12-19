@@ -340,6 +340,28 @@ class WinlatorEmulator @Inject constructor(
 
       // Setup hardcoded linker path now that rootfs is extracted
       setupHardcodedLinkerPath()
+      Log.d(TAG, "setupHardcodedLinkerPath() completed")
+
+      // CRITICAL FIX: Patch Box64 interpreter path
+      // Box64 was compiled with hardcoded interpreter: /data/data/com.winlator/files/rootfs/lib/ld-linux-aarch64.so.1
+      // We need to rewrite this to our actual linker location
+      // This allows posix_spawn to work correctly when Wine spawns wineserver
+      Log.d(TAG, "Starting Box64 interpreter path patch...")
+      val actualLinker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
+      Log.d(TAG, "actualLinker path: ${actualLinker.absolutePath}, exists: ${actualLinker.exists()}")
+      if (actualLinker.exists() && box64Binary.exists()) {
+       val patchResult = ElfPatcher.patchInterpreterPath(
+        box64Binary,
+        actualLinker.absolutePath
+       )
+       if (patchResult.isSuccess) {
+        Log.i(TAG, "Successfully patched Box64 interpreter path to: ${actualLinker.absolutePath}")
+       } else {
+        Log.w(TAG, "Failed to patch Box64 interpreter path: ${patchResult.exceptionOrNull()?.message}")
+       }
+      } else {
+       Log.w(TAG, "Skipping Box64 interpreter patch: linker=${actualLinker.exists()}, box64=${box64Binary.exists()}")
+      }
      }.onFailure { error ->
       Log.e(TAG, "Rootfs extraction failed: ${error.message}", error)
       return@withContext Result.failure(
@@ -351,6 +373,23 @@ class WinlatorEmulator @Inject constructor(
     Log.i(TAG, "Wine already extracted, skipping")
     // Ensure linker is setup even if rootfs was already extracted
     setupHardcodedLinkerPath()
+
+    // CRITICAL FIX: Patch Box64 interpreter path (also needed when Wine already extracted)
+    val actualLinker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
+    if (actualLinker.exists() && box64Binary.exists()) {
+     val patchResult = ElfPatcher.patchInterpreterPath(
+      box64Binary,
+      actualLinker.absolutePath
+     )
+     if (patchResult.isSuccess) {
+      Log.i(TAG, "Successfully patched Box64 interpreter path to: ${actualLinker.absolutePath}")
+     } else {
+      Log.w(TAG, "Failed to patch Box64 interpreter path: ${patchResult.exceptionOrNull()?.message}")
+     }
+    } else {
+     Log.w(TAG, "Skipping Box64 interpreter patch: linker=${actualLinker.exists()}, box64=${box64Binary.exists()}")
+    }
+
     progressCallback?.invoke(1.0f, "Wine already ready")
    }
 
@@ -772,17 +811,21 @@ class WinlatorEmulator @Inject constructor(
    put("LANG", "C")
    put("LC_ALL", "C")
 
-   // WINEDEBUG: Progressive verbosity based on attempt
-   // SEH (Structured Exception Handling) logs are critical for debugging crashes
+   // WINEDEBUG: Enhanced for maximum diagnostic capability
+   // Based on Wine troubleshooting best practices
    when (attemptNumber) {
-    0 -> put("WINEDEBUG", "+err,+seh")    // Errors + exception handling
-    1 -> put("WINEDEBUG", "+err,+seh,+module") // Add module loading info
-    else -> put("WINEDEBUG", "+err,+seh,+module,+relay") // Full diagnostics
+    0 -> put("WINEDEBUG", "+err,+seh,+loaddll,+process") // Core diagnostics
+    1 -> put("WINEDEBUG", "+err,+seh,+loaddll,+process,+module") // Add module info
+    else -> put("WINEDEBUG", "+all") // MAXIMUM: All Wine debug channels
    }
 
    put("WINEARCH", "win64")
    put("WINELOADERNOEXEC", "1")
-   put("WINESERVER", wineserverBinary.absolutePath)
+   // DO NOT set WINESERVER - let Wine find it via PATH
+   // Setting WINESERVER causes Box64 nested posix_spawn to fail with ENOENT
+   // Wine will search: $WINESERVER -> PATH -> hardcoded paths
+   // Box64 auto-wraps posix_spawn, so Wine will find wineserver via PATH
+   // put("WINESERVER", wineserverBinary.absolutePath)
    put("WINEFSYNC", "0") // Disable FSync during initialization for stability
 
    // Paths
@@ -816,8 +859,8 @@ class WinlatorEmulator @Inject constructor(
    // Box64 dynarec settings per attempt - each attempt gets more conservative
    when (attemptNumber) {
     0 -> {
-     // Attempt 1: MAXIMUM STABILITY preset (Winlator official STABILITY)
-     // These settings match Winlator's proven stable configuration
+     // Attempt 1: MAXIMUM STABILITY + DIAGNOSTIC MODE
+     // Based on Box64 Issue #1037 research and USAGE.md documentation
      put("BOX64_DYNAREC_SAFEFLAGS", "2")  // Full flag safety
      put("BOX64_DYNAREC_FASTNAN", "0")   // Accurate NaN handling
      put("BOX64_DYNAREC_FASTROUND", "0")  // Accurate rounding
@@ -827,14 +870,19 @@ class WinlatorEmulator @Inject constructor(
      put("BOX64_DYNAREC_FORWARD", "128")  // Conservative block forward
      put("BOX64_DYNAREC_CALLRET", "0")   // Disable call/ret optimization
      put("BOX64_DYNAREC_WAIT", "0")    // Winlator STABILITY setting
-     // REMOVED BOX64_DYNAREC_WEAKBARRIER - use Box64 default
-     put("BOX64_LOG", "2")      // INFO level logging
+
+     // CRITICAL DIAGNOSTIC ADDITIONS (based on research)
+     put("BOX64_TRACE", "1")      // ADDED: Instruction-level tracing for debugging
+     put("BOX64_PREFER_EMULATED", "1")  // ADDED: Avoid native/emulated library conflicts
+     put("BOX64_CRASHHANDLER", "0")   // ADDED: Use emulated crash handler for better diagnostics
+     put("BOX64_SHOWBT", "1")      // ADDED: Show backtrace on signals
+
+     put("BOX64_LOG", "3")       // UPGRADED: Maximum verbosity for diagnosis
      put("BOX64_SHOWSEGV", "1")    // Show segfault details
      put("BOX64_NOBANNER", "0")    // Show banner for diagnostics
     }
     1 -> {
-     // Attempt 2: COMPATIBILITY preset (Winlator official COMPATIBILITY)
-     // Slightly more conservative than STABILITY
+     // Attempt 2: COMPATIBILITY + ENHANCED DIAGNOSTICS
      put("BOX64_DYNAREC_SAFEFLAGS", "2")  // Full flag safety
      put("BOX64_DYNAREC_FASTNAN", "0")   // Accurate NaN handling
      put("BOX64_DYNAREC_FASTROUND", "0")  // Accurate rounding
@@ -844,16 +892,29 @@ class WinlatorEmulator @Inject constructor(
      put("BOX64_DYNAREC_FORWARD", "128")  // Keep conservative forward (not 0!)
      put("BOX64_DYNAREC_CALLRET", "0")   // Disable call/ret optimization
      put("BOX64_DYNAREC_WAIT", "1")    // Enable wait (Winlator COMPATIBILITY)
-     // REMOVED BOX64_DYNAREC_WEAKBARRIER - use Box64 default
-     put("BOX64_LOG", "2")       // INFO level logging
+
+     // Diagnostic mode
+     put("BOX64_TRACE", "1")      // Instruction-level tracing
+     put("BOX64_PREFER_EMULATED", "1")  // Prefer emulated libraries
+     put("BOX64_CRASHHANDLER", "0")   // Emulated crash handler
+     put("BOX64_SHOWBT", "1")      // Show backtrace
+
+     put("BOX64_LOG", "3")       // Maximum logging
      put("BOX64_SHOWSEGV", "1")     // Show segfault details
      put("BOX64_NOBANNER", "0")
     }
     else -> {
-     // Attempt 3: DISABLE DYNAREC (slowest but most stable)
+     // Attempt 3: DISABLE DYNAREC + FULL DIAGNOSTICS
      // Falls back to pure interpretation - ~10x slower but eliminates JIT bugs
-     put("BOX64_DYNAREC", "0")    // COMPLETE DISABLE
-     put("BOX64_LOG", "3")     // Maximum logging
+     put("BOX64_DYNAREC", "0")     // COMPLETE DISABLE
+
+     // Maximum diagnostic mode
+     put("BOX64_TRACE", "1")      // Instruction tracing
+     put("BOX64_PREFER_EMULATED", "1")  // Force emulated libraries
+     put("BOX64_CRASHHANDLER", "0")   // Emulated crash handler
+     put("BOX64_SHOWBT", "1")      // Backtrace on signals
+
+     put("BOX64_LOG", "3")       // Maximum logging
      put("BOX64_NOBANNER", "0")
     }
    }
@@ -975,6 +1036,9 @@ class WinlatorEmulator @Inject constructor(
   val rootfsLibraryPath = buildRootfsLibraryPath()
 
   // Build command (same for all attempts)
+  // CRITICAL FIX: Use wineboot as Wine built-in command, not .exe file
+  // Running "wine wineboot.exe --init" causes infinite recursion (Wine->Wine->Wine...)
+  // Correct approach: "wine wineboot --init" (wineboot is a Wine builtin command)
   val command = if (useWinebootBinary) {
    listOf(
     linker.absolutePath,
@@ -985,15 +1049,79 @@ class WinlatorEmulator @Inject constructor(
     "-i"
    )
   } else {
+   // CRITICAL FIX: wineboot.exe must be invoked as a Windows executable
+   // Use Windows-style path: C:\windows\system32\wineboot.exe
+   // Wine will map this to the correct location in its virtual filesystem
    listOf(
     linker.absolutePath,
     "--library-path",
     rootfsLibraryPath,
     box64ToUse.absolutePath,
     wineBinary.absolutePath,
-    winebootExe.absolutePath,
+    "C:\\\\windows\\\\system32\\\\wineboot.exe",
     "--init"
    )
+  }
+
+  // CRITICAL: Pre-start wineserver via Box64 before running wineboot
+  // Wine tries to spawn wineserver directly via posix_spawn, which fails because
+  // wineserver is an x86_64 binary and needs Box64 to run
+  //
+  // Research findings (Box64 Issue #208, #154):
+  // - Box64 automatically wraps posix_spawn() calls with itself as interpreter
+  // - Spawned wineserver subprocess needs all env vars (BOX64_*, LD_LIBRARY_PATH)
+  // - Must wait for wineserver socket to be created before launching wineboot
+  try {
+   Log.i(TAG, "Pre-starting wineserver via Box64...")
+   val wineserverCmd = listOf(
+    linker.absolutePath,
+    "--library-path",
+    rootfsLibraryPath,
+    box64ToUse.absolutePath,
+    wineserverBinary.absolutePath,
+    "-p0"  // Persistent mode
+   )
+   val wineserverEnv = buildWinebootEnvironmentVariables(containerDir, 0).toMutableMap()
+
+   // Add extra logging for subprocess debugging
+   wineserverEnv["BOX64_TRACE_INIT"] = "1"
+   wineserverEnv["BOX64_LOG"] = "3"
+
+   val wineserverProcess = ProcessBuilder(wineserverCmd).apply {
+    environment().clear()
+    environment().putAll(wineserverEnv)
+    redirectErrorStream(true)
+   }.start()
+
+   // Wait for wineserver socket to be created (up to 5 seconds)
+   val wineServerDir = File(containerDir, ".wine")
+   var wineserverReady = false
+   for (attempt in 0 until 50) {
+    kotlinx.coroutines.delay(100)
+    // Check if .wine directory exists and has server-* subdirectory with socket
+    if (wineServerDir.exists()) {
+     wineServerDir.listFiles()?.forEach { file ->
+      if (file.isDirectory && file.name.startsWith("server-")) {
+       val socket = File(file, "socket")
+       if (socket.exists()) {
+        wineserverReady = true
+        Log.i(TAG, "Wineserver socket found: ${socket.absolutePath}")
+        return@forEach
+       }
+      }
+     }
+    }
+    if (wineserverReady) break
+   }
+
+   if (wineserverReady) {
+    Log.i(TAG, "Wineserver pre-started successfully")
+   } else {
+    Log.w(TAG, "Wineserver socket not found after 5s, continuing anyway...")
+   }
+  } catch (e: Exception) {
+   Log.w(TAG, "Failed to pre-start wineserver: ${e.message}")
+   // Continue anyway - wineboot might still work
   }
 
   // 3-tier retry loop
@@ -1175,7 +1303,8 @@ class WinlatorEmulator @Inject constructor(
    put("WINEDEBUG", "-all") // Silent - most stable for game execution
    put("WINEARCH", "win64")
    put("WINELOADERNOEXEC", "1")
-   put("WINESERVER", wineserverBinary.absolutePath)
+   // DO NOT set WINESERVER - let Wine find it via PATH (same reason as wineboot)
+   // put("WINESERVER", wineserverBinary.absolutePath)
 
    // Graphics configuration
    when (config.directXWrapper) {

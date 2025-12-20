@@ -1,6 +1,7 @@
 package com.steamdeck.mobile.core.winlator
 
 import android.content.Context
+import android.system.Os
 import android.util.Log
 import com.steamdeck.mobile.core.util.ElfPatcher
 import com.steamdeck.mobile.domain.emulator.*
@@ -73,7 +74,9 @@ class WinlatorEmulator @Inject constructor(
   private const val ROOTFS_ASSET = "winlator/rootfs.txz"
 
   // PRoot asset for SELinux compatibility
-  private const val PROOT_ASSET = "winlator/proot-v5.3.0-aarch64.txz"
+  // CRITICAL FIX: Use Termux proot (proven compatible with Android)
+  // Previous v5.3.0 was incompatible and crashed with SIGSEGV
+  private const val PROOT_ASSET = "winlator/proot-termux-aarch64.txz"
  }
 
  override suspend fun isAvailable(): Result<Boolean> = withContext(Dispatchers.IO) {
@@ -116,8 +119,8 @@ class WinlatorEmulator @Inject constructor(
    if (!prootBinary.exists()) {
     progressCallback?.invoke(0.0f, "Extracting PRoot binary...")
 
-    // Extract proot.txz from assets
-    val prootTxzFile = File(prootDir, "proot-v5.3.0-aarch64.txz")
+    // Extract proot.txz from assets (Termux proot - Android-compatible)
+    val prootTxzFile = File(prootDir, "proot-termux-aarch64.txz")
     if (!prootTxzFile.exists()) {
      extractAsset(PROOT_ASSET, prootTxzFile)
      progressCallback?.invoke(0.025f, "PRoot asset copied")
@@ -161,19 +164,21 @@ class WinlatorEmulator @Inject constructor(
      prootBinary.setExecutable(true, false)
      Log.i(TAG, "PRoot extracted and set executable: ${prootBinary.absolutePath}")
 
-     // Patch PRoot to PIE format (ET_DYN) for Android 5.0+ compatibility
-     val patchResult = ElfPatcher.patchToPie(prootBinary)
-     if (patchResult.isFailure) {
-      Log.w(TAG, "Failed to patch PRoot to PIE: ${patchResult.exceptionOrNull()?.message}")
-      // Continue anyway - binary might already be PIE
-     }
+     // EXPERIMENTAL: Disable PRoot PIE/TLS patches (testing if patches cause SIGSEGV)
+     // // Patch PRoot to PIE format (ET_DYN) for Android 5.0+ compatibility
+     // val patchResult = ElfPatcher.patchToPie(prootBinary)
+     // if (patchResult.isFailure) {
+     //  Log.w(TAG, "Failed to patch PRoot to PIE: ${patchResult.exceptionOrNull()?.message}")
+     //  // Continue anyway - binary might already be PIE
+     // }
 
-     // Patch TLS alignment for Android 12+ (requires 64-byte alignment)
-     val tlsPatchResult = ElfPatcher.patchTlsAlignment(prootBinary, 64)
-     if (tlsPatchResult.isFailure) {
-      Log.w(TAG, "Failed to patch PRoot TLS alignment: ${tlsPatchResult.exceptionOrNull()?.message}")
-      // Continue anyway - might already be aligned
-     }
+     // // Patch TLS alignment for Android 12+ (requires 64-byte alignment)
+     // val tlsPatchResult = ElfPatcher.patchTlsAlignment(prootBinary, 64)
+     // if (tlsPatchResult.isFailure) {
+     //  Log.w(TAG, "Failed to patch PRoot TLS alignment: ${tlsPatchResult.exceptionOrNull()?.message}")
+     //  // Continue anyway - might already be aligned
+     // }
+     Log.i(TAG, "PRoot extracted, skipping PIE/TLS patches to test original binary")
 
      progressCallback?.invoke(0.15f, "PRoot ready")
     } else {
@@ -184,6 +189,28 @@ class WinlatorEmulator @Inject constructor(
     }
    } else {
     progressCallback?.invoke(0.15f, "PRoot already extracted")
+   }
+
+   // EXPERIMENTAL: Disable PRoot patching to test if patches cause SIGSEGV
+   // PRoot v5.3.0 is already statically linked and may not need PIE/TLS patches
+   // TODO: Re-enable if proot works without patches, or try different proot version
+   if (prootBinary.exists()) {
+    Log.i(TAG, "PRoot binary exists, skipping PIE/TLS patches (testing if patches cause SIGSEGV)")
+    // // Verify and patch PIE if needed
+    // val patchPieResult = ElfPatcher.patchToPie(prootBinary)
+    // if (patchPieResult.isFailure) {
+    //  Log.w(TAG, "PRoot PIE patch check failed: ${patchPieResult.exceptionOrNull()?.message}")
+    // } else {
+    //  Log.d(TAG, "PRoot PIE patch verified/applied")
+    // }
+
+    // // Verify and patch TLS if needed
+    // val patchTlsResult = ElfPatcher.patchTlsAlignment(prootBinary, 64)
+    // if (patchTlsResult.isFailure) {
+    //  Log.w(TAG, "PRoot TLS patch check failed: ${patchTlsResult.exceptionOrNull()?.message}")
+    // } else {
+    //  Log.d(TAG, "PRoot TLS alignment verified/applied")
+    // }
    }
 
    // Step 2: Extract Box64 binary (0.15 - 0.3)
@@ -342,26 +369,75 @@ class WinlatorEmulator @Inject constructor(
       setupHardcodedLinkerPath()
       Log.d(TAG, "setupHardcodedLinkerPath() completed")
 
-      // CRITICAL FIX: Patch Box64 interpreter path
-      // Box64 was compiled with hardcoded interpreter: /data/data/com.winlator/files/rootfs/lib/ld-linux-aarch64.so.1
-      // We need to rewrite this to our actual linker location
-      // This allows posix_spawn to work correctly when Wine spawns wineserver
+      // NOTE: Wine hardcoded path issue is now handled by proot virtualization
+      // Wine binaries have compile-time hardcoded paths (/data/data/com.winlator/files/rootfs/tmp)
+      // Instead of creating symlinks (which fails due to Android security), we wrap all
+      // Wine/Box64 commands with proot to bind our actual rootfs to the hardcoded path
+      // See wineboot/wineserver/launchExecutable command construction
+
+      // CRITICAL FIX: Short Symlink Strategy for PT_INTERP size limit
+      // Problem: actualLinker path is 89 chars, PT_INTERP limit is 63 bytes
+      // Solution: Create short symlink (~43 chars) pointing to actual glibc linker
       Log.d(TAG, "Starting Box64 interpreter path patch...")
       val actualLinker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
-      Log.d(TAG, "actualLinker path: ${actualLinker.absolutePath}, exists: ${actualLinker.exists()}")
+      val shortLinkerSymlink = File(context.filesDir, "l")
+
+      Log.d(TAG, "actualLinker: ${actualLinker.absolutePath} (${actualLinker.absolutePath.length} chars)")
+      Log.d(TAG, "shortSymlink: ${shortLinkerSymlink.absolutePath} (${shortLinkerSymlink.absolutePath.length} chars)")
+
       if (actualLinker.exists() && box64Binary.exists()) {
-       val patchResult = ElfPatcher.patchInterpreterPath(
-        box64Binary,
-        actualLinker.absolutePath
-       )
-       if (patchResult.isSuccess) {
-        Log.i(TAG, "Successfully patched Box64 interpreter path to: ${actualLinker.absolutePath}")
-       } else {
-        Log.w(TAG, "Failed to patch Box64 interpreter path: ${patchResult.exceptionOrNull()?.message}")
+       try {
+        // Remove old symlink if exists
+        if (shortLinkerSymlink.exists()) {
+         shortLinkerSymlink.delete()
+         Log.d(TAG, "Removed existing symlink")
+        }
+
+        // Create symlink using native Android API (no external commands)
+        Os.symlink(actualLinker.absolutePath, shortLinkerSymlink.absolutePath)
+        Log.i(TAG, "Created symlink: ${shortLinkerSymlink.absolutePath} -> ${actualLinker.absolutePath}")
+
+        // Verify symlink
+        if (!shortLinkerSymlink.exists()) {
+         Log.e(TAG, "Symlink creation failed - file doesn't exist")
+         return@withContext Result.failure(
+          EmulatorException("Failed to create linker symlink")
+         )
+        }
+
+        // Patch Box64 to use short symlink path
+        val patchResult = ElfPatcher.patchInterpreterPath(
+         box64Binary,
+         shortLinkerSymlink.absolutePath
+        )
+
+        if (patchResult.isSuccess) {
+         Log.i(TAG, "Successfully patched Box64 interpreter to: ${shortLinkerSymlink.absolutePath}")
+        } else {
+         Log.e(TAG, "Failed to patch Box64 interpreter", patchResult.exceptionOrNull())
+         return@withContext Result.failure(
+          patchResult.exceptionOrNull() ?: EmulatorException("Box64 interpreter patch failed")
+         )
+        }
+       } catch (e: Exception) {
+        Log.e(TAG, "Failed to setup linker symlink", e)
+        return@withContext Result.failure(
+         EmulatorException("Linker symlink setup failed: ${e.message}", e)
+        )
        }
       } else {
-       Log.w(TAG, "Skipping Box64 interpreter patch: linker=${actualLinker.exists()}, box64=${box64Binary.exists()}")
+       Log.w(TAG, "Skipping Box64 patch: actualLinker=${actualLinker.exists()}, box64=${box64Binary.exists()}")
       }
+
+      // EXPERIMENTAL: Skip proot PT_INTERP patch
+      // PRoot is statically linked and has NO PT_INTERP header (logs show "No PT_INTERP header found")
+      // Patching it is unnecessary and may cause issues
+      Log.d(TAG, "Skipping PRoot interpreter path patch (statically linked, no PT_INTERP)")
+
+      // CRITICAL FIX: Create libfreetype.so.6 symlink for Wine/Box64
+      // Wine+Box64 needs libfreetype.so.6 for font rendering (Steam installer GUI)
+      // Rootfs has libfreetype.so.6.20.2 but no .so.6 symlink → "cannot find FreeType library"
+      setupLibrarySymlinks()
      }.onFailure { error ->
       Log.e(TAG, "Rootfs extraction failed: ${error.message}", error)
       return@withContext Result.failure(
@@ -374,21 +450,47 @@ class WinlatorEmulator @Inject constructor(
     // Ensure linker is setup even if rootfs was already extracted
     setupHardcodedLinkerPath()
 
-    // CRITICAL FIX: Patch Box64 interpreter path (also needed when Wine already extracted)
+    // NOTE: Wine hardcoded paths now handled by proot (see command construction)
+
+    // CRITICAL FIX: Short Symlink Strategy (also needed when Wine already extracted)
     val actualLinker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
+    val shortLinkerSymlink = File(context.filesDir, "l")
+
     if (actualLinker.exists() && box64Binary.exists()) {
-     val patchResult = ElfPatcher.patchInterpreterPath(
-      box64Binary,
-      actualLinker.absolutePath
-     )
-     if (patchResult.isSuccess) {
-      Log.i(TAG, "Successfully patched Box64 interpreter path to: ${actualLinker.absolutePath}")
-     } else {
-      Log.w(TAG, "Failed to patch Box64 interpreter path: ${patchResult.exceptionOrNull()?.message}")
+     try {
+      // Remove old symlink if exists
+      if (shortLinkerSymlink.exists()) {
+       shortLinkerSymlink.delete()
+      }
+
+      // Create symlink using native Android API
+      Os.symlink(actualLinker.absolutePath, shortLinkerSymlink.absolutePath)
+      Log.i(TAG, "Created symlink: ${shortLinkerSymlink.absolutePath} -> ${actualLinker.absolutePath}")
+
+      // Patch Box64 to use short symlink path
+      val patchResult = ElfPatcher.patchInterpreterPath(
+       box64Binary,
+       shortLinkerSymlink.absolutePath
+      )
+
+      if (patchResult.isSuccess) {
+       Log.i(TAG, "Successfully patched Box64 with short symlink")
+      } else {
+       Log.e(TAG, "Box64 patch failed", patchResult.exceptionOrNull())
+      }
+     } catch (e: Exception) {
+      Log.e(TAG, "Symlink setup failed", e)
      }
     } else {
-     Log.w(TAG, "Skipping Box64 interpreter patch: linker=${actualLinker.exists()}, box64=${box64Binary.exists()}")
+     Log.w(TAG, "Skipping Box64 patch: linker=${actualLinker.exists()}, box64=${box64Binary.exists()}")
     }
+
+    // EXPERIMENTAL: Skip proot PT_INTERP patch (Wine already extracted case)
+    // PRoot is statically linked and has NO PT_INTERP header
+    Log.d(TAG, "Skipping PRoot interpreter path patch (Wine already extracted, proot is statically linked)")
+
+    // CRITICAL FIX: Ensure library symlinks even if Wine already extracted
+    setupLibrarySymlinks()
 
     progressCallback?.invoke(1.0f, "Wine already ready")
    }
@@ -539,12 +641,15 @@ class WinlatorEmulator @Inject constructor(
    val environmentVars = buildEnvironmentVariables(container)
    val rootfsLibraryPath = buildRootfsLibraryPath()
 
-   // 4. Build command - invoke linker directly with Box64 as argument
+   // 4. Build command - wrap with proot for hardcoded path virtualization
+   // CRITICAL FIX: Do NOT pass linker as proot argument
+   // Box64 binary already has PT_INTERP set to linker path - ELF loader handles it automatically
+   // Passing linker to proot causes proot to try executing ld-linux directly → SIGSEGV
    val command = buildList {
-    add(linker.absolutePath)
-    add("--library-path")
-    add(rootfsLibraryPath)
-    add(box64ToUse.absolutePath)
+    add(prootBinary.absolutePath)
+    add("-b")
+    add("${rootfsDir.absolutePath}:/data/data/com.winlator/files/rootfs")
+    add(box64ToUse.absolutePath)  // ✅ Execute Box64 directly (PT_INTERP handles linker)
     add(wineBinary.absolutePath)
     add(executable.absolutePath)
     addAll(arguments)
@@ -559,6 +664,8 @@ class WinlatorEmulator @Inject constructor(
    val env = processBuilder.environment()
    env.clear()
    env.putAll(environmentVars)
+   // CRITICAL: Set LD_LIBRARY_PATH via environment (not as proot argument)
+   env["LD_LIBRARY_PATH"] = rootfsLibraryPath
    processBuilder.redirectErrorStream(true)
 
    // Set working directory to executable's parent
@@ -808,6 +915,9 @@ class WinlatorEmulator @Inject constructor(
    put("WINEPREFIX", containerDir.absolutePath)
    put("HOME", containerDir.absolutePath)
    put("TMPDIR", context.cacheDir.absolutePath)
+   // CRITICAL: PRoot requires PROOT_TMP_DIR for temporary files
+   // Without this, proot fails with "can't create temporary directory"
+   put("PROOT_TMP_DIR", context.cacheDir.absolutePath)
    put("LANG", "C")
    put("LC_ALL", "C")
 
@@ -1036,15 +1146,19 @@ class WinlatorEmulator @Inject constructor(
   val rootfsLibraryPath = buildRootfsLibraryPath()
 
   // Build command (same for all attempts)
-  // CRITICAL FIX: Use wineboot as Wine built-in command, not .exe file
-  // Running "wine wineboot.exe --init" causes infinite recursion (Wine->Wine->Wine...)
-  // Correct approach: "wine wineboot --init" (wineboot is a Wine builtin command)
+  // CRITICAL FIX: Wrap with proot to virtualize hardcoded Wine paths
+  // Wine/Wineserver binaries have hardcoded paths: /data/data/com.winlator/files/rootfs/tmp
+  // proot binds our actual rootfs to the hardcoded path location
+  // This allows Wine to access /data/data/com.winlator/... without permission errors
+  //
+  // CRITICAL: Do NOT pass linker as proot argument
+  // Box64 binary already has PT_INTERP set to linker path - ELF loader handles it automatically
+  // Passing linker to proot causes proot to try executing ld-linux directly → SIGSEGV
   val command = if (useWinebootBinary) {
    listOf(
-    linker.absolutePath,
-    "--library-path",
-    rootfsLibraryPath,
-    box64ToUse.absolutePath,
+    prootBinary.absolutePath,
+    "-b", "${rootfsDir.absolutePath}:/data/data/com.winlator/files/rootfs",
+    box64ToUse.absolutePath,  // ✅ Execute Box64 directly (PT_INTERP handles linker)
     winebootBinary.absolutePath,
     "-i"
    )
@@ -1053,10 +1167,9 @@ class WinlatorEmulator @Inject constructor(
    // Use Windows-style path: C:\windows\system32\wineboot.exe
    // Wine will map this to the correct location in its virtual filesystem
    listOf(
-    linker.absolutePath,
-    "--library-path",
-    rootfsLibraryPath,
-    box64ToUse.absolutePath,
+    prootBinary.absolutePath,
+    "-b", "${rootfsDir.absolutePath}:/data/data/com.winlator/files/rootfs",
+    box64ToUse.absolutePath,  // ✅ Execute Box64 directly (PT_INTERP handles linker)
     wineBinary.absolutePath,
     "C:\\\\windows\\\\system32\\\\wineboot.exe",
     "--init"
@@ -1073,11 +1186,14 @@ class WinlatorEmulator @Inject constructor(
   // - Must wait for wineserver socket to be created before launching wineboot
   try {
    Log.i(TAG, "Pre-starting wineserver via Box64...")
+   // CRITICAL: Wrap wineserver with proot for hardcoded path virtualization
+   // CRITICAL: Do NOT pass linker as proot argument
+   // Box64 binary already has PT_INTERP set to linker path - ELF loader handles it automatically
+   // Passing linker to proot causes proot to try executing ld-linux directly → SIGSEGV
    val wineserverCmd = listOf(
-    linker.absolutePath,
-    "--library-path",
-    rootfsLibraryPath,
-    box64ToUse.absolutePath,
+    prootBinary.absolutePath,
+    "-b", "${rootfsDir.absolutePath}:/data/data/com.winlator/files/rootfs",
+    box64ToUse.absolutePath,  // ✅ Execute Box64 directly (PT_INTERP handles linker)
     wineserverBinary.absolutePath,
     "-p0"  // Persistent mode
    )
@@ -1086,6 +1202,8 @@ class WinlatorEmulator @Inject constructor(
    // Add extra logging for subprocess debugging
    wineserverEnv["BOX64_TRACE_INIT"] = "1"
    wineserverEnv["BOX64_LOG"] = "3"
+   // CRITICAL: Set LD_LIBRARY_PATH via environment (not as proot argument)
+   wineserverEnv["LD_LIBRARY_PATH"] = rootfsLibraryPath
 
    val wineserverProcess = ProcessBuilder(wineserverCmd).apply {
     environment().clear()
@@ -1143,6 +1261,8 @@ class WinlatorEmulator @Inject constructor(
     val env = processBuilder.environment()
     env.clear()
     env.putAll(environmentVars)
+    // CRITICAL: Set LD_LIBRARY_PATH via environment (not as proot argument)
+    env["LD_LIBRARY_PATH"] = rootfsLibraryPath
     processBuilder.redirectErrorStream(true)
 
     Log.d(TAG, "Running: ${command.joinToString(" ")}")
@@ -1158,8 +1278,10 @@ class WinlatorEmulator @Inject constructor(
      }
     }
 
-    // Timeout: 90s for first attempt, 120s for retries
-    val timeoutMs = if (attemptNumber == 0) 90_000L else 120_000L
+    // Timeout: 5 minutes for first attempt, 10 minutes for retries
+    // Wine + Box64 emulation on Android can be slow, especially during first initialization
+    // wineboot needs to create registry, initialize graphics subsystem, etc.
+    val timeoutMs = if (attemptNumber == 0) 300_000L else 600_000L
     val completed = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
      process.waitFor()
      true
@@ -1296,6 +1418,9 @@ class WinlatorEmulator @Inject constructor(
    put("WINEPREFIX", winePrefix.absolutePath)
    put("HOME", winePrefix.absolutePath)
    put("TMPDIR", context.cacheDir.absolutePath)
+   // CRITICAL: PRoot requires PROOT_TMP_DIR for temporary files
+   // Without this, proot fails with "can't create temporary directory"
+   put("PROOT_TMP_DIR", context.cacheDir.absolutePath)
    put("LANG", "C")
    put("LC_ALL", "C")
    // CRITICAL: Use minimal logging to prevent SIGSEGV crashes
@@ -1506,6 +1631,128 @@ class WinlatorEmulator @Inject constructor(
    }
   } catch (e: Exception) {
    Log.w(TAG, "Could not create linker symlink: ${e.message}")
+  }
+ }
+
+ /**
+  * Setup library symlinks for Wine/Box64 compatibility
+  *
+  * Problem: Wine+Box64 looks for libfreetype.so.6 for font rendering
+  * Rootfs has libfreetype.so.6.20.2 but no .so.6 symlink
+  * Result: "Wine cannot find the FreeType font library" → Steam installer GUI fails
+  *
+  * Solution: Create symlinks for versioned libraries (.so.6 → .so.6.x.x)
+  */
+ private fun setupLibrarySymlinks() {
+  val libDir = File(rootfsDir, "usr/lib")
+  if (!libDir.exists()) {
+   Log.w(TAG, "Library directory not found: ${libDir.absolutePath}")
+   return
+  }
+
+  try {
+   // Create symlinks for versioned libraries
+   // Format: library.so -> library.so.X.Y.Z, library.so.X -> library.so.X.Y.Z
+   val libraries = listOf(
+    Triple("libfreetype.so.6.20.2", "libfreetype.so.6", "libfreetype.so"),
+    Triple("libz.so.1.3.1", "libz.so.1", "libz.so"),
+    Triple("libzstd.so.1.5.6", "libzstd.so.1", "libzstd.so"),
+    Triple("libpng16.so.16.44.0", "libpng16.so.16", "libpng16.so"),
+    Triple("libpng16.so.16.44.0", "libpng.so", null), // libpng.so -> libpng16.so.16.44.0
+    Triple("libbz2.so.1.0.8", "libbz2.so.1.0", "libbz2.so.1"),
+    Triple("libbz2.so.1.0.8", "libbz2.so", null), // libbz2.so -> libbz2.so.1.0.8
+    Triple("libbrotlicommon.so.1.1.0", "libbrotlicommon.so.1", "libbrotlicommon.so"),
+    Triple("libbrotlidec.so.1.1.0", "libbrotlidec.so.1", "libbrotlidec.so"),
+    Triple("libbrotlienc.so.1.1.0", "libbrotlienc.so.1", "libbrotlienc.so")
+   )
+
+   for ((actual, symlink1, symlink2) in libraries) {
+    val actualFile = File(libDir, actual)
+    if (!actualFile.exists()) {
+     Log.d(TAG, "$actual not found, skipping symlinks")
+     continue
+    }
+
+    // Create first symlink (e.g., libfreetype.so.6 -> libfreetype.so.6.20.2)
+    val symlink1File = File(libDir, symlink1)
+    if (!symlink1File.exists()) {
+     Os.symlink(actualFile.absolutePath, symlink1File.absolutePath)
+     Log.i(TAG, "Created $symlink1 -> $actual")
+    } else {
+     Log.d(TAG, "$symlink1 already exists")
+    }
+
+    // Create second symlink if specified (e.g., libfreetype.so -> libfreetype.so.6.20.2)
+    if (symlink2 != null) {
+     val symlink2File = File(libDir, symlink2)
+     if (!symlink2File.exists()) {
+      Os.symlink(actualFile.absolutePath, symlink2File.absolutePath)
+      Log.i(TAG, "Created $symlink2 -> $actual")
+     } else {
+      Log.d(TAG, "$symlink2 already exists")
+     }
+    }
+   }
+  } catch (e: Exception) {
+   Log.w(TAG, "Failed to create library symlinks: ${e.message}", e)
+  }
+ }
+
+ /**
+  * Setup Wine's hardcoded paths as symlinks
+  *
+  * Wine binaries compiled for Winlator have hardcoded paths like:
+  * /data/data/com.winlator/files/rootfs/tmp
+  *
+  * We create these as symlinks pointing to our actual package paths.
+  */
+ private fun setupWineHardcodedPaths() {
+  try {
+   // Wine's hardcoded rootfs tmp directory
+   val hardcodedTmpDir = File("/data/data/com.winlator/files/rootfs/tmp")
+   val actualTmpDir = File(rootfsDir, "tmp")
+
+   // Ensure actual tmp directory exists
+   if (!actualTmpDir.exists()) {
+    val created = actualTmpDir.mkdirs()
+    Log.d(TAG, "Created actual tmp directory: ${actualTmpDir.absolutePath}, success=$created")
+   }
+
+   // Verify actualTmpDir exists before creating symlink
+   if (!actualTmpDir.exists()) {
+    Log.e(TAG, "Failed to create actual tmp directory: ${actualTmpDir.absolutePath}")
+    return
+   }
+
+   // Create parent directories for hardcoded path
+   val hardcodedParent = File("/data/data/com.winlator/files/rootfs")
+   if (!hardcodedParent.exists()) {
+    val created = hardcodedParent.mkdirs()
+    Log.d(TAG, "Created hardcoded parent directory: ${hardcodedParent.absolutePath}, success=$created")
+   }
+
+   // Verify hardcoded parent exists
+   if (!hardcodedParent.exists()) {
+    Log.e(TAG, "Failed to create hardcoded parent directory: ${hardcodedParent.absolutePath}")
+    return
+   }
+
+   // Create symlink: /data/data/com.winlator/files/rootfs/tmp -> actual tmp
+   // CRITICAL: Os.symlink(target, linkpath) - NOT (linkpath, target)
+   if (!hardcodedTmpDir.exists()) {
+    Os.symlink(actualTmpDir.absolutePath, hardcodedTmpDir.absolutePath)
+    Log.i(TAG, "Created Wine hardcoded tmp symlink: ${hardcodedTmpDir.absolutePath} -> ${actualTmpDir.absolutePath}")
+   } else if (!java.nio.file.Files.isSymbolicLink(hardcodedTmpDir.toPath())) {
+    // If it exists but is not a symlink, delete and recreate
+    hardcodedTmpDir.deleteRecursively()
+    Os.symlink(actualTmpDir.absolutePath, hardcodedTmpDir.absolutePath)
+    Log.i(TAG, "Recreated Wine hardcoded tmp symlink: ${hardcodedTmpDir.absolutePath} -> ${actualTmpDir.absolutePath}")
+   } else {
+    Log.d(TAG, "Wine hardcoded tmp symlink already exists")
+   }
+  } catch (e: Exception) {
+   Log.w(TAG, "Could not create Wine hardcoded paths: ${e.message}")
+   // This is not fatal - Wine may still work if it can create the directory itself
   }
 
   // Copy Box64 to rootfs and patch its interpreter to use Android system linker

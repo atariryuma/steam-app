@@ -134,7 +134,24 @@
       "Bash(call C:/Projects/steam-app/build-apk.bat)",
       "Bash(sort:*)",
       "Bash(powershell -Command:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(call C:Projectssteam-appquick-build.bat)",
+      "Bash(call quick-build.bat)",
+      "Bash(./quick-build.bat)",
+      "Bash(C:/Projects/steam-app/gradlew.bat assembleDebug --no-configuration-cache)",
+      "Bash(./clean-build.bat)",
+      "Bash(./adb.exe install:*)",
+      "Bash(./adb.exe shell pm list packages:*)",
+      "Bash(./adb.exe logcat:*)",
+      "Bash(./adb.exe shell am:*)",
+      "Bash(./adb.exe shell monkey:*)",
+      "Bash(./adb.exe shell:*)",
+      "Bash(python3:*)",
+      "Bash(call gradlew.bat assembleDebug --no-configuration-cache)",
+      "Bash(ar x:*)",
+      "Bash(timeout 60 ./adb.exe logcat:*)",
+      "Bash(call gradlew.bat --stop)",
+      "Bash(timeout:*)"
     ]
   }
 }

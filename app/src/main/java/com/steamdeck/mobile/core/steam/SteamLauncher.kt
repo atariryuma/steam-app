@@ -16,7 +16,7 @@ import javax.inject.Singleton
 /**
  * Steam Client ランチャー
  *
- * Steam Client viagamelaunchdo
+ * Steam Client経由でゲームを起動します
  */
 @Singleton
 class SteamLauncher @Inject constructor(
@@ -28,7 +28,7 @@ class SteamLauncher @Inject constructor(
  }
 
  /**
-  * Steam viagamelaunch
+  * Steam経由でゲームを起動
   */
  suspend fun launchGameViaSteam(
   containerId: String,

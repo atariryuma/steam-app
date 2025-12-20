@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * game詳細画面 ViewModel
+ * Game Detail Screen ViewModel
  *
  * 2025 Best Practice:
  * - DataResult<T> for type-safe error handling
@@ -66,7 +66,7 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * game詳細読み込み
+  * Load game details
   */
  fun loadGame(gameId: Long) {
   viewModelScope.launch {
@@ -75,16 +75,16 @@ class GameDetailViewModel @Inject constructor(
     _uiState.value = if (game != null) {
      GameDetailUiState.Success(game)
     } else {
-     GameDetailUiState.Error("game not found")
+     GameDetailUiState.Error("Game not found")
     }
    } catch (e: Exception) {
-    _uiState.value = GameDetailUiState.Error(e.message ?: "不明なError")
+    _uiState.value = GameDetailUiState.Error(e.message ?: "Unknown error")
    }
   }
  }
 
  /**
-  * gamelaunch
+  * Launch game
   */
  fun launchGame(gameId: Long) {
   viewModelScope.launch {
@@ -107,13 +107,13 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * favorite状態切り替え
+  * Toggle favorite status
   */
  fun toggleFavorite(gameId: Long, isFavorite: Boolean) {
   viewModelScope.launch {
    when (val result = toggleFavoriteUseCase(gameId, isFavorite)) {
     is DataResult.Success -> {
-     // UI状態Update
+     // Update UI state
      val currentState = _uiState.value
      if (currentState is GameDetailUiState.Success) {
       _uiState.value = GameDetailUiState.Success(
@@ -131,7 +131,7 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * gamedelete
+  * Delete game
   */
  fun deleteGame(game: Game) {
   viewModelScope.launch {
@@ -151,7 +151,7 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * Steaminstallation状態check
+  * Check Steam installation status
   */
  fun checkSteamInstallation() {
   viewModelScope.launch {
@@ -167,23 +167,23 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * Steam Clientvia gamelaunch
+  * Launch game via Steam Client
   */
  fun launchGameViaSteam(gameId: Long) {
   viewModelScope.launch {
    try {
     _steamLaunchState.value = SteamLaunchState.Launching
 
-    // 現在 game情報retrieve
+    // Get current game information
     val currentState = _uiState.value
     if (currentState !is GameDetailUiState.Success) {
-     _steamLaunchState.value = SteamLaunchState.Error("game情報 retrieve failed")
+     _steamLaunchState.value = SteamLaunchState.Error("Failed to get game information")
      return@launch
     }
 
     val game = currentState.game
 
-    // ContainerID Steam App IDcheck
+    // Check Container ID and Steam App ID
     if (game.winlatorContainerId == null) {
      _steamLaunchState.value = SteamLaunchState.Error(
       "Winlator container is not configured. Please create a container in Settings."
@@ -198,7 +198,7 @@ class GameDetailViewModel @Inject constructor(
      return@launch
     }
 
-    // Steam Clientvia launch
+    // Launch via Steam Client
     val result = steamLauncher.launchGameViaSteam(
      containerId = game.winlatorContainerId.toString(),
      appId = game.steamAppId
@@ -211,14 +211,14 @@ class GameDetailViewModel @Inject constructor(
      }
      .onFailure { error ->
       _steamLaunchState.value = SteamLaunchState.Error(
-       error.message ?: "Steamvia launch failed"
+       error.message ?: "Failed to launch via Steam"
       )
       AppLogger.e(TAG, "Failed to launch game via Steam", error)
      }
 
    } catch (e: Exception) {
     _steamLaunchState.value = SteamLaunchState.Error(
-     e.message ?: "Steamlaunchin 予期しないError 発生しました"
+     e.message ?: "An unexpected error occurred during Steam launch"
     )
     AppLogger.e(TAG, "Exception during Steam launch", e)
    }
@@ -226,23 +226,23 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * Steam Clientopen
+  * Open Steam Client
   */
  fun openSteamClient(gameId: Long) {
   viewModelScope.launch {
    try {
     _steamLaunchState.value = SteamLaunchState.Launching
 
-    // 現在 game情報retrieve
+    // Get current game information
     val currentState = _uiState.value
     if (currentState !is GameDetailUiState.Success) {
-     _steamLaunchState.value = SteamLaunchState.Error("game情報 retrieve failed")
+     _steamLaunchState.value = SteamLaunchState.Error("Failed to get game information")
      return@launch
     }
 
     val game = currentState.game
 
-    // ContainerIDcheck
+    // Check Container ID
     if (game.winlatorContainerId == null) {
      _steamLaunchState.value = SteamLaunchState.Error(
       "Winlator container is not configured. Please create a container in Settings."
@@ -250,7 +250,7 @@ class GameDetailViewModel @Inject constructor(
      return@launch
     }
 
-    // Steam Clientlaunch
+    // Launch Steam Client
     val result = steamLauncher.launchSteamClient(game.winlatorContainerId.toString())
 
     result
@@ -267,7 +267,7 @@ class GameDetailViewModel @Inject constructor(
 
    } catch (e: Exception) {
     _steamLaunchState.value = SteamLaunchState.Error(
-     e.message ?: "Steam Clientlaunchin 予期しないError 発生しました"
+     e.message ?: "An unexpected error occurred while launching Steam Client"
     )
     AppLogger.e(TAG, "Exception while opening Steam Client", e)
    }
@@ -275,22 +275,22 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * Steamlaunch状態リセット
+  * Reset Steam launch state
   */
  fun resetSteamLaunchState() {
   _steamLaunchState.value = SteamLaunchState.Idle
  }
 
  /**
-  * Steam Deep Link でゲームのインストール画面を開く
+  * Open game installation page using Steam Deep Link
   *
-  * Android版Steamアプリの steam://install/<appId> プロトコルを使用して、
-  * 公式Steamアプリでゲームをダウンロード/インストールできるようにする
+  * Uses the steam://install/<appId> protocol of the Android Steam app
+  * to enable game download/installation in the official Steam app
   */
  fun openSteamInstallPage(gameId: Long) {
   viewModelScope.launch {
    try {
-    // 現在のゲーム情報を取得
+    // Get current game information
     val currentState = _uiState.value
     if (currentState !is GameDetailUiState.Success) {
      AppLogger.e(TAG, "Cannot open Steam install page: game info not loaded")
@@ -299,7 +299,7 @@ class GameDetailViewModel @Inject constructor(
 
     val game = currentState.game
 
-    // Steam App IDチェック
+    // Check Steam App ID
     if (game.steamAppId == null) {
      _steamLaunchState.value = SteamLaunchState.Error(
       "This game has no Steam App ID"
@@ -307,7 +307,7 @@ class GameDetailViewModel @Inject constructor(
      return@launch
     }
 
-    // Steam Deep Link で開く
+    // Open with Steam Deep Link
     val result = steamLauncher.openSteamInstallPage(game.steamAppId)
 
     result
@@ -331,7 +331,7 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * インストール済みゲームをスキャンして実行ファイルパスを更新
+  * Scan for installed games and update executable file paths
   */
  fun scanForInstalledGame(gameId: Long) {
   viewModelScope.launch {
@@ -343,7 +343,7 @@ class GameDetailViewModel @Inject constructor(
      is DataResult.Success -> {
       if (result.data) {
        AppLogger.i(TAG, "Game found and updated")
-       // ゲーム情報を再読み込み
+       // Reload game information
        loadGame(gameId)
       } else {
        AppLogger.i(TAG, "Game not found (not installed yet)")

@@ -1,6 +1,7 @@
 package com.steamdeck.mobile.di.module
 
 import android.content.Context
+import com.steamdeck.mobile.core.wine.WineMonoInstaller
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
 import com.steamdeck.mobile.core.winlator.ZstdDecompressor
 import com.steamdeck.mobile.domain.emulator.WindowsEmulator
@@ -56,8 +57,9 @@ object EmulatorModule {
  fun provideWindowsEmulator(
   @ApplicationContext context: Context,
   zstdDecompressor: ZstdDecompressor,
-  processMonitor: com.steamdeck.mobile.core.winlator.ProcessMonitor
+  processMonitor: com.steamdeck.mobile.core.winlator.ProcessMonitor,
+  wineMonoInstaller: WineMonoInstaller
  ): WindowsEmulator {
-  return WinlatorEmulator(context, zstdDecompressor, processMonitor)
+  return WinlatorEmulator(context, zstdDecompressor, processMonitor, wineMonoInstaller)
  }
 }

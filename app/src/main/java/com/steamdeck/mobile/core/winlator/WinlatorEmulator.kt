@@ -4,6 +4,7 @@ import android.content.Context
 import android.system.Os
 import android.util.Log
 import com.steamdeck.mobile.core.util.ElfPatcher
+import com.steamdeck.mobile.core.wine.WineMonoInstaller
 import com.steamdeck.mobile.domain.emulator.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -38,7 +39,8 @@ import javax.inject.Singleton
 class WinlatorEmulator @Inject constructor(
  @ApplicationContext private val context: Context,
  private val zstdDecompressor: ZstdDecompressor,
- private val processMonitor: ProcessMonitor
+ private val processMonitor: ProcessMonitor,
+ private val wineMonoInstaller: WineMonoInstaller
 ) : WindowsEmulator {
 
  override val name: String = "Winlator"
@@ -571,6 +573,32 @@ class WinlatorEmulator @Inject constructor(
     )
    }
 
+   // Run wineboot with -u to update the Wine prefix (loads services)
+   // This is the "Normal (Load all services)" mode recommended for Steam
+   Log.i(TAG, "Running wineboot -u to load services...")
+   val updateResult = runWinebootUpdate(containerDir)
+   if (updateResult.isFailure) {
+    Log.w(TAG, "wineboot -u failed (non-fatal): ${updateResult.exceptionOrNull()?.message}")
+   }
+
+   // CRITICAL FIX: Create C:\windows\system32\ directory manually
+   // Wine's minimal prefix doesn't create this directory, causing
+   // "could not open working directory" errors for many Windows apps
+   try {
+    val windowsDir = File(containerDir, "drive_c/windows")
+    val system32Dir = File(windowsDir, "system32")
+    if (!system32Dir.exists()) {
+     system32Dir.mkdirs()
+     // Set permissions to match Wine-created directories (rwx------)
+     system32Dir.setReadable(true, false)
+     system32Dir.setWritable(true, false)
+     system32Dir.setExecutable(true, false)
+     Log.i(TAG, "Created C:\\windows\\system32\\ directory with correct permissions")
+    }
+   } catch (e: Exception) {
+    Log.w(TAG, "Failed to create system32 directory (non-fatal)", e)
+   }
+
    // Set Windows version to Windows 10 (required for Steam)
    // Use direct registry edit (Winlator method) instead of wine regedit to avoid proot crashes
    Log.i(TAG, "Configuring Wine to report as Windows 10...")
@@ -587,6 +615,20 @@ class WinlatorEmulator @Inject constructor(
     }
    } else {
     Log.i(TAG, "Windows 10 registry configuration completed successfully (direct edit)")
+   }
+
+   // NEW: Install Wine Mono for .NET Framework compatibility
+   // Required for 32-bit applications (e.g., SteamSetup.exe NSIS installer)
+   try {
+    Log.i(TAG, "Installing Wine Mono for WoW64 support...")
+    val monoInstallResult = installWineMonoIfNeeded(containerDir)
+    if (monoInstallResult.isFailure) {
+     Log.w(TAG, "Wine Mono installation failed (non-fatal): ${monoInstallResult.exceptionOrNull()?.message}")
+    } else {
+     Log.i(TAG, "Wine Mono installation completed successfully")
+    }
+   } catch (e: Exception) {
+    Log.w(TAG, "Wine Mono installation error (non-fatal)", e)
    }
 
    val container = EmulatorContainer(
@@ -727,13 +769,12 @@ class WinlatorEmulator @Inject constructor(
    env["LD_LIBRARY_PATH"] = rootfsLibraryPath
    processBuilder.redirectErrorStream(true)
 
-   // Set working directory to executable's parent
-   executable.parentFile?.let { workingDir ->
-    if (workingDir.exists()) {
-     processBuilder.directory(workingDir)
-     Log.d(TAG, "Working directory: ${workingDir.absolutePath}")
-    }
-   }
+   // CRITICAL FIX: Set working directory to root (/) instead of executable's parent
+   // Wine will use its own internal working directory based on WINEPREFIX
+   // Setting to executable's parent causes "could not open working directory" errors
+   // because Wine tries to access it as a Windows path (C:\...) which doesn't exist
+   processBuilder.directory(File("/"))
+   Log.d(TAG, "Working directory: /")
 
    val process = processBuilder.start()
    val pid = getPid(process)
@@ -1499,6 +1540,57 @@ class WinlatorEmulator @Inject constructor(
  }
 
  /**
+  * Run wineboot with -u flag to update Wine prefix and load services
+  *
+  * This is equivalent to Winlator's "Normal (Load all services)" startup mode.
+  * Recommended for Steam to ensure all Windows services are available.
+  *
+  * @param containerDir Wine prefix directory
+  * @return Result indicating success or failure (non-fatal)
+  */
+ private suspend fun runWinebootUpdate(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
+  try {
+   Log.i(TAG, "Running wineboot -u to load Windows services...")
+
+   val command = buildList {
+    add(prootBinary.absolutePath)
+    add("-b")
+    add("${rootfsDir.absolutePath}:/data/data/com.winlator/files/rootfs")
+    add(box64Binary.absolutePath)
+    add(File(wineDir, "bin/wine").absolutePath)
+    add("C:\\windows\\system32\\wineboot.exe")
+    add("-u")  // Update mode - loads services
+   }
+
+   val env = buildWinebootEnvironmentVariables(containerDir)
+   val process = ProcessBuilder(command)
+    .directory(File("/"))
+    .apply {
+     environment().putAll(env)
+    }
+    .start()
+
+   val output = StringBuilder()
+   process.inputStream.bufferedReader().forEachLine { line ->
+    output.appendLine(line)
+    Log.d(TAG, "[wineboot -u] $line")
+   }
+
+   val exitCode = process.waitFor()
+   Log.i(TAG, "wineboot -u completed with exit code: $exitCode")
+
+   if (exitCode == 0) {
+    Result.success(Unit)
+   } else {
+    Result.failure(EmulatorException("wineboot -u failed with exit code $exitCode"))
+   }
+  } catch (e: Exception) {
+   Log.e(TAG, "Failed to run wineboot -u", e)
+   Result.failure(e)
+  }
+ }
+
+ /**
   * Set Windows version to Windows 10 via Wine registry
   *
   * CRITICAL: Steam requires Windows 10/11 to run properly.
@@ -1687,21 +1779,56 @@ REGEDIT4
 
    // Read system.reg
    val lines = systemRegFile.readLines().toMutableList()
+   Log.d(TAG, "Read ${lines.size} lines from system.reg")
 
-   // Find the CurrentVersion section
-   // Wine registry uses double backslashes in paths
+   // Find the CurrentVersion section (or a suitable insertion point)
+   // Wine registry file uses single backslashes (escaped as \\ in Kotlin string)
    var currentVersionIndex = -1
+   var insertionPoint = -1
+
    for (i in lines.indices) {
-    if (lines[i].contains("[Software\\\\Microsoft\\\\Windows NT\\\\CurrentVersion]")) {
+    val line = lines[i]
+
+    // Debug: Log lines that look like CurrentVersion sections
+    if (line.contains("CurrentVersion", ignoreCase = true) && line.startsWith("[")) {
+     Log.d(TAG, "Line $i contains CurrentVersion: $line")
+    }
+
+    // Check if the exact section already exists
+    // Registry file format: [Software\\Microsoft\\...] with DOUBLE backslashes
+    if (line.startsWith("[Software\\\\Microsoft\\\\Windows NT\\\\CurrentVersion]")) {
      currentVersionIndex = i
      Log.d(TAG, "Found CurrentVersion section at line $i")
      break
     }
+    // Find a subsection like FontLink\SystemLink as insertion point
+    if (insertionPoint == -1 && line.startsWith("[Software\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\")) {
+     insertionPoint = i
+     Log.i(TAG, "Found CurrentVersion subsection at line $i: $line")
+    }
    }
 
+   Log.d(TAG, "Search complete: currentVersionIndex=$currentVersionIndex, insertionPoint=$insertionPoint")
+
+   // If the section doesn't exist, create it before the first subsection
    if (currentVersionIndex == -1) {
-    Log.e(TAG, "CurrentVersion section not found in system.reg")
-    return@withContext false
+    if (insertionPoint == -1) {
+     Log.e(TAG, "Cannot find suitable insertion point for CurrentVersion section")
+     Log.e(TAG, "First 50 lines of system.reg:")
+     lines.take(50).forEachIndexed { idx, line ->
+      Log.e(TAG, "  $idx: $line")
+     }
+     return@withContext false
+    }
+
+    Log.i(TAG, "CurrentVersion section not found, creating new section at line $insertionPoint")
+    // Insert new section with timestamp
+    // Use double backslashes to match Wine registry format
+    val timestamp = System.currentTimeMillis()
+    lines.add(insertionPoint, "")
+    lines.add(insertionPoint + 1, "[Software\\\\Microsoft\\\\Windows NT\\\\CurrentVersion] $timestamp")
+    lines.add(insertionPoint + 2, "#time=1dc71f780aa601e")
+    currentVersionIndex = insertionPoint + 1
    }
 
    // Remove existing Windows version settings to avoid duplicates
@@ -2259,5 +2386,101 @@ REGEDIT4
    .filter { it.isFile }
    .map { it.length() }
    .sum()
+ }
+
+ /**
+  * Install Wine Mono to Wine container if needed
+  *
+  * Wine Mono provides .NET Framework compatibility, which is required for
+  * some 32-bit Windows applications (e.g., SteamSetup.exe NSIS installer).
+  *
+  * @param containerDir Wine container directory
+  * @return Installation result (non-fatal if fails)
+  */
+ private suspend fun installWineMonoIfNeeded(
+  containerDir: File
+ ): Result<Unit> = withContext(Dispatchers.IO) {
+  try {
+   // Check if Wine Mono is already installed
+   val monoDir = File(containerDir, "drive_c/windows/mono")
+   if (monoDir.exists() && monoDir.listFiles()?.isNotEmpty() == true) {
+    Log.i(TAG, "Wine Mono already installed, skipping")
+    return@withContext Result.success(Unit)
+   }
+
+   // Download Wine Mono MSI
+   val downloadResult = wineMonoInstaller.downloadWineMono()
+   if (downloadResult.isFailure) {
+    return@withContext downloadResult.map { }
+   }
+
+   val msiFile = downloadResult.getOrThrow()
+
+   // Install Wine Mono using msiexec
+   val installResult = wineMonoInstaller.installWineMono(
+    msiFile = msiFile,
+    containerDir = containerDir,
+    executeCommand = { executable, arguments ->
+     executeWineCommand(containerDir, executable, arguments)
+    }
+   )
+
+   installResult
+
+  } catch (e: Exception) {
+   Log.e(TAG, "Failed to install Wine Mono", e)
+   Result.failure(e)
+  }
+ }
+
+ /**
+  * Execute Wine command in Wine container
+  *
+  * Runs a Windows executable via Wine using proot + box64 + wine.
+  *
+  * @param containerDir Wine container directory
+  * @param executable Executable name (e.g., "msiexec")
+  * @param arguments Command line arguments
+  * @return Execution result
+  */
+ private suspend fun executeWineCommand(
+  containerDir: File,
+  executable: String,
+  arguments: List<String>
+ ): Result<Unit> = withContext(Dispatchers.IO) {
+  try {
+   val command = buildList {
+    add(prootBinary.absolutePath)
+    add("-b")
+    add("${rootfsDir.absolutePath}:/data/data/com.winlator/files/rootfs")
+    add(box64Binary.absolutePath)
+    add(File(wineDir, "bin/wine").absolutePath)
+    add("C:\\windows\\system32\\$executable.exe")
+    addAll(arguments)
+   }
+
+   // Use the same environment variables as wineboot
+   val env = buildWinebootEnvironmentVariables(containerDir, 0)
+   val process = ProcessBuilder(command)
+    .directory(File("/"))
+    .apply { environment().putAll(env) }
+    .start()
+
+   val output = StringBuilder()
+   process.inputStream.bufferedReader().forEachLine { line ->
+    output.appendLine(line)
+    Log.d(TAG, "[$executable] $line")
+   }
+
+   val exitCode = process.waitFor()
+   Log.i(TAG, "$executable completed with exit code: $exitCode")
+
+   if (exitCode == 0) Result.success(Unit)
+   else Result.failure(Exception("$executable failed with exit code $exitCode"))
+
+  } catch (e: Exception) {
+   Log.e(TAG, "Failed to execute $executable", e)
+   Result.failure(e)
+  }
  }
 }

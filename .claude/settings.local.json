@@ -161,7 +161,8 @@
       "Bash(call C:/Projects/steam-app/clean-build.bat)",
       "Bash(C:Projectssteam-appquick-build.bat)",
       "Bash(git stash:*)",
-      "Bash(git revert:*)"
+      "Bash(git revert:*)",
+      "Bash(quick-build.bat)"
     ]
   }
 }

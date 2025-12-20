@@ -4,11 +4,13 @@ import android.content.Context
 import coil.ImageLoader
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.steamdeck.mobile.core.wine.WineMonoInstaller
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.OkHttpClient
 import javax.inject.Singleton
 
 /**
@@ -54,5 +56,20 @@ object AppModule {
    .crossfade(300) // 300ms smooth transition
    .respectCacheHeaders(true) // Use HTTP cache headers
    .build()
+ }
+
+ /**
+  * Wine Mono Auto-Installer
+  *
+  * Provides Wine Mono installer for .NET Framework compatibility.
+  * Downloads and installs Wine Mono (50MB) to enable 32-bit applications.
+  */
+ @Provides
+ @Singleton
+ fun provideWineMonoInstaller(
+  @ApplicationContext context: Context,
+  okHttpClient: OkHttpClient
+ ): WineMonoInstaller {
+  return WineMonoInstaller(context, okHttpClient)
  }
 }

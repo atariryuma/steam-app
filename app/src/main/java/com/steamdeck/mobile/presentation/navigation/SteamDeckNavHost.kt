@@ -17,7 +17,6 @@ import com.steamdeck.mobile.presentation.ui.game.GameDetailScreen
 import com.steamdeck.mobile.presentation.ui.home.HomeScreen
 import com.steamdeck.mobile.presentation.ui.container.ContainerScreen
 import com.steamdeck.mobile.presentation.ui.settings.ControllerSettingsScreen
-// import com.steamdeck.mobile.presentation.ui.settings.GameSettingsScreen // Temporarily disabled
 import com.steamdeck.mobile.presentation.ui.settings.SettingsScreen
 import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
 import com.steamdeck.mobile.presentation.viewmodel.SteamLoginViewModel
@@ -66,8 +65,6 @@ fun SteamDeckNavHost(
   composable(Screen.Downloads.route) {
    DownloadScreen(
     onNavigateBack = {
-     // Back navigation not required when accessing from Bottom Navigation
-     // Also handles back navigation from detail screens
      if (navController.previousBackStackEntry != null) {
       navController.popBackStack()
      }
@@ -81,7 +78,7 @@ fun SteamDeckNavHost(
    arguments = listOf(
     navArgument("section") {
      type = NavType.IntType
-     defaultValue = -1  // -1 means no specific section
+     defaultValue = -1
     }
    )
   ) { backStackEntry ->
@@ -114,28 +111,10 @@ fun SteamDeckNavHost(
     gameId = gameId,
     onNavigateBack = { navController.popBackStack() },
     onNavigateToSettings = {
-     // Navigate to main Settings screen instead of game-specific settings (not yet implemented)
      navController.navigate(Screen.Settings.route)
     }
    )
   }
-
-  // Detail screen: Game settings
-  // TODO: Needs fixing - GameSettingsUiState not yet defined
-  /*
-  composable(
-   route = Screen.GameSettings.route,
-   arguments = listOf(
-    navArgument("gameId") { type = NavType.LongType }
-   )
-  ) { backStackEntry ->
-   val gameId = backStackEntry.arguments?.getLong("gameId") ?: 0L
-   GameSettingsScreen(
-    gameId = gameId,
-    onNavigateBack = { navController.popBackStack() }
-   )
-  }
-  */
 
   // Settings sub-screen: Controller settings
   composable(Screen.ControllerSettings.route) {

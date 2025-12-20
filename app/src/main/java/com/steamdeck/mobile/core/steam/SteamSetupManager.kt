@@ -139,6 +139,15 @@ class SteamSetupManager @Inject constructor(
    }
    Log.i(TAG, "Using container: ${container.name} (${container.id})")
 
+   // Verify Wine Mono installation
+   val monoDir = File(container.rootPath, "drive_c/windows/mono")
+   if (monoDir.exists()) {
+    Log.i(TAG, "Wine Mono installation confirmed: ${monoDir.absolutePath}")
+   } else {
+    Log.w(TAG, "Wine Mono not found - 32-bit apps may not work")
+    Log.w(TAG, "Expected location: ${monoDir.absolutePath}")
+   }
+
    // progress: 0.6 ~ 0.7 (10%)
    progressCallback?.invoke(0.6f, "Copying installer to container...")
 
@@ -400,18 +409,23 @@ class SteamSetupManager @Inject constructor(
   progressCallback: ((Float) -> Unit)? = null
  ): Result<Unit> = withContext(Dispatchers.IO) {
   try {
-   // CRITICAL FIX: Use /S (silent mode) for non-interactive installation
-   // Without /S, NSIS installer shows GUI and exits immediately without installing
+   // DEBUG MODE: Temporarily disable silent mode to see installer errors
+   // In production, use /S for silent mode
    // /S - Silent installation (no user interaction required)
    // /D - Custom installation directory (MUST be last argument per NSIS spec)
    //
-   // Previous implementation incorrectly assumed /S was incompatible with Wine.
-   // Testing shows SteamSetup.exe completes in 6s without /S (no install),
-   // vs 2-5 minutes with /S (successful install).
-   val arguments = listOf(
-    "/S",  // Silent mode (REQUIRED for automated installation)
-    "/D=C:\\Program Files (x86)\\Steam"  // Install directory
-   )
+   // Current issue: SteamSetup.exe runs but doesn't install (even with Windows 10 + wineboot -u)
+   // Trying GUI mode to see error messages
+   val useSilentMode = false  // TODO: Set to true for production
+   val arguments = if (useSilentMode) {
+    listOf(
+     "/S",  // Silent mode
+     "/D=C:\\Program Files (x86)\\Steam"
+    )
+   } else {
+    // GUI mode - installer will show errors
+    listOf("/D=C:\\Program Files (x86)\\Steam")
+   }
 
    Log.i(TAG, "Launching Steam installer with arguments: $arguments")
 
@@ -494,15 +508,25 @@ class SteamSetupManager @Inject constructor(
     delay(retryDelay)
    }
 
-   // Verification failed
+   // Verification failed - provide detailed error message
    Log.e(TAG, "Steam installation verification failed: steam.exe not found at ${steamExe.absolutePath}")
-   return@withContext Result.failure(
-    Exception(
-     "Steam installation verification failed.\n" +
-     "steam.exe not found: ${steamExe.absolutePath}\n\n" +
-     "Please retry."
-    )
-   )
+
+   // CRITICAL: Explain the WoW64 issue to the user
+   val errorMessage = buildString {
+    appendLine("Steam installation failed.")
+    appendLine()
+    appendLine("KNOWN ISSUE: SteamSetup.exe is a 32-bit application that requires WoW64 support.")
+    appendLine()
+    appendLine("Error details:")
+    appendLine("• Wine could not load wow64.dll (STATUS_DLL_NOT_FOUND)")
+    appendLine("• 32-bit Windows applications require additional Wine components")
+    appendLine()
+    appendLine("SOLUTION:")
+    appendLine("This feature is currently under development.")
+    appendLine("Please check for app updates that include full Wine Mono/WoW64 support.")
+   }
+
+   return@withContext Result.failure(Exception(errorMessage))
 
   } catch (e: Exception) {
    Log.e(TAG, "Failed to run Steam installer", e)

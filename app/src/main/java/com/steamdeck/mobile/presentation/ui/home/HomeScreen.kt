@@ -458,9 +458,9 @@ fun NavigationDrawerContent(
      currentRoute.contains("section=1") || currentRoute.contains("section=2")
     )
 
-   IconButton(onClick = onNavigateToSteamLogin) {
+   IconButton(onClick = onExpandDrawer) {
     Icon(
-     imageVector = Icons.Default.Security,
+     imageVector = Icons.Default.CloudDownload,
      contentDescription = stringResource(R.string.drawer_section_steam),
      tint = if (steamActive) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -475,9 +475,9 @@ fun NavigationDrawerContent(
      currentRoute.contains("section=4") || currentRoute.contains("section=5")
     )
 
-   IconButton(onClick = onNavigateToController) {
+   IconButton(onClick = onExpandDrawer) {
     Icon(
-     imageVector = Icons.Default.SportsEsports,
+     imageVector = Icons.Default.Settings,
      contentDescription = stringResource(R.string.drawer_section_system),
      tint = if (systemActive) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant,

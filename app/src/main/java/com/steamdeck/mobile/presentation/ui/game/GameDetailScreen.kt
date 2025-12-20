@@ -54,6 +54,7 @@ fun GameDetailScreen(
  val launchState by viewModel.launchState.collectAsState()
  val steamLaunchState by viewModel.steamLaunchState.collectAsState()
  val isSteamInstalled by viewModel.isSteamInstalled.collectAsState()
+ val isScanning by viewModel.isScanning.collectAsState()
  var showDeleteDialog by remember { mutableStateOf(false) }
  var showLaunchErrorDialog by remember { mutableStateOf(false) }
  var showSteamLaunchErrorDialog by remember { mutableStateOf(false) }
@@ -97,9 +98,12 @@ fun GameDetailScreen(
     GameDetailContent(
      game = state.game,
      isSteamInstalled = isSteamInstalled,
+     isScanning = isScanning,
      onLaunchGame = { viewModel.launchGame(gameId) },
      onLaunchViaSteam = { viewModel.launchGameViaSteam(gameId) },
      onOpenSteamClient = { viewModel.openSteamClient(gameId) },
+     onOpenSteamInstallPage = { viewModel.openSteamInstallPage(gameId) },
+     onScanForInstalledGame = { viewModel.scanForInstalledGame(gameId) },
      onNavigateBack = onNavigateBack,
      onNavigateToSettings = onNavigateToSettings,
      onToggleFavorite = { viewModel.toggleFavorite(state.game.id, !state.game.isFavorite) },
@@ -163,9 +167,12 @@ fun GameDetailScreen(
 fun GameDetailContent(
  game: Game,
  isSteamInstalled: Boolean,
+ isScanning: Boolean,
  onLaunchGame: () -> Unit,
  onLaunchViaSteam: () -> Unit,
  onOpenSteamClient: () -> Unit,
+ onOpenSteamInstallPage: () -> Unit,
+ onScanForInstalledGame: () -> Unit,
  onNavigateBack: () -> Unit,
  onNavigateToSettings: () -> Unit,
  onToggleFavorite: () -> Unit,
@@ -291,7 +298,7 @@ fun GameDetailContent(
     ) {
      Column(
       modifier = Modifier.padding(20.dp),
-      verticalArrangement = Arrangement.spacedBy(12.dp)
+      verticalArrangement = Arrangement.spacedBy(16.dp)
      ) {
       Row(
        verticalAlignment = Alignment.CenterVertically,
@@ -304,7 +311,7 @@ fun GameDetailContent(
         modifier = Modifier.size(28.dp)
        )
        Text(
-        "How to Download This Game",
+        "Game Not Installed",
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -316,54 +323,60 @@ fun GameDetailContent(
        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
       )
 
-      // Step-by-step instructions
-      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-       StepItem(number = 1, text = "Click the button below to launch Steam Client")
-       StepItem(number = 2, text = "Search for \"${game.name}\" in your Library")
-       StepItem(number = 3, text = "Click \"Install\" button in Steam")
-       StepItem(number = 4, text = "Wait for download to complete")
-       StepItem(number = 5, text = "Return to this app - the \"Launch Game\" button will activate")
-      }
+      // Simplified description
+      Text(
+       "Download \"${game.name}\" from the official Steam app, then return here to play.",
+       style = MaterialTheme.typography.bodyMedium,
+       color = MaterialTheme.colorScheme.onPrimaryContainer
+      )
 
-      Spacer(modifier = Modifier.height(4.dp))
-
-      // Primary action button
+      // Primary action button - Download via Steam App
       Button(
-       onClick = onOpenSteamClient,
+       onClick = onOpenSteamInstallPage,
        modifier = Modifier.fillMaxWidth(),
        colors = ButtonDefaults.buttonColors(
         containerColor = MaterialTheme.colorScheme.primary
        )
       ) {
        Icon(
-        Icons.Default.SportsEsports,
+        Icons.Default.Download,
         contentDescription = null,
         modifier = Modifier.size(20.dp)
        )
        Spacer(modifier = Modifier.width(8.dp))
-       Text("Open Steam Client", style = MaterialTheme.typography.titleSmall)
+       Text("Download via Steam App", style = MaterialTheme.typography.titleSmall)
       }
 
-      // Secondary action button (refresh)
+      // Secondary action button - Rescan (implemented)
       OutlinedButton(
-       onClick = { /* TODO: Implement scan for installed games */ },
-       modifier = Modifier.fillMaxWidth()
+       onClick = onScanForInstalledGame,
+       modifier = Modifier.fillMaxWidth(),
+       enabled = !isScanning
       ) {
-       Icon(
-        Icons.Default.Refresh,
-        contentDescription = null,
-        modifier = Modifier.size(18.dp)
-       )
+       if (isScanning) {
+        CircularProgressIndicator(
+         modifier = Modifier.size(18.dp),
+         strokeWidth = 2.dp
+        )
+       } else {
+        Icon(
+         Icons.Default.Refresh,
+         contentDescription = null,
+         modifier = Modifier.size(18.dp)
+        )
+       }
        Spacer(modifier = Modifier.width(8.dp))
-       Text("Rescan for Installed Games", style = MaterialTheme.typography.bodyMedium)
+       Text(
+        if (isScanning) "Scanning..." else "Check If Downloaded",
+        style = MaterialTheme.typography.bodyMedium
+       )
       }
 
       // Info footer
       Text(
-       "Steam ToS Compliance: All downloads must go through the official Steam client",
+       "Tip: Click \"Download via Steam App\" to open ${game.name}'s download page directly",
        style = MaterialTheme.typography.bodySmall,
-       color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-       modifier = Modifier.padding(top = 4.dp)
+       color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
       )
      }
     }
@@ -758,49 +771,6 @@ fun SplitLaunchButton(
     }
    )
   }
- }
-}
-
-/**
- * Step item composable for download instructions
- */
-@Composable
-private fun StepItem(
- number: Int,
- text: String,
- modifier: Modifier = Modifier
-) {
- Row(
-  modifier = modifier,
-  horizontalArrangement = Arrangement.spacedBy(12.dp),
-  verticalAlignment = Alignment.Top
- ) {
-  // Step number badge
-  Surface(
-   shape = CircleShape,
-   color = MaterialTheme.colorScheme.primary,
-   modifier = Modifier.size(24.dp)
-  ) {
-   Box(
-    contentAlignment = Alignment.Center,
-    modifier = Modifier.fillMaxSize()
-   ) {
-    Text(
-     text = number.toString(),
-     style = MaterialTheme.typography.labelMedium,
-     color = MaterialTheme.colorScheme.onPrimary,
-     fontWeight = FontWeight.Bold
-    )
-   }
-  }
-
-  // Step text
-  Text(
-   text = text,
-   style = MaterialTheme.typography.bodyMedium,
-   color = MaterialTheme.colorScheme.onPrimaryContainer,
-   modifier = Modifier.weight(1f)
-  )
  }
 }
 

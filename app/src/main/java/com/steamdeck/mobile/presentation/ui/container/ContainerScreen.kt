@@ -96,6 +96,30 @@ fun ContainerScreen(
     }
    }
 
+   is ContainerUiState.Creating -> {
+    Box(
+     modifier = Modifier.fillMaxSize(),
+     contentAlignment = Alignment.Center
+    ) {
+     Column(
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(16.dp)
+     ) {
+      CircularProgressIndicator()
+      Text(
+       text = state.message,
+       style = MaterialTheme.typography.bodyLarge,
+       color = MaterialTheme.colorScheme.onSurface
+      )
+      Text(
+       text = "This may take 30-60 seconds...",
+       style = MaterialTheme.typography.bodySmall,
+       color = MaterialTheme.colorScheme.onSurfaceVariant
+      )
+     }
+    }
+   }
+
    is ContainerUiState.Success -> {
     if (state.containers.isEmpty()) {
      EmptyContainersPlaceholder(

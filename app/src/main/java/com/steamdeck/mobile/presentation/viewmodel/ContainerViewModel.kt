@@ -48,6 +48,8 @@ class ContainerViewModel @Inject constructor(
   */
  fun createContainer(name: String) {
   viewModelScope.launch {
+   _uiState.value = ContainerUiState.Creating("Initializing container...")
+
    val config = EmulatorContainerConfig(name = name)
    val result = winlatorEmulator.createContainer(config)
 
@@ -89,6 +91,10 @@ sealed class ContainerUiState {
  /** Loading */
  @Immutable
  data object Loading : ContainerUiState()
+
+ /** Creating container */
+ @Immutable
+ data class Creating(val message: String) : ContainerUiState()
 
  /** Success */
  @Immutable

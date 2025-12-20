@@ -38,7 +38,8 @@ class GameDetailViewModel @Inject constructor(
  private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
  private val deleteGameUseCase: DeleteGameUseCase,
  private val steamLauncher: SteamLauncher,
- private val steamSetupManager: SteamSetupManager
+ private val steamSetupManager: SteamSetupManager,
+ private val scanInstalledGamesUseCase: com.steamdeck.mobile.domain.usecase.ScanInstalledGamesUseCase
 ) : ViewModel() {
 
  companion object {
@@ -56,6 +57,9 @@ class GameDetailViewModel @Inject constructor(
 
  private val _isSteamInstalled = MutableStateFlow(false)
  val isSteamInstalled: StateFlow<Boolean> = _isSteamInstalled.asStateFlow()
+
+ private val _isScanning = MutableStateFlow(false)
+ val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
  init {
   checkSteamInstallation()
@@ -275,6 +279,90 @@ class GameDetailViewModel @Inject constructor(
   */
  fun resetSteamLaunchState() {
   _steamLaunchState.value = SteamLaunchState.Idle
+ }
+
+ /**
+  * Steam Deep Link でゲームのインストール画面を開く
+  *
+  * Android版Steamアプリの steam://install/<appId> プロトコルを使用して、
+  * 公式Steamアプリでゲームをダウンロード/インストールできるようにする
+  */
+ fun openSteamInstallPage(gameId: Long) {
+  viewModelScope.launch {
+   try {
+    // 現在のゲーム情報を取得
+    val currentState = _uiState.value
+    if (currentState !is GameDetailUiState.Success) {
+     AppLogger.e(TAG, "Cannot open Steam install page: game info not loaded")
+     return@launch
+    }
+
+    val game = currentState.game
+
+    // Steam App IDチェック
+    if (game.steamAppId == null) {
+     _steamLaunchState.value = SteamLaunchState.Error(
+      "This game has no Steam App ID"
+     )
+     return@launch
+    }
+
+    // Steam Deep Link で開く
+    val result = steamLauncher.openSteamInstallPage(game.steamAppId)
+
+    result
+     .onSuccess {
+      AppLogger.i(TAG, "Opened Steam install page for: ${game.name} (appId=${game.steamAppId})")
+     }
+     .onFailure { error ->
+      _steamLaunchState.value = SteamLaunchState.Error(
+       error.message ?: "Failed to open Steam install page"
+      )
+      AppLogger.e(TAG, "Failed to open Steam install page", error)
+     }
+
+   } catch (e: Exception) {
+    _steamLaunchState.value = SteamLaunchState.Error(
+     e.message ?: "An unexpected error occurred"
+    )
+    AppLogger.e(TAG, "Exception while opening Steam install page", e)
+   }
+  }
+ }
+
+ /**
+  * インストール済みゲームをスキャンして実行ファイルパスを更新
+  */
+ fun scanForInstalledGame(gameId: Long) {
+  viewModelScope.launch {
+   try {
+    _isScanning.value = true
+    AppLogger.i(TAG, "Scanning for installed game: gameId=$gameId")
+
+    when (val result = scanInstalledGamesUseCase(gameId)) {
+     is DataResult.Success -> {
+      if (result.data) {
+       AppLogger.i(TAG, "Game found and updated")
+       // ゲーム情報を再読み込み
+       loadGame(gameId)
+      } else {
+       AppLogger.i(TAG, "Game not found (not installed yet)")
+      }
+     }
+     is DataResult.Error -> {
+      AppLogger.e(TAG, "Scan failed: ${result.error.message}")
+     }
+     is DataResult.Loading -> {
+      // Handled by _isScanning
+     }
+    }
+
+   } catch (e: Exception) {
+    AppLogger.e(TAG, "Exception during scan", e)
+   } finally {
+    _isScanning.value = false
+   }
+  }
  }
 
 }

@@ -3,6 +3,7 @@ package com.steamdeck.mobile.di.module
 import android.content.Context
 import com.steamdeck.mobile.core.download.DownloadManager
 import com.steamdeck.mobile.core.steam.ProtonManager
+import com.steamdeck.mobile.core.steam.SteamGameScanner
 import com.steamdeck.mobile.core.steam.SteamInstallerService
 import com.steamdeck.mobile.core.steam.SteamLauncher
 import com.steamdeck.mobile.core.steam.SteamSetupManager
@@ -101,6 +102,21 @@ object SteamAuthModule {
   return ProtonManager(
    context = context,
    database = database
+  )
+ }
+
+ /**
+  * Steam Game Scanner
+  *
+  * インストール済みSteamゲームをスキャンします
+  */
+ @Provides
+ @Singleton
+ fun provideSteamGameScanner(
+  winlatorEmulator: WinlatorEmulator
+ ): SteamGameScanner {
+  return SteamGameScanner(
+   winlatorEmulator = winlatorEmulator
   )
  }
 }

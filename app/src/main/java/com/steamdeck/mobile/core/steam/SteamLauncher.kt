@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.Log
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -19,9 +20,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class SteamLauncher @Inject constructor(
- private val context: Context,
- private val winlatorEmulator: WinlatorEmulator,
- private val database: SteamDeckDatabase
+ @ApplicationContext private val context: Context,
+ private val winlatorEmulator: WinlatorEmulator
 ) {
  companion object {
   private const val TAG = "SteamLauncher"

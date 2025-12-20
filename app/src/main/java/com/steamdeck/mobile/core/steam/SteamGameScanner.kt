@@ -123,9 +123,10 @@ class SteamGameScanner @Inject constructor(
   */
  private fun parseInstallDirFromManifest(manifestFile: File): String? {
   return try {
-   val line = manifestFile.readLines()
-    .find { it.contains("\"installdir\"", ignoreCase = true) }
-    ?: return null
+   // Use useLines to properly close file resources
+   val line = manifestFile.useLines { lines ->
+    lines.find { it.contains("\"installdir\"", ignoreCase = true) }
+   } ?: return null
 
    // Bug fix: More robust parsing
    // Expected format: "\t\"installdir\"\t\t\"GameFolder\""
@@ -170,21 +171,28 @@ class SteamGameScanner @Inject constructor(
   * 2. 最初に見つかった .exe ファイル
   */
  private fun findMainExecutable(gameDir: File): File? {
-  val exeFiles = gameDir.walkTopDown()
-   .maxDepth(2) // サブフォルダも1階層まで検索
-   .filter { it.isFile && it.extension.equals("exe", ignoreCase = true) }
-   .toList()
+  return try {
+   // walkTopDown() returns a FileTreeWalk which is closeable
+   // Use toList() within try-catch to handle potential errors during directory traversal
+   val exeFiles = gameDir.walkTopDown()
+    .maxDepth(2) // サブフォルダも1階層まで検索
+    .filter { it.isFile && it.extension.equals("exe", ignoreCase = true) }
+    .toList()
 
-  if (exeFiles.isEmpty()) {
-   return null
+   if (exeFiles.isEmpty()) {
+    return null
+   }
+
+   // フォルダ名と同じ名前の .exe を優先
+   val gameName = gameDir.name
+   val mainExe = exeFiles.find {
+    it.nameWithoutExtension.equals(gameName, ignoreCase = true)
+   }
+
+   mainExe ?: exeFiles.firstOrNull()
+  } catch (e: Exception) {
+   Log.w(TAG, "Error finding executable in ${gameDir.name}: ${e.message}")
+   null
   }
-
-  // フォルダ名と同じ名前の .exe を優先
-  val gameName = gameDir.name
-  val mainExe = exeFiles.find {
-   it.nameWithoutExtension.equals(gameName, ignoreCase = true)
-  }
-
-  return mainExe ?: exeFiles.firstOrNull()
  }
 }

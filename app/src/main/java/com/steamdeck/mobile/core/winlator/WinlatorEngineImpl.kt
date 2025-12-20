@@ -7,6 +7,7 @@ import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.model.WinlatorContainer
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,8 +29,8 @@ class WinlatorEngineImpl @Inject constructor(
  private var currentEmulatorProcess: com.steamdeck.mobile.domain.emulator.EmulatorProcess? = null
 
  // OPTIMIZATION: Cache default container to avoid repeated file system scans
- // Cleared on cleanup() to ensure fresh state
- private var cachedDefaultContainer: com.steamdeck.mobile.domain.emulator.EmulatorContainer? = null
+ // Cleared on cleanup() to ensure fresh state - Thread-safe with AtomicReference
+ private val cachedDefaultContainer = AtomicReference<com.steamdeck.mobile.domain.emulator.EmulatorContainer?>(null)
 
  /**
   * cleanupmethod（メモリリーク防止）
@@ -43,7 +44,7 @@ class WinlatorEngineImpl @Inject constructor(
   Log.d(TAG, "Cleaning up WinlatorEngine resources")
   currentProcessId = null
   currentEmulatorProcess = null
-  cachedDefaultContainer = null // Clear container cache
+  cachedDefaultContainer.set(null) // Clear container cache (thread-safe)
  }
 
  override suspend fun launchGame(game: Game, container: WinlatorContainer?): LaunchResult {
@@ -265,7 +266,7 @@ class WinlatorEngineImpl @Inject constructor(
 
   // PRIORITY 2: Use cached default container (OPTIMIZATION)
   // Most games use the default container, so cache it for instant lookup
-  cachedDefaultContainer?.let { cached ->
+  cachedDefaultContainer.get()?.let { cached ->
    Log.d(TAG, "Using cached default container for: ${game.name}")
    return cached
   }
@@ -278,7 +279,7 @@ class WinlatorEngineImpl @Inject constructor(
 
   if (defaultContainer != null) {
    Log.d(TAG, "Fetched and cached default container for: ${game.name}")
-   cachedDefaultContainer = defaultContainer // Cache for future lookups
+   cachedDefaultContainer.set(defaultContainer) // Cache for future lookups (thread-safe)
    return defaultContainer
   }
 
@@ -305,7 +306,7 @@ class WinlatorEngineImpl @Inject constructor(
 
   val createResult = winlatorEmulator.createContainer(config)
   val createdContainer = createResult.getOrThrow()
-  cachedDefaultContainer = createdContainer // Cache newly created container
+  cachedDefaultContainer.set(createdContainer) // Cache newly created container (thread-safe)
   return createdContainer
  }
 

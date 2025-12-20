@@ -78,13 +78,11 @@ object SteamAuthModule {
  @Singleton
  fun provideSteamLauncher(
   @ApplicationContext context: Context,
-  winlatorEmulator: WinlatorEmulator,
-  database: SteamDeckDatabase
+  winlatorEmulator: WinlatorEmulator
  ): SteamLauncher {
   return SteamLauncher(
    context = context,
-   winlatorEmulator = winlatorEmulator,
-   database = database
+   winlatorEmulator = winlatorEmulator
   )
  }
 

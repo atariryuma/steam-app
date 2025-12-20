@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -54,8 +55,8 @@ class WinlatorEmulator @Inject constructor(
  private val winebootBinary = File(wineDir, "bin/wineboot")
  private val wineserverBinary = File(wineDir, "bin/wineserver")
 
- // Active processes map (processId -> ProcessInfo)
- private val activeProcesses = mutableMapOf<String, ProcessInfo>()
+ // Active processes map (processId -> ProcessInfo) - Thread-safe for concurrent access
+ private val activeProcesses = ConcurrentHashMap<String, ProcessInfo>()
 
  private data class ProcessInfo(
   val process: Process,

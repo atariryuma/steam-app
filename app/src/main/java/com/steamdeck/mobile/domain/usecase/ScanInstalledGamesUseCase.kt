@@ -65,8 +65,8 @@ class ScanInstalledGamesUseCase @Inject constructor(
    if (scanResult.isFailure) {
     AppLogger.e(TAG, "Scan failed: ${scanResult.exceptionOrNull()?.message}")
     return@withContext DataResult.Error(
-     com.steamdeck.mobile.core.error.AppError.UnknownError(
-      "Scan failed: ${scanResult.exceptionOrNull()?.message}"
+     com.steamdeck.mobile.core.error.AppError.Unknown(
+      scanResult.exceptionOrNull()
      )
     )
    }
@@ -102,7 +102,7 @@ class ScanInstalledGamesUseCase @Inject constructor(
   } catch (e: Exception) {
    AppLogger.e(TAG, "Exception during scan", e)
    DataResult.Error(
-    com.steamdeck.mobile.core.error.AppError.UnknownError(e.message ?: "Unknown error")
+    com.steamdeck.mobile.core.error.AppError.Unknown(e)
    )
   }
  }

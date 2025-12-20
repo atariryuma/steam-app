@@ -75,8 +75,16 @@ class ScanInstalledGamesUseCase @Inject constructor(
 
    // 6. 実行ファイルが見つかった場合、ゲーム情報を更新
    if (executablePath != null) {
-    // インストールパスも設定（実行ファイルの親フォルダ）
-    val installPath = executablePath.substringBeforeLast("\\")
+    // Bug fix: インストールパスも設定（実行ファイルの親フォルダ）
+    // Handle cases where path separator might not be present
+    val installPath = if (executablePath.contains("\\")) {
+     executablePath.substringBeforeLast("\\")
+    } else if (executablePath.contains("/")) {
+     executablePath.substringBeforeLast("/")
+    } else {
+     // No path separator - use the path as-is (edge case)
+     executablePath
+    }
 
     val updatedGame = game.copy(
      executablePath = executablePath,

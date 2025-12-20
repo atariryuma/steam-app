@@ -347,10 +347,17 @@ class GameDetailViewModel @Inject constructor(
        loadGame(gameId)
       } else {
        AppLogger.i(TAG, "Game not found (not installed yet)")
+       // Bug fix: Notify user when game is not found
+       _steamLaunchState.value = SteamLaunchState.NotInstalled(
+        "Game not found. Please make sure it's downloaded via Steam app."
+       )
       }
      }
      is DataResult.Error -> {
-      AppLogger.e(TAG, "Scan failed: ${result.error.message}")
+      val errorMessage = result.error.toUserMessage(context)
+      AppLogger.e(TAG, "Scan failed: $errorMessage")
+      // Bug fix: Notify user of scan errors
+      _steamLaunchState.value = SteamLaunchState.Error(errorMessage)
      }
      is DataResult.Loading -> {
       // Handled by _isScanning
@@ -359,6 +366,10 @@ class GameDetailViewModel @Inject constructor(
 
    } catch (e: Exception) {
     AppLogger.e(TAG, "Exception during scan", e)
+    // Bug fix: Notify user of exceptions
+    _steamLaunchState.value = SteamLaunchState.Error(
+     e.message ?: "An unexpected error occurred while scanning"
+    )
    } finally {
     _isScanning.value = false
    }

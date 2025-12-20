@@ -87,9 +87,19 @@ class SteamGameScanner @Inject constructor(
     return@withContext Result.success(null)
    }
 
-   // 7. Windows パス形式に変換 (例: C:/Program Files (x86)/Steam/steamapps/common/Game/game.exe)
-   val relativePath = exeFile.absolutePath.substringAfter("drive_c/")
-   val windowsPath = "C:/$relativePath".replace("/", "\\")
+   // 7. Windows パス形式に変換 (例: C:\Program Files (x86)\Steam\steamapps\common\Game\game.exe)
+   // Bug fix: Handle cases where "drive_c/" might not be in the path
+   val absolutePath = exeFile.absolutePath
+   val relativePath = if (absolutePath.contains("drive_c/")) {
+    absolutePath.substringAfter("drive_c/")
+   } else if (absolutePath.contains("drive_c\\")) {
+    absolutePath.substringAfter("drive_c\\")
+   } else {
+    Log.w(TAG, "Unexpected path format (no drive_c): $absolutePath")
+    return@withContext Result.success(null)
+   }
+
+   val windowsPath = "C:\\$relativePath".replace("/", "\\")
 
    Log.i(TAG, "Found executable: $windowsPath")
    Result.success(windowsPath)
@@ -113,12 +123,39 @@ class SteamGameScanner @Inject constructor(
   */
  private fun parseInstallDirFromManifest(manifestFile: File): String? {
   return try {
-   manifestFile.readLines()
-    .find { it.contains("\"installdir\"") }
-    ?.substringAfter("\"installdir\"")
-    ?.trim()
-    ?.removeSurrounding("\"")
-    ?.trim()
+   val line = manifestFile.readLines()
+    .find { it.contains("\"installdir\"", ignoreCase = true) }
+    ?: return null
+
+   // Bug fix: More robust parsing
+   // Expected format: "\t\"installdir\"\t\t\"GameFolder\""
+   val afterKey = line.substringAfter("\"installdir\"", "")
+   if (afterKey.isEmpty()) {
+    Log.w(TAG, "Invalid manifest format: $line")
+    return null
+   }
+
+   // Extract value between quotes
+   val firstQuote = afterKey.indexOf('"')
+   if (firstQuote == -1) {
+    Log.w(TAG, "No opening quote found: $afterKey")
+    return null
+   }
+
+   val secondQuote = afterKey.indexOf('"', firstQuote + 1)
+   if (secondQuote == -1) {
+    Log.w(TAG, "No closing quote found: $afterKey")
+    return null
+   }
+
+   val installDir = afterKey.substring(firstQuote + 1, secondQuote).trim()
+   if (installDir.isEmpty()) {
+    Log.w(TAG, "Empty install directory")
+    return null
+   }
+
+   installDir
+
   } catch (e: Exception) {
    Log.e(TAG, "Failed to parse manifest file", e)
    null

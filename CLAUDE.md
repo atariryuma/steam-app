@@ -125,6 +125,76 @@ abstract class RepositoryModule {
 - Encrypted token storage via `SecurePreferencesImpl` (AES256-GCM)
 - WebView-based login (Steam公式ログインページ経由)
 
+### Wine Container Management (2025 Best Practice)
+
+**Shared Default Container Pattern** - Optimized for efficiency and UX:
+
+```kotlin
+// WinlatorEngineImpl.kt - Container reuse logic
+private suspend fun getOrCreateEmulatorContainer(
+  game: Game,
+  winlatorContainer: WinlatorContainer
+): EmulatorContainer {
+  // PRIORITY 1: Custom container (advanced users only)
+  if (game.winlatorContainerId != null) {
+    val customContainer = findContainer("container_${game.winlatorContainerId}")
+    if (customContainer != null) return customContainer
+  }
+
+  // PRIORITY 2: Shared default container (recommended for all games)
+  val defaultContainer = findContainer("default_shared_container")
+  if (defaultContainer != null) {
+    Log.d(TAG, "Using shared default container for: ${game.name}")
+    return defaultContainer
+  }
+
+  // PRIORITY 3: Create default container (first-time only)
+  return createContainer(EmulatorContainerConfig(name = "Default Container"))
+}
+```
+
+**Why Shared Containers?**
+- ✅ **Disk usage**: 500MB × 10 games = 5GB → 500MB (90% reduction)
+- ✅ **Launch speed**: 60s × 10 games → 60s once (10x faster)
+- ✅ **Simple UX**: Users don't manage containers manually
+- ✅ **Wine compatibility**: Most games work in shared Wine prefix
+
+**When to Create Separate Containers:**
+- Different Wine versions required (Wine 8.0 vs 9.0)
+- Different Box64 settings (Performance vs Stability)
+- Game-specific DLL conflicts (rare)
+
+**Container ID Strategy:**
+- Default container: Fixed ID `default_shared_container`
+- Custom containers: Timestamp-based ID `${System.currentTimeMillis()}`
+- Game assignment: `Game.winlatorContainerId` (null = use default)
+
+**File Structure:**
+```
+containers/
+├── default_shared_container/    # Shared by all games (default)
+│   └── drive_c/
+│       ├── Program Files/
+│       │   ├── Game1/
+│       │   ├── Game2/
+│       │   └── Game3/
+│       └── windows/
+└── 1703123456789/              # Custom container (if needed)
+    └── drive_c/
+```
+
+**Performance Optimizations (2025):**
+- Container creation timeout: 60s (1st attempt), 90s (retries)
+- Wineserver socket wait: 2s (down from 5s)
+- Box64 settings: Balanced performance (1st attempt), max stability (2nd)
+- Wine logging: Minimal (`-all,+err`) for speed
+- Expected completion time: 30-40s on modern devices
+
+**References:**
+- `WinlatorEngineImpl.kt:225-293` - Container reuse logic
+- `WinlatorEmulator.kt:508-549` - Container creation
+- `LaunchGameUseCase.kt:40-95` - Game launch flow
+
 ## MANDATORY RULES
 
 ### Layer Boundaries

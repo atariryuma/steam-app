@@ -509,8 +509,31 @@ class WinlatorEmulator @Inject constructor(
   config: EmulatorContainerConfig
  ): Result<EmulatorContainer> = withContext(Dispatchers.IO) {
   try {
-   val containerId = "${System.currentTimeMillis()}"
+   // Best Practice: Use fixed ID for default shared container
+   // This enables efficient container reuse across all games
+   val containerId = if (config.name == "Default Container") {
+    "default_shared_container"
+   } else {
+    "${System.currentTimeMillis()}"
+   }
    val containerDir = File(containersDir, containerId)
+
+   // Check if container already exists (prevent duplicate creation)
+   if (containerDir.exists()) {
+    Log.w(TAG, "Container already exists: $containerId, skipping creation")
+    // Return existing container info
+    return@withContext Result.success(
+     EmulatorContainer(
+      id = containerId,
+      name = config.name,
+      config = config,
+      rootPath = containerDir,
+      createdAt = containerDir.lastModified(),
+      lastUsedAt = containerDir.lastModified(),
+      sizeBytes = calculateDirectorySize(containerDir)
+     )
+    )
+   }
 
    // Create container directory structure
    val driveC = File(containerDir, "drive_c")

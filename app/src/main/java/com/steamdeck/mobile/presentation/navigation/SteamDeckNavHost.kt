@@ -24,10 +24,16 @@ import com.steamdeck.mobile.presentation.viewmodel.SteamLoginViewModel
 
 /**
  * App-wide navigation graph
+ *
+ * @param navController Navigation controller for managing app navigation
+ * @param onOpenDrawer Callback to open the app-level drawer (triggered from Home screen hamburger menu)
+ * @param modifier Modifier for the NavHost
+ * @param startDestination Starting destination route
  */
 @Composable
 fun SteamDeckNavHost(
  navController: NavHostController,
+ onOpenDrawer: () -> Unit = {},
  modifier: Modifier = Modifier,
  startDestination: String = Screen.Home.route
 ) {
@@ -37,34 +43,22 @@ fun SteamDeckNavHost(
   modifier = modifier
  ) {
   // Top-level screen: Library (Home)
-  composable(Screen.Home.route) {
-   val currentRoute = navController.currentBackStackEntry?.destination?.route ?: "home"
+  composable(
+   route = Screen.Home.route,
+   arguments = listOf(
+    navArgument("showAddGame") {
+     type = NavType.BoolType
+     defaultValue = false
+    }
+   )
+  ) { backStackEntry ->
+   val showAddGameFromNav = backStackEntry.arguments?.getBoolean("showAddGame") ?: false
    HomeScreen(
     onGameClick = { gameId ->
      navController.navigate(Screen.GameDetail.createRoute(gameId))
     },
-    onNavigateToSettings = {
-     navController.navigate(Screen.Settings.route)
-    },
-    onNavigateToDownloads = {
-     navController.navigate(Screen.Downloads.route)
-    },
-    onNavigateToSteamLogin = {
-     navController.navigate(Screen.SteamLogin.route)
-    },
-    onNavigateToController = {
-     navController.navigate(Screen.ControllerSettings.route)
-    },
-    onNavigateToContainerManagement = {
-     navController.navigate(Screen.ContainerManagement.route)
-    },
-    onNavigateToSteamClient = {
-     navController.navigate(Screen.Settings.createRoute(section = 1))
-    },
-    onNavigateToAppSettings = {
-     navController.navigate(Screen.Settings.createRoute(section = 5))
-    },
-    currentRoute = currentRoute
+    onOpenDrawer = onOpenDrawer,
+    showAddGameDialogInitially = showAddGameFromNav
    )
   }
 

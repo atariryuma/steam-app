@@ -5,7 +5,15 @@ package com.steamdeck.mobile.presentation.navigation
  */
 sealed class Screen(val route: String) {
  // Top-level screens (Bottom Navigation)
- data object Home : Screen("home")
+ data object Home : Screen("home?showAddGame={showAddGame}") {
+  fun createRoute(showAddGame: Boolean = false): String {
+   return if (showAddGame) {
+    "home?showAddGame=true"
+   } else {
+    "home"
+   }
+  }
+ }
  data object Downloads : Screen("downloads")
  data object Settings : Screen("settings?section={section}") {
   fun createRoute(section: Int? = null): String {
@@ -43,7 +51,7 @@ sealed class TopLevelDestination(
  val labelResourceKey: String
 ) {
  data object Home : TopLevelDestination(
-  route = Screen.Home.route,
+  route = "home", // Base route without arguments for bottom nav
   iconResourceName = "home",
   labelResourceKey = "library"
  )

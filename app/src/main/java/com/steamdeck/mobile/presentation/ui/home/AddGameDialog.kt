@@ -46,6 +46,7 @@ private object AddGameDialogDefaults {
  * @param selectedExecutablePath Selected executable file path (passed from parent, immutable)
  * @param selectedInstallPath Selected installation path (passed from parent, immutable)
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddGameDialog(
  onDismiss: () -> Unit,
@@ -99,56 +100,56 @@ fun AddGameDialog(
    modifier = Modifier.fillMaxSize(),
    color = MaterialTheme.colorScheme.background
   ) {
-   Column(modifier = Modifier.fillMaxSize()) {
-    // BackboneOne-style custom header
-    Row(
-     modifier = Modifier
-      .fillMaxWidth()
-      .padding(horizontal = 16.dp, vertical = 16.dp),
-     horizontalArrangement = Arrangement.SpaceBetween,
-     verticalAlignment = Alignment.CenterVertically
-    ) {
-     Row(
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(12.dp)
-     ) {
-      IconButton(onClick = onDismiss) {
-       Icon(
-        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-        contentDescription = stringResource(R.string.content_desc_back),
-        tint = MaterialTheme.colorScheme.primary
+   Scaffold(
+    topBar = {
+     TopAppBar(
+      title = {
+       Text(
+        text = stringResource(R.string.dialog_add_game_title),
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold
        )
-      }
-      Text(
-       text = stringResource(R.string.dialog_add_game_title),
-       style = MaterialTheme.typography.headlineMedium,
-       fontWeight = FontWeight.Bold,
-       color = MaterialTheme.colorScheme.primary
-      )
-     }
-
-     // Add button (in header)
-     Button(
-      onClick = {
-       if (gameName.isNotBlank() &&
-        selectedExecutablePath.isNotBlank() &&
-        selectedInstallPath.isNotBlank()) {
-        onConfirm(gameName, selectedExecutablePath, selectedInstallPath)
-       } else {
-        showError = true
+      },
+      navigationIcon = {
+       IconButton(onClick = onDismiss) {
+        Icon(
+         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+         contentDescription = stringResource(R.string.content_desc_back)
+        )
        }
-      }
-     ) {
-      Icon(Icons.Default.Add, contentDescription = null)
-      Spacer(modifier = Modifier.width(8.dp))
-      Text(stringResource(R.string.dialog_add_game_button))
-     }
+      },
+      actions = {
+       // Add button
+       Button(
+        onClick = {
+         if (gameName.isNotBlank() &&
+          selectedExecutablePath.isNotBlank() &&
+          selectedInstallPath.isNotBlank()) {
+          onConfirm(gameName, selectedExecutablePath, selectedInstallPath)
+         } else {
+          showError = true
+         }
+        },
+        modifier = Modifier.padding(end = 8.dp)
+       ) {
+        Icon(Icons.Default.Add, contentDescription = null)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(stringResource(R.string.dialog_add_game_button))
+       }
+      },
+      colors = TopAppBarDefaults.topAppBarColors(
+       containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+       titleContentColor = MaterialTheme.colorScheme.primary,
+       navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+      )
+     )
     }
-
+   ) { paddingValues ->
     // Content area (scrollable)
     Column(
      modifier = Modifier
       .fillMaxSize()
+      .padding(paddingValues)
       .verticalScroll(rememberScrollState())
       .padding(24.dp),
      verticalArrangement = Arrangement.spacedBy(16.dp)

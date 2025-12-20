@@ -1,9 +1,14 @@
 package com.steamdeck.mobile.presentation.ui.home
 
-import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,19 +17,12 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -35,12 +33,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.steamdeck.mobile.R
 import coil.compose.AsyncImage
+import com.steamdeck.mobile.R
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.model.GameSource
 import com.steamdeck.mobile.presentation.viewmodel.HomeUiState
 import com.steamdeck.mobile.presentation.viewmodel.HomeViewModel
+import kotlinx.coroutines.launch
 
 // UI Constants for maintainability
 private object HomeScreenDefaults {
@@ -78,27 +77,15 @@ private object HomeScreenDefaults {
 @Composable
 fun HomeScreen(
  onGameClick: (Long) -> Unit,
- onNavigateToSettings: () -> Unit,
- onNavigateToDownloads: () -> Unit = onNavigateToSettings,
- onNavigateToSteamLogin: () -> Unit = { },
- onNavigateToController: () -> Unit = { },
- onNavigateToContainerManagement: () -> Unit = { },
- onNavigateToSteamClient: () -> Unit = onNavigateToSettings,
- onNavigateToAppSettings: () -> Unit = onNavigateToSettings,
- currentRoute: String = "home",
+ onOpenDrawer: () -> Unit = {},
+ showAddGameDialogInitially: Boolean = false,
  viewModel: HomeViewModel = hiltViewModel()
 ) {
  val context = LocalContext.current
  val uiState by viewModel.uiState.collectAsState()
- var showAddGameDialog by remember { mutableStateOf(false) }
+ var showAddGameDialog by remember { mutableStateOf(showAddGameDialogInitially) }
  var executableUri by remember { mutableStateOf<Uri?>(null) }
  var installFolderUri by remember { mutableStateOf<Uri?>(null) }
- val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
- val scope = rememberCoroutineScope()
-
- // Mini drawer width state (280.dp expanded, 80.dp collapsed icon-only mode)
- var drawerWidth by remember { mutableStateOf(280.dp) }
- val isDrawerCollapsed = drawerWidth == 80.dp
 
  val executableLauncher = rememberLauncherForActivityResult(
   contract = ActivityResultContracts.OpenDocument()
@@ -108,148 +95,46 @@ fun HomeScreen(
   contract = ActivityResultContracts.OpenDocumentTree()
  ) { uri -> uri?.let { installFolderUri = it } }
 
- // Drawer actions with proper scope management
- val openDrawer: () -> Unit = {
-  scope.launch {
-   drawerWidth = 280.dp
-   drawerState.open()
+ // Use Scaffold for proper layout structure (Material 3 best practice)
+ Scaffold(
+  topBar = {
+   HomeTopBar(
+    onMenuClick = onOpenDrawer
+   )
   }
- }
- val closeDrawer: () -> Unit = { scope.launch { drawerState.close() } }
- val collapseDrawer: () -> Unit = {
-  scope.launch {
-   drawerWidth = 80.dp
-   if (!drawerState.isOpen) {
-    drawerState.open()
-   }
-   // Keep drawer open but collapsed to icon-only mode
-  }
- }
- val expandDrawer: () -> Unit = {
-  scope.launch {
-   drawerWidth = 280.dp
-   if (!drawerState.isOpen) {
-    drawerState.open()
-   }
-  }
- }
-
- // Reset drawer width when returning to home (currentRoute == "home")
- LaunchedEffect(currentRoute) {
-  if (currentRoute == "home" && isDrawerCollapsed) {
-   drawerWidth = 280.dp
-   if (drawerState.isOpen) {
-    drawerState.close()
-   }
-  }
- }
-
- // Row-based layout for persistent mini drawer support
- Row(modifier = Modifier.fillMaxSize()) {
-  // Animated drawer with width state (280.dp expanded, 80.dp collapsed)
-  AnimatedVisibility(
-   visible = drawerState.isOpen || isDrawerCollapsed,
-   enter = androidx.compose.animation.expandHorizontally(),
-   exit = androidx.compose.animation.shrinkHorizontally()
+ ) { paddingValues ->
+  // Content area with state-based rendering
+  Box(
+   modifier = Modifier
+    .fillMaxSize()
+    .padding(paddingValues)
   ) {
-   Surface(
-    modifier = Modifier
-     .fillMaxHeight()
-     .width(drawerWidth)
-     .animateContentSize(
-      animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-     ),
-    color = MaterialTheme.colorScheme.surfaceVariant,
-    tonalElevation = 3.dp
-   ) {
-    NavigationDrawerContent(
-     onNavigateToHome = {
-      closeDrawer()
-      // Already on home, just close drawer
-     },
-     onNavigateToDownloads = {
-      closeDrawer()
-      onNavigateToDownloads()
-     },
-     onNavigateToSteamLogin = {
-      collapseDrawer()
-      onNavigateToSteamLogin()
-     },
-     onNavigateToSyncLibrary = {
-      collapseDrawer()
-      onNavigateToSettings() // Navigate to Settings for Steam sync
-     },
-     onNavigateToSteamClient = {
-      collapseDrawer()
-      onNavigateToSteamClient()
-     },
-     onNavigateToController = {
-      collapseDrawer()
-      onNavigateToController()
-     },
-     onNavigateToContainerManagement = {
-      collapseDrawer()
-      onNavigateToContainerManagement()
-     },
-     onNavigateToAppSettings = {
-      collapseDrawer()
-      onNavigateToAppSettings()
-     },
-     onAddGame = {
-      closeDrawer()
-      showAddGameDialog = true
-     },
-     currentRoute = currentRoute,
-     isCollapsed = isDrawerCollapsed,
-     onExpandDrawer = expandDrawer
-    )
-   }
-  }
-
-  // Main content area
-  Box(modifier = Modifier.fillMaxSize()) {
-   // Use Scaffold for proper layout structure (Material 3 best practice)
-   Scaffold(
-    topBar = {
-     HomeTopBar(
-      onMenuClick = openDrawer
+   when (val state = uiState) {
+    is HomeUiState.Loading -> LoadingContent()
+    is HomeUiState.Success -> {
+     BackboneOneStyleContent(
+      games = state.games,
+      onGameClick = onGameClick,
+      onToggleFavorite = viewModel::toggleFavorite
      )
     }
-   ) { paddingValues ->
-    // Content area with state-based rendering
-    Box(
-     modifier = Modifier
-      .fillMaxSize()
-      .padding(paddingValues)
-    ) {
-     when (val state = uiState) {
-      is HomeUiState.Loading -> LoadingContent()
-      is HomeUiState.Success -> {
-       BackboneOneStyleContent(
-        games = state.games,
-        onGameClick = onGameClick,
-        onToggleFavorite = viewModel::toggleFavorite
-       )
-      }
-      is HomeUiState.Empty -> EmptyContent(onAddGame = { showAddGameDialog = true })
-      is HomeUiState.Error -> ErrorContent(state.message, viewModel::refresh)
-     }
-    }
+    is HomeUiState.Empty -> EmptyContent(onAddGame = { showAddGameDialog = true })
+    is HomeUiState.Error -> ErrorContent(state.message, viewModel::refresh)
    }
+  }
 
-   if (showAddGameDialog) {
-    AddGameDialog(
-     onDismiss = { showAddGameDialog = false },
-     onConfirm = { name, execPath, instPath ->
-      viewModel.addGame(name, execPath, instPath)
-      showAddGameDialog = false
-     },
-     onSelectExecutable = { executableLauncher.launch(arrayOf("*/*")) },
-     onSelectInstallFolder = { folderLauncher.launch(null) },
-     selectedExecutablePath = executableUri?.toString() ?: "",
-     selectedInstallPath = installFolderUri?.toString() ?: ""
-    )
-   }
+  if (showAddGameDialog) {
+   AddGameDialog(
+    onDismiss = { showAddGameDialog = false },
+    onConfirm = { name, execPath, instPath ->
+     viewModel.addGame(name, execPath, instPath)
+     showAddGameDialog = false
+    },
+    onSelectExecutable = { executableLauncher.launch(arrayOf("*/*")) },
+    onSelectInstallFolder = { folderLauncher.launch(null) },
+    selectedExecutablePath = executableUri?.toString() ?: "",
+    selectedInstallPath = installFolderUri?.toString() ?: ""
+   )
   }
  }
 }
@@ -515,6 +400,7 @@ fun NavigationDrawerContent(
  onNavigateToSteamClient: () -> Unit,
  onNavigateToController: () -> Unit,
  onNavigateToContainerManagement: () -> Unit,
+ onNavigateToWineTest: () -> Unit,
  onNavigateToAppSettings: () -> Unit,
  onAddGame: () -> Unit,
  currentRoute: String,
@@ -526,39 +412,91 @@ fun NavigationDrawerContent(
   Column(
    modifier = Modifier
     .fillMaxHeight()
-    .padding(8.dp),
+    .padding(vertical = 8.dp, horizontal = 4.dp),
    horizontalAlignment = Alignment.CenterHorizontally,
-   verticalArrangement = Arrangement.spacedBy(16.dp)
+   verticalArrangement = Arrangement.spacedBy(8.dp)
   ) {
-   // Expand button
+   // Expand button (hamburger menu)
    IconButton(onClick = onExpandDrawer) {
     Icon(
      imageVector = Icons.Default.Menu,
      contentDescription = "Expand drawer",
-     tint = MaterialTheme.colorScheme.primary
+     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+     modifier = Modifier.size(24.dp)
     )
    }
 
-   HorizontalDivider()
+   HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-   // Show only active section icon
-   when {
-    currentRoute in listOf("settings/steam_login", "settings?section=1", "settings?section=2") -> {
-     Icon(
-      imageVector = Icons.Default.CloudDownload,
-      contentDescription = "STEAM",
-      tint = MaterialTheme.colorScheme.primary,
-      modifier = Modifier.size(24.dp)
-     )
-    }
-    currentRoute in listOf("settings/controller", "settings/containers", "settings?section=4", "settings?section=5") -> {
-     Icon(
-      imageVector = Icons.Default.Settings,
-      contentDescription = "SYSTEM",
-      tint = MaterialTheme.colorScheme.primary,
-      modifier = Modifier.size(24.dp)
-     )
-    }
+   // Home / Library
+   IconButton(onClick = onNavigateToHome) {
+    Icon(
+     imageVector = Icons.Default.Home,
+     contentDescription = stringResource(R.string.drawer_item_library),
+     tint = if (currentRoute == "home") MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+     modifier = Modifier.size(24.dp)
+    )
+   }
+
+   // Downloads
+   IconButton(onClick = onNavigateToDownloads) {
+    Icon(
+     imageVector = Icons.Default.CloudDownload,
+     contentDescription = stringResource(R.string.drawer_item_downloads),
+     tint = if (currentRoute == "downloads") MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+     modifier = Modifier.size(24.dp)
+    )
+   }
+
+   HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+   // STEAM Section (highlighted if any child route is active)
+   val steamActive = currentRoute == "settings/steam_login" ||
+    currentRoute.startsWith("settings") && (
+     currentRoute.contains("section=1") || currentRoute.contains("section=2")
+    )
+
+   IconButton(onClick = onNavigateToSteamLogin) {
+    Icon(
+     imageVector = Icons.Default.Security,
+     contentDescription = stringResource(R.string.drawer_section_steam),
+     tint = if (steamActive) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+     modifier = Modifier.size(24.dp)
+    )
+   }
+
+   // SYSTEM Section (highlighted if any child route is active)
+   val systemActive = currentRoute == "settings/controller" ||
+    currentRoute == "settings/containers" ||
+    currentRoute.startsWith("settings") && (
+     currentRoute.contains("section=4") || currentRoute.contains("section=5")
+    )
+
+   IconButton(onClick = onNavigateToController) {
+    Icon(
+     imageVector = Icons.Default.SportsEsports,
+     contentDescription = stringResource(R.string.drawer_section_system),
+     tint = if (systemActive) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+     modifier = Modifier.size(24.dp)
+    )
+   }
+
+   Spacer(modifier = Modifier.weight(1f))
+
+   HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+   // Add Game button at bottom
+   IconButton(onClick = onAddGame) {
+    Icon(
+     imageVector = Icons.Default.Add,
+     contentDescription = stringResource(R.string.drawer_item_add_game),
+     tint = MaterialTheme.colorScheme.primary,
+     modifier = Modifier.size(24.dp)
+    )
    }
   }
   return
@@ -567,11 +505,20 @@ fun NavigationDrawerContent(
  // Expansion state (Gmail-style: only 1 section expanded at a time)
  var expandedSection by rememberSaveable { mutableStateOf<String?>(null) }
 
- // Auto-expand based on current route
+ // Auto-expand based on current route (detect Settings screen sections)
  LaunchedEffect(currentRoute) {
   expandedSection = when {
-   currentRoute in listOf("settings/steam_login", "settings?section=1", "settings?section=2") -> "steam"
-   currentRoute in listOf("settings/controller", "settings/containers", "settings?section=4", "settings?section=5") -> "system"
+   // STEAM section routes
+   currentRoute == "settings/steam_login" ||
+   currentRoute.startsWith("settings") && (
+    currentRoute.contains("section=1") || currentRoute.contains("section=2")
+   ) -> "steam"
+   // SYSTEM section routes
+   currentRoute == "settings/controller" ||
+   currentRoute == "settings/containers" ||
+   currentRoute.startsWith("settings") && (
+    currentRoute.contains("section=4") || currentRoute.contains("section=5")
+   ) -> "system"
    else -> null
   }
  }
@@ -646,7 +593,10 @@ fun NavigationDrawerContent(
    icon = Icons.Default.CloudDownload,
    expanded = steamExpanded,
    onExpandToggle = { toggleSection("steam") },
-   selected = currentRoute in listOf("settings/steam_login", "settings?section=1", "settings?section=2")
+   selected = currentRoute == "settings/steam_login" ||
+    currentRoute.startsWith("settings") && (
+     currentRoute.contains("section=1") || currentRoute.contains("section=2")
+    )
   ) {
    DrawerChildItem(
     label = stringResource(R.string.drawer_item_steam_login),
@@ -657,13 +607,13 @@ fun NavigationDrawerContent(
    DrawerChildItem(
     label = stringResource(R.string.drawer_item_sync_library),
     icon = Icons.Default.Refresh,
-    selected = currentRoute.contains("section=2"),
+    selected = currentRoute.startsWith("settings") && currentRoute.contains("section=2"),
     onClick = onNavigateToSyncLibrary
    )
    DrawerChildItem(
     label = stringResource(R.string.drawer_item_steam_client),
     icon = Icons.Default.Computer,
-    selected = currentRoute.contains("section=1"),
+    selected = currentRoute.startsWith("settings") && currentRoute.contains("section=1"),
     onClick = onNavigateToSteamClient
    )
   }
@@ -676,7 +626,11 @@ fun NavigationDrawerContent(
    icon = Icons.Default.Settings,
    expanded = systemExpanded,
    onExpandToggle = { toggleSection("system") },
-   selected = currentRoute in listOf("settings/controller", "settings/containers", "settings?section=4", "settings?section=5")
+   selected = currentRoute == "settings/controller" ||
+    currentRoute == "settings/containers" ||
+    currentRoute.startsWith("settings") && (
+     currentRoute.contains("section=4") || currentRoute.contains("section=5")
+    )
   ) {
    DrawerChildItem(
     label = stringResource(R.string.drawer_item_controller),
@@ -687,8 +641,8 @@ fun NavigationDrawerContent(
    DrawerChildItem(
     label = stringResource(R.string.drawer_item_wine_test),
     icon = Icons.Default.Warning,
-    selected = currentRoute.contains("section=4"),
-    onClick = { onNavigateToAppSettings() } // Navigate to Settings Section 4 (Wine Test)
+    selected = currentRoute.startsWith("settings") && currentRoute.contains("section=4"),
+    onClick = onNavigateToWineTest
    )
    DrawerChildItem(
     label = stringResource(R.string.drawer_item_container_management),
@@ -699,7 +653,7 @@ fun NavigationDrawerContent(
    DrawerChildItem(
     label = stringResource(R.string.drawer_item_app_settings),
     icon = Icons.Default.Info,
-    selected = currentRoute.contains("section=5"),
+    selected = currentRoute.startsWith("settings") && currentRoute.contains("section=5"),
     onClick = onNavigateToAppSettings
    )
   }

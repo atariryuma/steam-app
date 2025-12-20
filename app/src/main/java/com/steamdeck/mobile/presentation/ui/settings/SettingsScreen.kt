@@ -109,6 +109,13 @@ fun SettingsScreen(
  }
  var showWebView by remember { mutableStateOf(false) }
 
+ // Update selectedSection when initialSection changes (navigation from drawer)
+ LaunchedEffect(initialSection) {
+  if (initialSection >= 0) {
+   selectedSection = initialSection
+  }
+ }
+
  // Error・Successメッセージ スナックバー表示
  LaunchedEffect(uiState) {
   when (val state = uiState) {
@@ -291,14 +298,14 @@ private fun SettingsContent(
       onNavigateToControllerSettings = onNavigateToControllerSettings
      )
      4 -> WineTestIntegratedContent(
-      viewModel = wineTestViewModel,
-      modifier = Modifier.fillMaxSize()
+      viewModel = wineTestViewModel
      )
      5 -> AppSettingsContent()
     }
    }
   }
  }
+}
 }
 
 @Composable
@@ -1219,16 +1226,14 @@ private fun ControllerContent(
  */
 @Composable
 private fun WineTestIntegratedContent(
- modifier: Modifier = Modifier,
- viewModel: WineTestViewModel = hiltViewModel()
+ viewModel: WineTestViewModel
 ) {
  val uiState by viewModel.uiState.collectAsState()
 
  Column(
-  modifier = modifier
-   .fillMaxSize()
-   .verticalScroll(rememberScrollState())
-   .padding(24.dp),
+  modifier = Modifier
+   .fillMaxWidth()
+   .padding(0.dp),
   verticalArrangement = Arrangement.spacedBy(16.dp)
  ) {
   // Header
@@ -1599,5 +1604,4 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
    }
   }
  }
-}
 }

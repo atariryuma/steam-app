@@ -20,16 +20,17 @@ import com.steamdeck.mobile.presentation.viewmodel.ControllerUiState
 import com.steamdeck.mobile.presentation.viewmodel.ControllerViewModel
 
 /**
- * Controller settings screen - BackboneOnestyle design
+ * Controller settings screen - Material3 design
  *
  * Best Practices:
- * - No TopAppBar for immersive full-screen experience
- * - Custom header with back button and refresh action
+ * - Material3 TopAppBar for consistency
+ * - Scaffold structure
  * - Material3 Card styling: elevation 2dp, padding 20dp, shapes.large
  * - LazyColumn with 24dp contentPadding, 16dp item spacing
  *
  * Displays connected controllers, button mapping configuration, and profile management.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ControllerSettingsScreen(
  viewModel: ControllerViewModel = hiltViewModel(),
@@ -44,45 +45,46 @@ fun ControllerSettingsScreen(
 
  var showDeleteConfirmation by remember { mutableStateOf<ControllerProfile?>(null) }
 
- Column(modifier = Modifier.fillMaxSize()) {
-  // BackboneOne-style custom header
-  Row(
-   modifier = Modifier
-    .fillMaxWidth()
-    .padding(horizontal = 16.dp, vertical = 16.dp),
-   horizontalArrangement = Arrangement.SpaceBetween,
-   verticalAlignment = Alignment.CenterVertically
-  ) {
-   Row(
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(12.dp)
-   ) {
-    IconButton(onClick = onBackClick) {
-     Icon(
-      imageVector = Icons.Default.ArrowBack,
-      contentDescription = "Back",
-      tint = MaterialTheme.colorScheme.primary
+ Scaffold(
+  topBar = {
+   TopAppBar(
+    title = {
+     Text(
+      text = "Controller Settings",
+      style = MaterialTheme.typography.titleLarge,
+      fontWeight = FontWeight.Bold
      )
-    }
-    Text(
-     text = "Controller Settings",
-     style = MaterialTheme.typography.headlineMedium,
-     fontWeight = FontWeight.Bold,
-     color = MaterialTheme.colorScheme.primary
+    },
+    navigationIcon = {
+     IconButton(onClick = onBackClick) {
+      Icon(
+       imageVector = Icons.Default.ArrowBack,
+       contentDescription = "Back"
+      )
+     }
+    },
+    actions = {
+     IconButton(onClick = { viewModel.refreshControllers() }) {
+      Icon(
+       imageVector = Icons.Default.Refresh,
+       contentDescription = "Update"
+      )
+     }
+    },
+    colors = TopAppBarDefaults.topAppBarColors(
+     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+     titleContentColor = MaterialTheme.colorScheme.primary,
+     navigationIconContentColor = MaterialTheme.colorScheme.onSurface
     )
-   }
-
-   IconButton(onClick = { viewModel.refreshControllers() }) {
-    Icon(
-     imageVector = Icons.Default.Refresh,
-     contentDescription = "Update",
-     tint = MaterialTheme.colorScheme.onSurface
-    )
-   }
+   )
   }
-
+ ) { paddingValues ->
   // Content area
-  Box(modifier = Modifier.fillMaxSize()) {
+  Box(
+   modifier = Modifier
+    .fillMaxSize()
+    .padding(paddingValues)
+  ) {
    when {
     uiState is ControllerUiState.Loading -> {
      CircularProgressIndicator(

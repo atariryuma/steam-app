@@ -572,15 +572,21 @@ class WinlatorEmulator @Inject constructor(
    }
 
    // Set Windows version to Windows 10 (required for Steam)
+   // Use direct registry edit (Winlator method) instead of wine regedit to avoid proot crashes
    Log.i(TAG, "Configuring Wine to report as Windows 10...")
-   val versionResult = setWindowsVersion(containerDir)
-   if (versionResult.isFailure) {
-    Log.e(TAG, "CRITICAL: Failed to set Windows version: ${versionResult.exceptionOrNull()?.message}")
-    Log.e(TAG, "Steam installation will likely fail without Windows 10 registry configuration")
-    // NOTE: Non-fatal error - continue container creation
-    // Some apps may work without Windows 10, but Steam requires it
+   val directEditSuccess = setWindowsVersionDirect(containerDir)
+   if (!directEditSuccess) {
+    Log.w(TAG, "Direct registry edit failed, trying fallback method...")
+    // Fallback: try the old wine regedit method
+    val versionResult = setWindowsVersion(containerDir)
+    if (versionResult.isFailure) {
+     Log.e(TAG, "CRITICAL: Failed to set Windows version: ${versionResult.exceptionOrNull()?.message}")
+     Log.e(TAG, "Steam installation will likely fail without Windows 10 registry configuration")
+    } else {
+     Log.i(TAG, "Windows 10 registry configuration completed via fallback method")
+    }
    } else {
-    Log.i(TAG, "Windows 10 registry configuration completed successfully")
+    Log.i(TAG, "Windows 10 registry configuration completed successfully (direct edit)")
    }
 
    val container = EmulatorContainer(
@@ -1396,9 +1402,53 @@ class WinlatorEmulator @Inject constructor(
     }
 
     if (exitCode == 0) {
-     // SUCCESS!
-     Log.i(TAG, "Wine prefix initialized successfully on attempt ${attemptNumber + 1}")
-     return@withContext Result.success(Unit)
+     // Exit code 0, but verify Wine prefix is actually complete
+     // Check for critical registry files (Wine best practice)
+     val systemReg = File(containerDir, "system.reg")
+     val userReg = File(containerDir, "user.reg")
+     val userdefReg = File(containerDir, "userdef.reg")
+
+     // Wait up to 5 seconds for registry files to be created
+     var registryCheckRetries = 0
+     val maxRegistryRetries = 10 // 10 x 500ms = 5 seconds
+     while (registryCheckRetries < maxRegistryRetries) {
+      if (systemReg.exists() && userReg.exists() && userdefReg.exists()) {
+       Log.i(TAG, "Wine prefix initialized successfully on attempt ${attemptNumber + 1}")
+       Log.d(TAG, "Verified: system.reg, user.reg, userdef.reg all present")
+       return@withContext Result.success(Unit)
+      }
+
+      if (registryCheckRetries == 0) {
+       Log.i(TAG, "Registry files not yet created, waiting...")
+      }
+      delay(500)
+      registryCheckRetries++
+     }
+
+     // Registry files not created despite exit code 0
+     Log.w(TAG, "wineboot returned 0 but registry files missing after ${maxRegistryRetries * 500 / 1000}s")
+     Log.w(TAG, "  system.reg exists: ${systemReg.exists()}")
+     Log.w(TAG, "  user.reg exists: ${userReg.exists()}")
+     Log.w(TAG, "  userdef.reg exists: ${userdefReg.exists()}")
+
+     // Check output for c0000135 error (DLL not found)
+     val hasC0000135 = output.toString().contains("c0000135", ignoreCase = true)
+     if (hasC0000135) {
+      Log.e(TAG, "Detected c0000135 error (DLL not found) - Wine prefix initialization failed")
+     }
+
+     // Treat as failure and retry
+     if (attemptNumber < MAX_RETRY_ATTEMPTS - 1) {
+      cleanupPartialPrefix(containerDir)
+      val backoffMs = (attemptNumber + 1) * RETRY_BACKOFF_MS
+      Log.i(TAG, "Retrying after ${backoffMs / 1000}s...")
+      delay(backoffMs)
+      continue
+     } else {
+      return@withContext Result.failure(
+       WinePrefixException("Wine prefix incomplete: registry files not created. Possible c0000135 error.")
+      )
+     }
     }
 
     // Failed with non-zero exit code
@@ -1599,6 +1649,99 @@ REGEDIT4
   } catch (e: Exception) {
    Log.e(TAG, "Failed to set Windows version", e)
    Result.failure(EmulatorException("Failed to set Windows version: ${e.message}", e))
+  }
+ }
+
+ /**
+  * Set Windows version to Windows 10 by directly editing system.reg
+  *
+  * This method uses the Winlator approach: directly editing the registry file
+  * instead of using `wine regedit`, which can crash with proot (SIGSEGV).
+  *
+  * @param containerDir Wine prefix directory
+  * @return true if successful, false otherwise
+  */
+ private suspend fun setWindowsVersionDirect(containerDir: File): Boolean = withContext(Dispatchers.IO) {
+  try {
+   Log.i(TAG, "Setting Windows version to Windows 10 (direct registry edit)")
+
+   val systemRegFile = File(containerDir, "system.reg")
+
+   // Wait for system.reg to be created by wineserver (up to 10 seconds)
+   var retries = 0
+   val maxRetries = 20  // 20 x 500ms = 10 seconds
+   while (!systemRegFile.exists() && retries < maxRetries) {
+    if (retries == 0) {
+     Log.i(TAG, "Waiting for system.reg to be created by wineserver...")
+    }
+    delay(500)
+    retries++
+   }
+
+   if (!systemRegFile.exists()) {
+    Log.e(TAG, "system.reg not found after ${maxRetries * 500 / 1000}s: ${systemRegFile.absolutePath}")
+    return@withContext false
+   }
+
+   Log.i(TAG, "Found system.reg after ${retries * 500}ms")
+
+   // Read system.reg
+   val lines = systemRegFile.readLines().toMutableList()
+
+   // Find the CurrentVersion section
+   // Wine registry uses double backslashes in paths
+   var currentVersionIndex = -1
+   for (i in lines.indices) {
+    if (lines[i].contains("[Software\\\\Microsoft\\\\Windows NT\\\\CurrentVersion]")) {
+     currentVersionIndex = i
+     Log.d(TAG, "Found CurrentVersion section at line $i")
+     break
+    }
+   }
+
+   if (currentVersionIndex == -1) {
+    Log.e(TAG, "CurrentVersion section not found in system.reg")
+    return@withContext false
+   }
+
+   // Remove existing Windows version settings to avoid duplicates
+   var insertIndex = currentVersionIndex + 1
+   val keysToRemove = setOf("CurrentVersion", "CurrentBuild", "CurrentBuildNumber", "ProductName")
+
+   while (insertIndex < lines.size && !lines[insertIndex].startsWith("[")) {
+    val line = lines[insertIndex]
+    if (line.isNotBlank() && keysToRemove.any { key -> line.contains("\"$key\"") }) {
+     Log.d(TAG, "Removing existing registry entry: ${line.trim()}")
+     lines.removeAt(insertIndex)
+    } else {
+     insertIndex++
+    }
+   }
+
+   // Insert Windows 10 settings
+   // Wine registry format: "KeyName"="Value" for strings, "KeyName"=dword:VALUE for DWORD
+   val newSettings = listOf(
+    "\"CurrentVersion\"=\"10.0\"",
+    "\"CurrentBuild\"=\"19045\"",
+    "\"CurrentBuildNumber\"=\"19045\"",
+    "\"ProductName\"=\"Windows 10 Pro\""
+   )
+
+   insertIndex = currentVersionIndex + 1
+   newSettings.forEach { setting ->
+    lines.add(insertIndex++, setting)
+    Log.d(TAG, "Added registry entry: $setting")
+   }
+
+   // Write back to file
+   systemRegFile.writeText(lines.joinToString("\n"))
+
+   Log.i(TAG, "Successfully configured Wine to report as Windows 10 (direct edit)")
+   return@withContext true
+
+  } catch (e: Exception) {
+   Log.e(TAG, "Failed to set Windows version via direct edit", e)
+   return@withContext false
   }
  }
 

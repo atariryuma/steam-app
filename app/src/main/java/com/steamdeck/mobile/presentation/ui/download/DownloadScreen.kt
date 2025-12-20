@@ -33,6 +33,7 @@ import com.steamdeck.mobile.presentation.viewmodel.DownloadViewModel
  * - https://developer.android.com/develop/ui/compose/lists
  * - https://m3.material.io/develop/android/jetpack-compose
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DownloadScreen(
  viewModel: DownloadViewModel = hiltViewModel(),
@@ -41,82 +42,85 @@ fun DownloadScreen(
  val downloads by viewModel.downloads.collectAsState()
  val activeDownloads by viewModel.activeDownloads.collectAsState()
 
- Column(modifier = Modifier.fillMaxSize()) {
-  // BackboneOne-style custom header
-  Row(
+ Scaffold(
+  topBar = {
+   TopAppBar(
+    title = {
+     Text(
+      text = stringResource(R.string.drawer_item_downloads),
+      style = MaterialTheme.typography.titleLarge,
+      fontWeight = FontWeight.Bold
+     )
+    },
+    navigationIcon = {
+     IconButton(onClick = onNavigateBack) {
+      Icon(
+       imageVector = Icons.Default.ArrowBack,
+       contentDescription = "Back"
+      )
+     }
+    },
+    actions = {
+     // Clear completed button
+     IconButton(
+      onClick = { viewModel.clearCompleted() },
+      enabled = downloads.any { it.status == DownloadStatus.COMPLETED }
+     ) {
+      Icon(
+       imageVector = Icons.Default.Clear,
+       contentDescription = "Clear Completed"
+      )
+     }
+    },
+    colors = TopAppBarDefaults.topAppBarColors(
+     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+     titleContentColor = MaterialTheme.colorScheme.primary,
+     navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+    )
+   )
+  }
+ ) { paddingValues ->
+  Column(
    modifier = Modifier
-    .fillMaxWidth()
-    .padding(horizontal = 16.dp, vertical = 16.dp),
-   horizontalArrangement = Arrangement.SpaceBetween,
-   verticalAlignment = Alignment.CenterVertically
+    .fillMaxSize()
+    .padding(paddingValues)
   ) {
-   Row(
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(12.dp)
-   ) {
-    IconButton(onClick = onNavigateBack) {
-     Icon(
-      imageVector = Icons.Default.ArrowBack,
-      contentDescription = "Back",
-      tint = MaterialTheme.colorScheme.primary
+   // Active downloads count display
+   if (activeDownloads > 0) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+     LinearProgressIndicator(
+      modifier = Modifier.fillMaxWidth()
+     )
+     Text(
+      text = stringResource(R.string.download_active_count, activeDownloads),
+      style = MaterialTheme.typography.labelMedium,
+      color = MaterialTheme.colorScheme.primary,
+      modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
      )
     }
-    Text(
-     text = stringResource(R.string.drawer_item_downloads),
-     style = MaterialTheme.typography.headlineMedium,
-     fontWeight = FontWeight.Bold,
-     color = MaterialTheme.colorScheme.primary
-    )
    }
 
-   // Clear completed button
-   IconButton(
-    onClick = { viewModel.clearCompleted() },
-    enabled = downloads.any { it.status == DownloadStatus.COMPLETED }
-   ) {
-    Icon(
-     imageVector = Icons.Default.Clear,
-     contentDescription = "Clear Completed",
-     tint = MaterialTheme.colorScheme.onSurface
-    )
-   }
-  }
-
-  // Active downloads count display
-  if (activeDownloads > 0) {
-   Column(modifier = Modifier.fillMaxWidth()) {
-    LinearProgressIndicator(
-     modifier = Modifier.fillMaxWidth()
-    )
-    Text(
-     text = stringResource(R.string.download_active_count, activeDownloads),
-     style = MaterialTheme.typography.labelMedium,
-     color = MaterialTheme.colorScheme.primary,
-     modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
-    )
-   }
-  }
-
-  // Download list
-  if (downloads.isEmpty()) {
-   EmptyDownloadsPlaceholder()
-  } else {
-   LazyColumn(
-    modifier = Modifier.fillMaxSize(),
-    contentPadding = PaddingValues(24.dp),
-    verticalArrangement = Arrangement.spacedBy(16.dp)
-   ) {
-    items(
-     items = downloads,
-     key = { it.id }
-    ) { download ->
-     DownloadItem(
-      download = download,
-      onPause = { viewModel.pauseDownload(download.id) },
-      onResume = { viewModel.resumeDownload(download.id) },
-      onCancel = { viewModel.cancelDownload(download.id) },
-      onRetry = { viewModel.retryDownload(download.id) }
-     )
+   // Download list
+   if (downloads.isEmpty()) {
+    EmptyDownloadsPlaceholder()
+   } else {
+    LazyColumn(
+     modifier = Modifier.fillMaxSize(),
+     contentPadding = PaddingValues(24.dp),
+     verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+     items(
+      items = downloads,
+      key = { it.id }
+     ) { download ->
+      DownloadItem(
+       download = download,
+       onPause = { viewModel.pauseDownload(download.id) },
+       onResume = { viewModel.resumeDownload(download.id) },
+       onCancel = { viewModel.cancelDownload(download.id) },
+       onRetry = { viewModel.retryDownload(download.id) }
+      )
+     }
     }
    }
   }

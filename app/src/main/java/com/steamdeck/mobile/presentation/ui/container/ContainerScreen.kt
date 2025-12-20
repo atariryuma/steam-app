@@ -19,11 +19,11 @@ import com.steamdeck.mobile.presentation.viewmodel.ContainerUiState
 import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
 
 /**
- * WinlatorContainer Management画面 - BackboneOnestyle design
+ * WinlatorContainer Management画面 - Material3 design
  *
  * Best Practices:
- * - No TopAppBar for immersive full-screen experience
- * - Custom header with back button and add button
+ * - Material3 TopAppBar for consistency
+ * - Scaffold structure
  * - Material3 Card styling: elevation 2dp, padding 20dp, shapes.large
  * - LazyColumn with 24dp contentPadding, 16dp item spacing
  *
@@ -33,6 +33,7 @@ import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
  * - ContainerEdit
  * - Containerdelete
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContainerScreen(
  onNavigateBack: () -> Unit,
@@ -48,48 +49,47 @@ fun ContainerScreen(
   viewModel.loadContainers()
  }
 
- Column(modifier = Modifier.fillMaxSize()) {
-  // BackboneOne風customヘッダー
-  Row(
-   modifier = Modifier
-    .fillMaxWidth()
-    .padding(horizontal = 16.dp, vertical = 16.dp),
-   horizontalArrangement = Arrangement.SpaceBetween,
-   verticalAlignment = Alignment.CenterVertically
-  ) {
-   Row(
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(12.dp)
-   ) {
-    IconButton(onClick = onNavigateBack) {
-     Icon(
-      imageVector = Icons.Default.ArrowBack,
-      contentDescription = "Back",
-      tint = MaterialTheme.colorScheme.primary
+ Scaffold(
+  topBar = {
+   TopAppBar(
+    title = {
+     Text(
+      text = "Container Management",
+      style = MaterialTheme.typography.titleLarge,
+      fontWeight = FontWeight.Bold
      )
-    }
-    Text(
-     text = "Container Management",
-     style = MaterialTheme.typography.headlineMedium,
-     fontWeight = FontWeight.Bold,
-     color = MaterialTheme.colorScheme.primary
+    },
+    navigationIcon = {
+     IconButton(onClick = onNavigateBack) {
+      Icon(
+       imageVector = Icons.Default.ArrowBack,
+       contentDescription = "Back"
+      )
+     }
+    },
+    actions = {
+     IconButton(onClick = { showCreateDialog = true }) {
+      Icon(
+       imageVector = Icons.Default.Add,
+       contentDescription = "新規create"
+      )
+     }
+    },
+    colors = TopAppBarDefaults.topAppBarColors(
+     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+     titleContentColor = MaterialTheme.colorScheme.primary,
+     navigationIconContentColor = MaterialTheme.colorScheme.onSurface
     )
-   }
-
-   IconButton(onClick = { showCreateDialog = true }) {
-    Icon(
-     imageVector = Icons.Default.Add,
-     contentDescription = "新規create",
-     tint = MaterialTheme.colorScheme.primary
-    )
-   }
+   )
   }
-
+ ) { paddingValues ->
   // コンテンツエリア
   when (val state = uiState) {
    is ContainerUiState.Loading -> {
     Box(
-     modifier = Modifier.fillMaxSize(),
+     modifier = Modifier
+      .fillMaxSize()
+      .padding(paddingValues),
      contentAlignment = Alignment.Center
     ) {
      CircularProgressIndicator()
@@ -98,7 +98,9 @@ fun ContainerScreen(
 
    is ContainerUiState.Creating -> {
     Box(
-     modifier = Modifier.fillMaxSize(),
+     modifier = Modifier
+      .fillMaxSize()
+      .padding(paddingValues),
      contentAlignment = Alignment.Center
     ) {
      Column(
@@ -124,12 +126,19 @@ fun ContainerScreen(
     if (state.containers.isEmpty()) {
      EmptyContainersPlaceholder(
       onCreateClick = { showCreateDialog = true },
-      modifier = Modifier.fillMaxSize()
+      modifier = Modifier
+       .fillMaxSize()
+       .padding(paddingValues)
      )
     } else {
      LazyColumn(
       modifier = Modifier.fillMaxSize(),
-      contentPadding = PaddingValues(24.dp),
+      contentPadding = PaddingValues(
+       start = 24.dp,
+       end = 24.dp,
+       top = 24.dp + paddingValues.calculateTopPadding(),
+       bottom = 24.dp
+      ),
       verticalArrangement = Arrangement.spacedBy(16.dp)
      ) {
       items(
@@ -151,7 +160,9 @@ fun ContainerScreen(
 
    is ContainerUiState.Error -> {
     Box(
-     modifier = Modifier.fillMaxSize(),
+     modifier = Modifier
+      .fillMaxSize()
+      .padding(paddingValues),
      contentAlignment = Alignment.Center
     ) {
      Column(

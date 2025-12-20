@@ -24,7 +24,7 @@ data class Download(
  val errorMessage: String? = null
 ) {
  /**
-  * download速度calculation（bytes/sec）
+  * Calculate download speed (bytes/sec)
   */
  fun calculateSpeed(elapsedMillis: Long): Long {
   if (elapsedMillis == 0L) return 0L
@@ -32,7 +32,7 @@ data class Download(
  }
 
  /**
-  * 残り時間calculation（秒）
+  * Calculate remaining time (seconds)
   */
  fun calculateRemainingTime(speedBytesPerSec: Long): Long {
   if (speedBytesPerSec == 0L) return Long.MAX_VALUE
@@ -41,28 +41,28 @@ data class Download(
  }
 
  /**
-  * download済みサイズ人間 読み すい形式 retrieve
+  * Get formatted downloaded size
   */
  val downloadedSizeFormatted: String
   get() = formatBytes(downloadedBytes)
 
  /**
-  * 総サイズ人間 読み すい形式 retrieve
+  * Get formatted total size
   */
  val totalSizeFormatted: String
   get() = formatBytes(totalBytes)
 
  /**
-  * progress率文字列 retrieve（Example: "45%"）
+  * Get formatted progress percentage (Example: "45%")
   */
  val progressFormatted: String
   get() = "$progress%"
 
  companion object {
   /**
-   * バイトサイズ人間 読み すい形式 conversion
+   * Convert bytes to human-readable format
    *
-   * Best Practice: 明示的 Locale.US指定してロケール依存 フォーマット問題回避
+   * Best Practice: Explicit Locale.US to avoid locale-dependent formatting issues
    * Reference: https://developer.android.com/guide/topics/resources/localization
    */
   fun formatBytes(bytes: Long): String {
@@ -76,54 +76,54 @@ data class Download(
   }
 
   /**
-   * 速度人間 読み すい形式 conversion
+   * Convert speed to human-readable format
    */
   fun formatSpeed(bytesPerSec: Long): String {
    return "${formatBytes(bytesPerSec)}/s"
   }
 
   /**
-   * 残り時間人間 読み すい形式 conversion
+   * Convert remaining time to human-readable format
    */
   fun formatRemainingTime(seconds: Long): String {
-   if (seconds == Long.MAX_VALUE) return "不明"
+   if (seconds == Long.MAX_VALUE) return "Unknown"
    val hours = seconds / 3600
    val minutes = (seconds % 3600) / 60
    val secs = seconds % 60
 
    return when {
-    hours > 0 -> "${hours}時間${minutes}minutes"
-    minutes > 0 -> "${minutes}minutes${secs}秒"
-    else -> "${secs}秒"
+    hours > 0 -> "${hours}h ${minutes}m"
+    minutes > 0 -> "${minutes}m ${secs}s"
+    else -> "${secs}s"
    }
   }
  }
 }
 
 /**
- * downloadstate
+ * Download status
  */
 enum class DownloadStatus {
- /** downloadwaiting */
+ /** Download queued */
  PENDING,
 
- /** downloadin */
+ /** Downloading */
  DOWNLOADING,
 
- /** pausein */
+ /** Paused */
  PAUSED,
 
- /** completed */
+ /** Completed */
  COMPLETED,
 
- /** error */
+ /** Failed */
  FAILED,
 
- /** cancel */
+ /** Cancelled */
  CANCELLED;
 
  /**
-  * state 日本語表示
+  * Display name for status
   */
  val displayName: String
   get() = when (this) {
@@ -136,40 +136,40 @@ enum class DownloadStatus {
   }
 
  /**
-  * アクティブなstateかどうか
+  * Check if status is active
   */
  val isActive: Boolean
   get() = this == DOWNLOADING || this == PENDING
 }
 
 /**
- * installationstate (downloadcompleted後)
+ * Installation status (after download completion)
  */
 enum class InstallationStatus {
- /** 未installation (download みcompleted) */
+ /** Not installed (download only completed) */
  NOT_INSTALLED,
 
- /** installationwaiting */
+ /** Installation queued */
  PENDING,
 
- /** installationin */
+ /** Installing */
  INSTALLING,
 
- /** installationcompleted */
+ /** Installation completed */
  INSTALLED,
 
- /** installationfailure */
+ /** Installation failed */
  FAILED;
 
  /**
-  * state 日本語表示
+  * Display name for status
   */
  val displayName: String
   get() = when (this) {
-   NOT_INSTALLED -> "未installation"
+   NOT_INSTALLED -> "Not Installed"
    PENDING -> "waiting"
-   INSTALLING -> "installationin"
-   INSTALLED -> "installation済み"
-   FAILED -> "failure"
+   INSTALLING -> "Installing"
+   INSTALLED -> "Installed"
+   FAILED -> "Failed"
   }
 }

@@ -151,7 +151,16 @@
       "Bash(ar x:*)",
       "Bash(timeout 60 ./adb.exe logcat:*)",
       "Bash(call gradlew.bat --stop)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(git pull:*)",
+      "Bash(call C:Projectssteam-appgradlew.bat assembleDebug --no-configuration-cache)",
+      "Bash(.\\\\gradlew.bat assembleDebug:*)",
+      "Bash(cmd.exe /c \"set JAVA_HOME=C:\\\\Program Files\\\\Eclipse Adoptium\\\\jdk-17.0.17.10-hotspot && set PATH=%JAVA_HOME%\\\\bin;%PATH% && gradlew.bat --stop && gradlew.bat clean --no-configuration-cache && gradlew.bat assembleDebug --no-configuration-cache --rerun-tasks\":*)",
+      "Bash(.gradlew.bat assembleDebug:*)",
+      "Bash(call C:/Projects/steam-app/quick-build.bat)",
+      "Bash(call C:/Projects/steam-app/clean-build.bat)",
+      "Bash(C:Projectssteam-appquick-build.bat)",
+      "Bash(git stash:*)"
     ]
   }
 }

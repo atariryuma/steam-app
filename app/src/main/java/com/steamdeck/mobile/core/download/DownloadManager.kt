@@ -248,7 +248,8 @@ class DownloadWorker @AssistedInject constructor(
    database.downloadDao().updateDownloadProgress(
     downloadId = downloadId,
     downloadedBytes = totalSize,
-    progress = 100
+    progress = 100,
+    updatedAt = System.currentTimeMillis()
    )
    database.downloadDao().markDownloadCompleted(
     downloadId = downloadId,
@@ -412,7 +413,8 @@ class DownloadWorker @AssistedInject constructor(
    database.downloadDao().updateDownloadProgress(
     downloadId = downloadId,
     downloadedBytes = currentByte,
-    progress = finalProgress
+    progress = finalProgress,
+    updatedAt = System.currentTimeMillis()
    )
   }
  }

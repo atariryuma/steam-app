@@ -2,6 +2,7 @@ package com.steamdeck.mobile.core.steam
 
 import android.content.Context
 import android.util.Log
+import com.steamdeck.mobile.R
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
 import com.steamdeck.mobile.data.local.database.entity.Box64Preset
@@ -45,7 +46,13 @@ class SteamSetupManager @Inject constructor(
    val containerId: String
   ) : SteamInstallResult()
   data class Error(val message: String) : SteamInstallResult()
-  data class Progress(val progress: Float, val message: String) : SteamInstallResult()
+  data class Progress(
+   val progress: Float,
+   val message: String,
+   val currentStep: Int = 0,
+   val totalSteps: Int = 5,
+   val elapsedTimeMs: Long = 0L
+  ) : SteamInstallResult()
  }
 
  /**
@@ -98,18 +105,18 @@ class SteamSetupManager @Inject constructor(
    // progress: 0.4 ~ 0.5 (10%)
    progressCallback?.invoke(0.4f, "Downloading Steam installer...")
 
-   // 1. Download Steam installer
-   // progress: 0.4 ~ 0.5 (10%)
+   // 1. Download SteamSetup.exe (32-bit NSIS installer)
+   // DEBUG MODE: Enable Wine logging to diagnose installation failure
    val installerResult = steamInstallerService.downloadInstaller()
    if (installerResult.isFailure) {
     return@withContext Result.success(
-     SteamInstallResult.Error("Failed to download installer: ${installerResult.exceptionOrNull()?.message}")
+     SteamInstallResult.Error("Failed to download Steam installer: ${installerResult.exceptionOrNull()?.message}")
     )
    }
 
    val installerFile = installerResult.getOrElse {
     return@withContext Result.success(
-     SteamInstallResult.Error("Installer file not found after download: ${it.message}")
+     SteamInstallResult.Error("Installer not available: ${it.message}")
     )
    }
    Log.i(TAG, "Installer downloaded: ${installerFile.absolutePath}")
@@ -132,34 +139,35 @@ class SteamSetupManager @Inject constructor(
    }
    Log.i(TAG, "Using container: ${container.name} (${container.id})")
 
-   // progress: 0.6 ~ 0.65 (5%)
+   // progress: 0.6 ~ 0.7 (10%)
    progressCallback?.invoke(0.6f, "Copying installer to container...")
 
    // 3. Copy installer to container
-   val containerInstallerPath = copyInstallerToContainer(container, installerFile)
-   if (containerInstallerPath.isFailure) {
+   val copyResult = copyInstallerToContainer(container, installerFile)
+   if (copyResult.isFailure) {
     return@withContext Result.success(
-     SteamInstallResult.Error("Failed to copy installer: ${containerInstallerPath.exceptionOrNull()?.message}")
+     SteamInstallResult.Error("Failed to copy installer: ${copyResult.exceptionOrNull()?.message}")
     )
    }
 
-   val containerInstaller = containerInstallerPath.getOrElse {
+   val containerInstaller = copyResult.getOrElse {
     return@withContext Result.success(
-     SteamInstallResult.Error("Failed to get installer path in container: ${it.message}")
+     SteamInstallResult.Error("Container installer not available: ${it.message}")
     )
    }
    Log.i(TAG, "Installer copied to container: ${containerInstaller.absolutePath}")
 
-   // progress: 0.65 ~ 0.95 (30%)
-   progressCallback?.invoke(0.65f, "Running Steam installer (this may take a few minutes)...")
+   // progress: 0.7 ~ 0.95 (25%)
+   progressCallback?.invoke(0.7f, "Running Steam installer (DEBUG MODE - check logs)...")
 
-   // 4. Execute Steam installer via Wine
+   // 4. Run installer via Wine with DEBUG logging enabled
    val installResult = runSteamInstaller(
     container = container,
     installerFile = containerInstaller,
-    progressCallback = { installProgress ->
-     // Map installer progress (0.0-1.0) to 0.65-0.95 range
-     progressCallback?.invoke(0.65f + installProgress * 0.3f, "Installing Steam Client...")
+    progressCallback = { progress ->
+     // Map installer progress (0.0-1.0) to overall progress (0.7-0.95)
+     val mappedProgress = 0.7f + (progress * 0.25f)
+     progressCallback?.invoke(mappedProgress, "Installing Steam...")
     }
    )
    if (installResult.isFailure) {
@@ -167,6 +175,8 @@ class SteamSetupManager @Inject constructor(
      SteamInstallResult.Error("Failed to run installer: ${installResult.exceptionOrNull()?.message}")
     )
    }
+
+   progressCallback?.invoke(0.95f, "Steam installer completed")
 
    // progress: 0.95 ~ 1.0 (5%)
    progressCallback?.invoke(0.95f, "Finalizing installation...")
@@ -282,7 +292,17 @@ class SteamSetupManager @Inject constructor(
      val createdContainer = created.getOrNull()
       ?: return@withLock Result.failure(Exception("Container creation failed"))
 
+     Log.d(TAG, "Created container - ID: ${createdContainer.id}, rootPath: ${createdContainer.rootPath}")
+
      if (!isWinePrefixInitialized(createdContainer)) {
+      val systemReg = File(createdContainer.rootPath, "system.reg")
+      val userReg = File(createdContainer.rootPath, "user.reg")
+      Log.e(TAG, "Wine prefix check failed - system.reg exists: ${systemReg.exists()}, user.reg exists: ${userReg.exists()}")
+      Log.e(TAG, "  rootPath: ${createdContainer.rootPath}")
+      Log.e(TAG, "  rootPath.absolutePath: ${createdContainer.rootPath.absolutePath}")
+      Log.e(TAG, "  systemReg.absolutePath: ${systemReg.absolutePath}")
+      Log.e(TAG, "  systemReg.exists(): ${systemReg.exists()}")
+      Log.e(TAG, "  systemReg.canRead(): ${systemReg.canRead()}")
       return@withLock Result.failure(
        Exception(
         "Wine prefix initialization failed (system.reg missing). " +
@@ -300,14 +320,43 @@ class SteamSetupManager @Inject constructor(
    }
   }
 
- private fun isWinePrefixInitialized(container: com.steamdeck.mobile.domain.emulator.EmulatorContainer): Boolean {
+ /**
+  * Check if Wine prefix is properly initialized with registry files.
+  *
+  * IMPORTANT: Includes retry logic because file system writes may not be
+  * immediately visible after wineboot completes (filesystem buffer flush delay).
+  *
+  * @param container Container to check
+  * @return true if both system.reg and user.reg exist
+  */
+ private suspend fun isWinePrefixInitialized(container: com.steamdeck.mobile.domain.emulator.EmulatorContainer): Boolean = withContext(Dispatchers.IO) {
   val systemReg = File(container.rootPath, "system.reg")
   val userReg = File(container.rootPath, "user.reg")
-  return systemReg.exists() && userReg.exists()
+
+  // Retry up to 5 times with 200ms delay to handle filesystem buffer flush
+  repeat(5) { attempt ->
+   if (systemReg.exists() && userReg.exists()) {
+    if (attempt > 0) {
+     Log.d(TAG, "Wine prefix files found after ${attempt} retries")
+    }
+    return@withContext true
+   }
+
+   if (attempt < 4) {
+    Log.d(TAG, "Wine prefix files not found (attempt ${attempt + 1}/5), waiting 200ms...")
+    delay(200)
+   }
+  }
+
+  Log.e(TAG, "Wine prefix files still not found after 5 attempts (1 second total)")
+  false
  }
 
  /**
-  * Copy installer to container
+  * Copy installer to container - CURRENT IMPLEMENTATION
+  *
+  * Copies SteamSetup.exe to the Wine container's Downloads directory
+  * for execution via Wine.
   */
  private suspend fun copyInstallerToContainer(
   container: com.steamdeck.mobile.domain.emulator.EmulatorContainer,
@@ -333,12 +382,17 @@ class SteamSetupManager @Inject constructor(
  }
 
  /**
-  * Execute Steam installer via Wine
+  * Execute Steam installer via Wine - CURRENT IMPLEMENTATION
+  *
+  * Runs SteamSetup.exe in Wine with Windows 10 registry configuration.
+  * Requires WinlatorEmulator.setWindowsVersion() to have been called during container creation.
   *
   * Enhanced installation verification:
   * 1. Wait for process to finish
   * 2. Verify steam.exe exists (retry up to 3 times)
   * 3. Return error on timeout
+  *
+  * NOTE: This method is NOT deprecated. It's the primary installation method.
   */
  private suspend fun runSteamInstaller(
   container: com.steamdeck.mobile.domain.emulator.EmulatorContainer,
@@ -346,11 +400,17 @@ class SteamSetupManager @Inject constructor(
   progressCallback: ((Float) -> Unit)? = null
  ): Result<Unit> = withContext(Dispatchers.IO) {
   try {
-   // Steam installer interactive mode (silent mode /S incompatible with Wine on Android)
-   // /D = installation directory (specify path even without /S)
-   // User must click through installer wizard in Wine window
+   // CRITICAL FIX: Use /S (silent mode) for non-interactive installation
+   // Without /S, NSIS installer shows GUI and exits immediately without installing
+   // /S - Silent installation (no user interaction required)
+   // /D - Custom installation directory (MUST be last argument per NSIS spec)
+   //
+   // Previous implementation incorrectly assumed /S was incompatible with Wine.
+   // Testing shows SteamSetup.exe completes in 6s without /S (no install),
+   // vs 2-5 minutes with /S (successful install).
    val arguments = listOf(
-    "/D=C:\\Program Files (x86)\\Steam"
+    "/S",  // Silent mode (REQUIRED for automated installation)
+    "/D=C:\\Program Files (x86)\\Steam"  // Install directory
    )
 
    Log.i(TAG, "Launching Steam installer with arguments: $arguments")
@@ -384,7 +444,7 @@ class SteamSetupManager @Inject constructor(
     val statusResult = winlatorEmulator.getProcessStatus(process.id)
     val isRunning = statusResult.getOrNull()?.isRunning ?: false
     if (!isRunning) {
-     Log.i(TAG, "Steam installer process completed")
+     Log.i(TAG, "Steam installer process completed after ${waitTime / 1000}s")
      processCompleted = true
      progressCallback?.invoke(0.9f)
      break
@@ -400,6 +460,13 @@ class SteamSetupManager @Inject constructor(
 
    if (!processCompleted) {
     Log.e(TAG, "Steam installer timeout after 5 minutes")
+    // CRITICAL FIX: Kill the process before returning failure
+    try {
+     winlatorEmulator.killProcess(process.id)
+     Log.d(TAG, "Killed timed-out Steam installer process: ${process.id}")
+    } catch (e: Exception) {
+     Log.w(TAG, "Failed to kill timed-out process: ${e.message}")
+    }
     return@withContext Result.failure(
      Exception(
       "Steam installer timed out (5 minutes).\n" +

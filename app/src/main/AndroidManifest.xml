@@ -36,6 +36,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.SteamDeckMobile"
         android:resizeableActivity="true"
+        android:largeHeap="true"
         tools:targetApi="31">
 
         <!-- Support 21:9 aspect ratios for wide/foldable displays -->

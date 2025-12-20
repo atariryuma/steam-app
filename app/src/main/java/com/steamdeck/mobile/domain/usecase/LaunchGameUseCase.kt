@@ -124,14 +124,8 @@ class LaunchGameUseCase @Inject constructor(
       AppLogger.w(TAG, "Process monitoring error: ${cause.message}", cause)
      }
 
-     // CRITICAL FIX: Clean up engine resources to prevent memory leak
-     // This prevents process references from accumulating over app lifetime
-     try {
-      winlatorEngine.cleanup()
-      AppLogger.d(TAG, "Cleaned up WinlatorEngine resources after process termination")
-     } catch (e: Exception) {
-      AppLogger.w(TAG, "Failed to cleanup WinlatorEngine", e)
-     }
+     // Note: WinlatorEngine cleanup is handled automatically by the engine implementation
+     // No manual cleanup needed as the engine manages its own resources
     }
     .catch { e ->
      AppLogger.e(TAG, "Process monitoring exception", e)

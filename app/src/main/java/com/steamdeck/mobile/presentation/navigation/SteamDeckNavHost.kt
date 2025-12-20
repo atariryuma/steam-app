@@ -15,14 +15,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.steamdeck.mobile.presentation.ui.download.DownloadScreen
 import com.steamdeck.mobile.presentation.ui.game.GameDetailScreen
 import com.steamdeck.mobile.presentation.ui.home.HomeScreen
+import com.steamdeck.mobile.presentation.ui.container.ContainerScreen
 import com.steamdeck.mobile.presentation.ui.settings.ControllerSettingsScreen
 // import com.steamdeck.mobile.presentation.ui.settings.GameSettingsScreen // Temporarily disabled
 import com.steamdeck.mobile.presentation.ui.settings.SettingsScreen
-import com.steamdeck.mobile.presentation.ui.wine.WineTestScreen
+import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
 import com.steamdeck.mobile.presentation.viewmodel.SteamLoginViewModel
 
 /**
- * アプリ全体 ナビゲーショングラフ
+ * App-wide navigation graph
  */
 @Composable
 fun SteamDeckNavHost(
@@ -35,24 +36,44 @@ fun SteamDeckNavHost(
   startDestination = startDestination,
   modifier = modifier
  ) {
-  // トップレベル画面：library（ホーム）
+  // Top-level screen: Library (Home)
   composable(Screen.Home.route) {
+   val currentRoute = navController.currentBackStackEntry?.destination?.route ?: "home"
    HomeScreen(
     onGameClick = { gameId ->
      navController.navigate(Screen.GameDetail.createRoute(gameId))
     },
     onNavigateToSettings = {
      navController.navigate(Screen.Settings.route)
-    }
+    },
+    onNavigateToDownloads = {
+     navController.navigate(Screen.Downloads.route)
+    },
+    onNavigateToSteamLogin = {
+     navController.navigate(Screen.SteamLogin.route)
+    },
+    onNavigateToController = {
+     navController.navigate(Screen.ControllerSettings.route)
+    },
+    onNavigateToContainerManagement = {
+     navController.navigate(Screen.ContainerManagement.route)
+    },
+    onNavigateToSteamClient = {
+     navController.navigate(Screen.Settings.createRoute(section = 1))
+    },
+    onNavigateToAppSettings = {
+     navController.navigate(Screen.Settings.createRoute(section = 5))
+    },
+    currentRoute = currentRoute
    )
   }
 
-  // トップレベル画面：download
+  // Top-level screen: Downloads
   composable(Screen.Downloads.route) {
    DownloadScreen(
     onNavigateBack = {
-     // Bottom Navigation from アクセス時 Back不要
-     // 詳細画面 from 戻り も対応
+     // Back navigation not required when accessing from Bottom Navigation
+     // Also handles back navigation from detail screens
      if (navController.previousBackStackEntry != null) {
       navController.popBackStack()
      }
@@ -60,19 +81,26 @@ fun SteamDeckNavHost(
    )
   }
 
-  // トップレベル画面：settings
-  composable(Screen.Settings.route) {
+  // Top-level screen: Settings
+  composable(
+   route = Screen.Settings.route,
+   arguments = listOf(
+    navArgument("section") {
+     type = NavType.IntType
+     defaultValue = -1  // -1 means no specific section
+    }
+   )
+  ) { backStackEntry ->
    val settingsViewModel: com.steamdeck.mobile.presentation.viewmodel.SettingsViewModel = hiltViewModel()
+   val initialSection = backStackEntry.arguments?.getInt("section") ?: -1
 
    SettingsScreen(
     viewModel = settingsViewModel,
+    initialSection = initialSection,
     onNavigateBack = {
      if (navController.previousBackStackEntry != null) {
       navController.popBackStack()
      }
-    },
-    onNavigateToWineTest = {
-     navController.navigate(Screen.WineTest.route)
     },
     onNavigateToControllerSettings = {
      navController.navigate(Screen.ControllerSettings.route)
@@ -80,7 +108,7 @@ fun SteamDeckNavHost(
    )
   }
 
-  // 詳細画面：game詳細
+  // Detail screen: Game details
   composable(
    route = Screen.GameDetail.route,
    arguments = listOf(
@@ -98,8 +126,8 @@ fun SteamDeckNavHost(
    )
   }
 
-  // 詳細画面：gamesettings
-  // TODO: 修正 必要 - GameSettingsUiState 未定義
+  // Detail screen: Game settings
+  // TODO: Needs fixing - GameSettingsUiState not yet defined
   /*
   composable(
    route = Screen.GameSettings.route,
@@ -115,29 +143,36 @@ fun SteamDeckNavHost(
   }
   */
 
-  // settingsサブ画面：controllersettings
+  // Settings sub-screen: Controller settings
   composable(Screen.ControllerSettings.route) {
    ControllerSettingsScreen(
     onBackClick = { navController.popBackStack() }
    )
   }
 
-  // settingsサブ画面：Wineテスト
-  composable(Screen.WineTest.route) {
-   WineTestScreen(
-    onNavigateBack = { navController.popBackStack() }
+  // Settings sub-screen: Container Management
+  composable(Screen.ContainerManagement.route) {
+   val containerViewModel: ContainerViewModel = hiltViewModel()
+
+   ContainerScreen(
+    viewModel = containerViewModel,
+    onNavigateBack = {
+     if (navController.previousBackStackEntry != null) {
+      navController.popBackStack()
+     }
+    }
    )
   }
 
-  // settingsサブ画面：Steam ログイン（OpenIDauthentication）
+  // Settings sub-screen: Steam Login (OpenID authentication)
   composable(Screen.SteamLogin.route) {
    val loginViewModel: SteamLoginViewModel = hiltViewModel()
    val uiState by loginViewModel.uiState.collectAsState()
 
-   // authenticationURLgenerate
+   // Generate authentication URL
    val (authUrl, _) = remember { loginViewModel.startOpenIdLogin() }
 
-   // Steam OpenID ログイン画面
+   // Steam OpenID login screen
    com.steamdeck.mobile.presentation.ui.auth.SteamOpenIdLoginScreen(
     authUrl = authUrl,
     callbackUrl = "http://127.0.0.1:8080/auth/callback",
@@ -145,7 +180,7 @@ fun SteamDeckNavHost(
     onError = { errorMessage -> android.util.Log.e("Navigation", "OpenID error: $errorMessage") }
    )
 
-   // authentication成功時 処理
+   // Handle authentication success
    val isSuccess = uiState is com.steamdeck.mobile.presentation.viewmodel.SteamLoginUiState.Success
    LaunchedEffect(isSuccess) {
     if (isSuccess) {

@@ -149,7 +149,10 @@ sealed class WinlatorInitUiState {
  @Immutable
  data class Initializing(
   val progress: Float,
-  val statusText: String
+  val statusText: String,
+  val currentStep: Int = 0,
+  val totalSteps: Int = 0,
+  val elapsedTimeMs: Long = 0L
  ) : WinlatorInitUiState()
 
  /** Completed */

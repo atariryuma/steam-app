@@ -1,25 +1,33 @@
 package com.steamdeck.mobile.presentation.navigation
 
 /**
- * アプリ内 ナビゲーション画面定義
+ * App-wide navigation screen definitions
  */
 sealed class Screen(val route: String) {
- // トップレベル画面（Bottom Navigation）
+ // Top-level screens (Bottom Navigation)
  data object Home : Screen("home")
  data object Downloads : Screen("downloads")
- data object Settings : Screen("settings")
+ data object Settings : Screen("settings?section={section}") {
+  fun createRoute(section: Int? = null): String {
+   return if (section != null) {
+    "settings?section=$section"
+   } else {
+    "settings"
+   }
+  }
+ }
 
- // 詳細画面
+ // Detail screens
  data object GameDetail : Screen("game/{gameId}") {
   fun createRoute(gameId: Long) = "game/$gameId"
  }
 
- // gamesettings画面
+ // Game settings screen
  data object GameSettings : Screen("game/{gameId}/settings") {
   fun createRoute(gameId: Long) = "game/$gameId/settings"
  }
 
- // settingsサブ画面
+ // Settings sub-screens
  data object ControllerSettings : Screen("settings/controller")
  data object WineTest : Screen("settings/wine_test")
  data object SteamLogin : Screen("settings/steam_login")
@@ -27,7 +35,7 @@ sealed class Screen(val route: String) {
 }
 
 /**
- * ナビゲーションアイテム（Bottom Navigation/Navigation Rail用）
+ * Navigation items (for Bottom Navigation / Navigation Rail)
  */
 sealed class TopLevelDestination(
  val route: String,

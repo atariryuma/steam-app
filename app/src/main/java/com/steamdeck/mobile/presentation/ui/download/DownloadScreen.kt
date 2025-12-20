@@ -10,15 +10,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.steamdeck.mobile.R
 import com.steamdeck.mobile.data.local.database.entity.DownloadEntity
 import com.steamdeck.mobile.data.local.database.entity.DownloadStatus
 import com.steamdeck.mobile.presentation.viewmodel.DownloadViewModel
 
 /**
- * download管理画面 - BackboneOnestyle design
+ * Download Management Screen - BackboneOne-style design
  *
  * Best Practices:
  * - No TopAppBar for immersive full-screen experience
@@ -40,7 +42,7 @@ fun DownloadScreen(
  val activeDownloads by viewModel.activeDownloads.collectAsState()
 
  Column(modifier = Modifier.fillMaxSize()) {
-  // BackboneOne風customヘッダー
+  // BackboneOne-style custom header
   Row(
    modifier = Modifier
     .fillMaxWidth()
@@ -60,34 +62,34 @@ fun DownloadScreen(
      )
     }
     Text(
-     text = "download管理",
+     text = stringResource(R.string.drawer_item_downloads),
      style = MaterialTheme.typography.headlineMedium,
      fontWeight = FontWeight.Bold,
      color = MaterialTheme.colorScheme.primary
     )
    }
 
-   // Complete済みクリアボタン
+   // Clear completed button
    IconButton(
     onClick = { viewModel.clearCompleted() },
     enabled = downloads.any { it.status == DownloadStatus.COMPLETED }
    ) {
     Icon(
      imageVector = Icons.Default.Clear,
-     contentDescription = "Complete済みクリア",
+     contentDescription = "Clear Completed",
      tint = MaterialTheme.colorScheme.onSurface
     )
    }
   }
 
-  // 進行indownload数表示
+  // Active downloads count display
   if (activeDownloads > 0) {
    Column(modifier = Modifier.fillMaxWidth()) {
     LinearProgressIndicator(
      modifier = Modifier.fillMaxWidth()
     )
     Text(
-     text = "進行in: $activeDownloads 件",
+     text = stringResource(R.string.download_active_count, activeDownloads),
      style = MaterialTheme.typography.labelMedium,
      color = MaterialTheme.colorScheme.primary,
      modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
@@ -95,7 +97,7 @@ fun DownloadScreen(
    }
   }
 
-  // downloadリスト
+  // Download list
   if (downloads.isEmpty()) {
    EmptyDownloadsPlaceholder()
   } else {
@@ -138,7 +140,7 @@ private fun EmptyDownloadsPlaceholder() {
     tint = MaterialTheme.colorScheme.outline
    )
    Text(
-    text = "download履歴なし",
+    text = stringResource(R.string.download_empty_title),
     style = MaterialTheme.typography.titleLarge,
     fontWeight = FontWeight.Bold,
     color = MaterialTheme.colorScheme.outline
@@ -148,7 +150,7 @@ private fun EmptyDownloadsPlaceholder() {
 }
 
 /**
- * downloadアイテム - BackboneOne風カード
+ * Download item - BackboneOne-style card
  */
 @Composable
 private fun DownloadItem(
@@ -172,7 +174,7 @@ private fun DownloadItem(
     .padding(20.dp),
    verticalArrangement = Arrangement.spacedBy(12.dp)
   ) {
-   // ファイル名 ステータス
+   // File name & Status
    Row(
     modifier = Modifier.fillMaxWidth(),
     horizontalArrangement = Arrangement.SpaceBetween,
@@ -245,7 +247,7 @@ private fun DownloadItem(
     }
    }
 
-   // アクションボタン
+   // Action buttons
    Row(
     modifier = Modifier.fillMaxWidth(),
     horizontalArrangement = Arrangement.End,
@@ -300,10 +302,10 @@ private fun DownloadItem(
     }
    }
 
-   // Errorメッセージ
+   // Error message
    if (download.status == DownloadStatus.FAILED && download.errorMessage != null) {
     Text(
-     text = "Error: ${download.errorMessage}",
+     text = stringResource(R.string.download_error_prefix, download.errorMessage),
      style = MaterialTheme.typography.bodySmall,
      color = MaterialTheme.colorScheme.error
     )
@@ -323,7 +325,7 @@ private fun DownloadStatusIcon(status: DownloadStatus) {
 
   DownloadStatus.DOWNLOADING -> Icon(
    Icons.Default.ArrowForward,
-   contentDescription = "downloadin",
+   contentDescription = "Downloading",
    tint = MaterialTheme.colorScheme.primary
   )
 

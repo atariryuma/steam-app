@@ -45,8 +45,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -77,26 +75,27 @@ import com.steamdeck.mobile.presentation.viewmodel.SteamInstallState
 import com.steamdeck.mobile.presentation.viewmodel.SteamLoginUiState
 import com.steamdeck.mobile.presentation.viewmodel.SteamLoginViewModel
 import com.steamdeck.mobile.presentation.viewmodel.SyncState
+import com.steamdeck.mobile.presentation.viewmodel.WineTestUiState
+import com.steamdeck.mobile.presentation.viewmodel.WineTestViewModel
 
 /**
- * Settings画面 - BackboneOnestyle design
+ * Settings画面 - Simplified design without NavigationRail
+ *
+ * Navigation is handled by the Home screen's mini drawer.
+ * This screen only displays the content for the selected section.
  *
  * Best Practices:
- * - NavigationRail for side navigation (3-7 items recommended)
- * - List-detail canonical layout for tablet optimization
  * - Steam color scheme with Material3
  * - No TopAppBar for immersive full-screen experience
- *
- * References:
- * - https://developer.android.com/develop/ui/compose/components/navigation-rail
- * - https://codelabs.developers.google.com/codelabs/adaptive-material-guidance
+ * - Mini drawer controlled from Home screen
  */
 @Composable
 fun SettingsScreen(
  onNavigateBack: () -> Unit,
- onNavigateToWineTest: () -> Unit = {},
  onNavigateToControllerSettings: () -> Unit = {},
+ initialSection: Int = -1,
  viewModel: SettingsViewModel = hiltViewModel(),
+ wineTestViewModel: WineTestViewModel = hiltViewModel(),
  steamLoginViewModel: SteamLoginViewModel = hiltViewModel()
 ) {
  val context = LocalContext.current
@@ -105,7 +104,9 @@ fun SettingsScreen(
  val steamInstallState by viewModel.steamInstallState.collectAsState()
  val steamLoginState by steamLoginViewModel.uiState.collectAsState()
  val snackbarHostState = remember { SnackbarHostState() }
- var selectedSection by remember { mutableIntStateOf(0) }
+ var selectedSection by remember {
+  mutableIntStateOf(if (initialSection >= 0) initialSection else 0)
+ }
  var showWebView by remember { mutableStateOf(false) }
 
  // Error・Successメッセージ スナックバー表示
@@ -158,35 +159,26 @@ fun SettingsScreen(
     LoadingContent()
    }
    is SettingsUiState.Success -> {
-    // BackboneOne風レイアウト: NavigationRail + Content
-    Row(modifier = Modifier.fillMaxSize()) {
-     // 左サイドバー（NavigationRail）
-     SettingsNavigationRail(
-      selectedSection = selectedSection,
-      onSectionSelected = { selectedSection = it },
-      onNavigateBack = onNavigateBack
-     )
-
-     // 右側コンテンツ
-     SettingsContent(
-      selectedSection = selectedSection,
-      data = state.data,
-      syncState = syncState,
-      steamInstallState = steamInstallState,
-      showWebView = showWebView,
-      steamLoginViewModel = steamLoginViewModel,
-      onShowWebView = { showWebView = true },
-      onHideWebView = { showWebView = false },
-      onSyncLibrary = viewModel::syncSteamLibrary,
-      onClearSettings = viewModel::clearSteamSettings,
-      onNavigateToWineTest = onNavigateToWineTest,
-      onNavigateToControllerSettings = onNavigateToControllerSettings,
-      onSaveApiKey = viewModel::saveSteamApiKey,
-      onInstallSteam = viewModel::installSteamClient,
-      onOpenSteam = viewModel::openSteamClient,
-      onUninstallSteam = viewModel::uninstallSteamClient
-     )
-    }
+    // Simplified layout without NavigationRail (mini drawer handles navigation)
+    SettingsContent(
+     selectedSection = selectedSection,
+     data = state.data,
+     syncState = syncState,
+     steamInstallState = steamInstallState,
+     showWebView = showWebView,
+     steamLoginViewModel = steamLoginViewModel,
+     wineTestViewModel = wineTestViewModel,
+     onShowWebView = { showWebView = true },
+     onHideWebView = { showWebView = false },
+     onSyncLibrary = viewModel::syncSteamLibrary,
+     onClearSettings = viewModel::clearSteamSettings,
+     onNavigateToControllerSettings = onNavigateToControllerSettings,
+     onSaveApiKey = viewModel::saveSteamApiKey,
+     onInstallSteam = viewModel::installSteamClient,
+     onOpenSteam = viewModel::openSteamClient,
+     onUninstallSteam = viewModel::uninstallSteamClient,
+     onNavigateBack = onNavigateBack
+    )
    }
    is SettingsUiState.Error -> {
     LoadingContent()
@@ -197,116 +189,6 @@ fun SettingsScreen(
   SnackbarHost(
    hostState = snackbarHostState,
    modifier = Modifier.align(Alignment.BottomCenter)
-  )
- }
-}
-
-/**
- * NavigationRail - 左サイドバーナビゲーション
- *
- * Best Practice: 3-7 items recommended by Material3 guidelines
- */
-@Composable
-private fun SettingsNavigationRail(
- selectedSection: Int,
- onSectionSelected: (Int) -> Unit,
- onNavigateBack: () -> Unit
-) {
- NavigationRail(
-  modifier = Modifier.fillMaxHeight(),
-  containerColor = MaterialTheme.colorScheme.surfaceVariant,
-  header = {
-   // Back button
-   IconButton(
-    onClick = onNavigateBack,
-    modifier = Modifier.padding(vertical = 8.dp)
-   ) {
-    Icon(
-     imageVector = Icons.Default.ArrowBack,
-     contentDescription = "Back",
-     tint = MaterialTheme.colorScheme.primary
-    )
-   }
-  }
- ) {
-  Spacer(modifier = Modifier.height(16.dp))
-
-  // Steam Authentication
-  NavigationRailItem(
-   selected = selectedSection == 0,
-   onClick = { onSectionSelected(0) },
-   icon = {
-    Icon(
-     imageVector = Icons.Default.Security,
-     contentDescription = "Steam Auth"
-    )
-   },
-   label = { Text("Auth") }
-  )
-
-  // Steam Client
-  NavigationRailItem(
-   selected = selectedSection == 1,
-   onClick = { onSectionSelected(1) },
-   icon = {
-    Icon(
-     imageVector = Icons.Default.CloudDownload,
-     contentDescription = "Steam Client"
-    )
-   },
-   label = { Text("Client") }
-  )
-
-  // Library Sync
-  NavigationRailItem(
-   selected = selectedSection == 2,
-   onClick = { onSectionSelected(2) },
-   icon = {
-    Icon(
-     imageVector = Icons.Default.Refresh,
-     contentDescription = "Library"
-    )
-   },
-   label = { Text("Sync") }
-  )
-
-  // Controller
-  NavigationRailItem(
-   selected = selectedSection == 3,
-   onClick = { onSectionSelected(3) },
-   icon = {
-    Icon(
-     imageVector = Icons.Default.SportsEsports,
-     contentDescription = "Controller"
-    )
-   },
-   label = { Text("Control") }
-  )
-
-  // Wine/Winlator
-  NavigationRailItem(
-   selected = selectedSection == 4,
-   onClick = { onSectionSelected(4) },
-   icon = {
-    Icon(
-     imageVector = Icons.Default.Warning,
-     contentDescription = "Wine"
-    )
-   },
-   label = { Text("Wine") }
-  )
-
-  // App Settings
-  NavigationRailItem(
-   selected = selectedSection == 5,
-   onClick = { onSectionSelected(5) },
-   icon = {
-    Icon(
-     imageVector = Icons.Default.Info,
-     contentDescription = "App"
-    )
-   },
-   label = { Text("App") }
   )
  }
 }
@@ -324,56 +206,74 @@ private fun SettingsContent(
  steamInstallState: SteamInstallState,
  showWebView: Boolean,
  steamLoginViewModel: SteamLoginViewModel,
+ wineTestViewModel: WineTestViewModel,
  onShowWebView: () -> Unit,
  onHideWebView: () -> Unit,
  onSyncLibrary: () -> Unit,
  onClearSettings: () -> Unit,
- onNavigateToWineTest: () -> Unit,
  onNavigateToControllerSettings: () -> Unit,
  onSaveApiKey: (String) -> Unit,
  onInstallSteam: (String) -> Unit,
  onOpenSteam: (String) -> Unit,
  onUninstallSteam: (String) -> Unit,
+ onNavigateBack: () -> Unit,
  modifier: Modifier = Modifier
 ) {
  Surface(
   modifier = modifier.fillMaxSize(),
   color = MaterialTheme.colorScheme.background
  ) {
-  // authenticationセクション（selectedSection==0） 別扱い（fillMaxSizeusedoため）
-  if (selectedSection == 0) {
-   SteamAuthContent(
-    data = data,
-    showWebView = showWebView,
-    steamLoginViewModel = steamLoginViewModel,
-    onShowWebView = onShowWebView,
-    onHideWebView = onHideWebView,
-    onClear = onClearSettings
-   )
-  } else {
-   Column(
+  Column(modifier = Modifier.fillMaxSize()) {
+   // Back button header (always visible)
+   Row(
     modifier = Modifier
-     .fillMaxSize()
-     .verticalScroll(rememberScrollState())
-     .padding(24.dp),
-    verticalArrangement = Arrangement.spacedBy(24.dp)
+     .fillMaxWidth()
+     .padding(horizontal = 16.dp, vertical = 16.dp),
+    verticalAlignment = Alignment.CenterVertically
    ) {
-    // タイトル
+    IconButton(onClick = onNavigateBack) {
+     Icon(
+      imageVector = Icons.Default.ArrowBack,
+      contentDescription = "Back",
+      tint = MaterialTheme.colorScheme.primary
+     )
+    }
     Text(
      text = when (selectedSection) {
+      0 -> "Steam Authentication"
       1 -> "Steam Client"
       2 -> "Library Sync"
       3 -> "Controller Settings"
-      4 -> "Wine/Winlator"
+      4 -> "Wine Environment"
       5 -> "App Settings"
-      else -> ""
+      else -> "Settings"
      },
      style = MaterialTheme.typography.headlineMedium,
      fontWeight = FontWeight.Bold,
-     color = MaterialTheme.colorScheme.primary
+     color = MaterialTheme.colorScheme.primary,
+     modifier = Modifier.padding(start = 8.dp)
     )
+   }
 
-    // セクション別コンテンツ
+   // Content area
+   if (selectedSection == 0) {
+    SteamAuthContent(
+     data = data,
+     showWebView = showWebView,
+     steamLoginViewModel = steamLoginViewModel,
+     onShowWebView = onShowWebView,
+     onHideWebView = onHideWebView,
+     onClear = onClearSettings
+    )
+   } else {
+    Column(
+     modifier = Modifier
+      .fillMaxSize()
+      .verticalScroll(rememberScrollState())
+      .padding(24.dp),
+     verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+     // セクション別コンテンツ
     when (selectedSection) {
      1 -> SteamClientContent(
       steamInstallState = steamInstallState,
@@ -390,8 +290,9 @@ private fun SettingsContent(
      3 -> ControllerContent(
       onNavigateToControllerSettings = onNavigateToControllerSettings
      )
-     4 -> WineTestContent(
-      onNavigateToWineTest = onNavigateToWineTest
+     4 -> WineTestIntegratedContent(
+      viewModel = wineTestViewModel,
+      modifier = Modifier.fillMaxSize()
      )
      5 -> AppSettingsContent()
     }
@@ -1312,14 +1213,182 @@ private fun ControllerContent(
  }
 }
 
+/**
+ * Wine Test integrated content (formerly separate WineTestScreen)
+ * Combines Wine diagnostics into Settings Section 4
+ */
 @Composable
-private fun WineTestContent(
- onNavigateToWineTest: () -> Unit
+private fun WineTestIntegratedContent(
+ modifier: Modifier = Modifier,
+ viewModel: WineTestViewModel = hiltViewModel()
 ) {
+ val uiState by viewModel.uiState.collectAsState()
+
+ Column(
+  modifier = modifier
+   .fillMaxSize()
+   .verticalScroll(rememberScrollState())
+   .padding(24.dp),
+  verticalArrangement = Arrangement.spacedBy(16.dp)
+ ) {
+  // Header
+  Text(
+   text = "🧪 Wine Environment Test",
+   style = MaterialTheme.typography.headlineSmall,
+   fontWeight = FontWeight.Bold
+  )
+
+  // Status card
+  WineTestCompactStatusRow(uiState = uiState)
+
+  // Test buttons
+  if (uiState !is WineTestUiState.Testing) {
+   WineTestCompactTestButtons(
+    onCheckWine = viewModel::checkWineAvailability,
+    onInitialize = viewModel::initializeEmulator,
+    onCreateContainer = viewModel::testCreateContainer,
+    onListContainers = viewModel::listContainers
+   )
+  }
+
+  // Progress/Results
+  when (val state = uiState) {
+   is WineTestUiState.Testing -> {
+    WineTestTestingProgressCard(message = state.message)
+   }
+   is WineTestUiState.Success -> {
+    WineTestTestResultCard(
+     title = "✓ Test Success",
+     message = state.message,
+     isSuccess = true
+    )
+   }
+   is WineTestUiState.Error -> {
+    WineTestTestResultCard(
+     title = "✗ Error",
+     message = state.message,
+     isSuccess = false
+    )
+   }
+   else -> {}
+  }
+ }
+}
+
+@Composable
+private fun WineTestCompactStatusRow(uiState: WineTestUiState) {
  Card(
   modifier = Modifier.fillMaxWidth(),
   colors = CardDefaults.cardColors(
    containerColor = MaterialTheme.colorScheme.surfaceVariant
+  ),
+  shape = MaterialTheme.shapes.medium,
+  elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+ ) {
+  Row(
+   modifier = Modifier
+    .fillMaxWidth()
+    .padding(16.dp),
+   horizontalArrangement = Arrangement.SpaceBetween,
+   verticalAlignment = Alignment.CenterVertically
+  ) {
+   Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(8.dp)
+   ) {
+    Icon(
+     imageVector = when (uiState) {
+      is WineTestUiState.Success -> Icons.Default.Check
+      is WineTestUiState.Error -> Icons.Default.Clear
+      else -> Icons.Default.Info
+     },
+     contentDescription = null,
+     tint = when (uiState) {
+      is WineTestUiState.Success -> MaterialTheme.colorScheme.primary
+      is WineTestUiState.Error -> MaterialTheme.colorScheme.error
+      else -> MaterialTheme.colorScheme.onSurfaceVariant
+     }
+    )
+    Text(
+     text = when (uiState) {
+      is WineTestUiState.Idle -> "Ready"
+      is WineTestUiState.Testing -> "Running..."
+      is WineTestUiState.Success -> "Available"
+      is WineTestUiState.Error -> "Error"
+     },
+     style = MaterialTheme.typography.titleSmall,
+     fontWeight = FontWeight.Bold
+    )
+   }
+
+   Text(
+    text = "Wine/Winlator",
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant
+   )
+  }
+ }
+}
+
+@Composable
+private fun WineTestCompactTestButtons(
+ onCheckWine: () -> Unit,
+ onInitialize: () -> Unit,
+ onCreateContainer: () -> Unit,
+ onListContainers: () -> Unit
+) {
+ Column(
+  modifier = Modifier.fillMaxWidth(),
+  verticalArrangement = Arrangement.spacedBy(12.dp)
+ ) {
+  // Row 1: Check & Initialize
+  Row(
+   modifier = Modifier.fillMaxWidth(),
+   horizontalArrangement = Arrangement.spacedBy(12.dp)
+  ) {
+   Button(
+    onClick = onCheckWine,
+    modifier = Modifier.weight(1f)
+   ) {
+    Text("1. Check", style = MaterialTheme.typography.labelLarge)
+   }
+
+   Button(
+    onClick = onInitialize,
+    modifier = Modifier.weight(1f)
+   ) {
+    Text("2. Initialize", style = MaterialTheme.typography.labelLarge)
+   }
+  }
+
+  // Row 2: Create & List
+  Row(
+   modifier = Modifier.fillMaxWidth(),
+   horizontalArrangement = Arrangement.spacedBy(12.dp)
+  ) {
+   Button(
+    onClick = onCreateContainer,
+    modifier = Modifier.weight(1f)
+   ) {
+    Text("3. Create", style = MaterialTheme.typography.labelLarge)
+   }
+
+   Button(
+    onClick = onListContainers,
+    modifier = Modifier.weight(1f)
+   ) {
+    Text("4. List", style = MaterialTheme.typography.labelLarge)
+   }
+  }
+ }
+}
+
+@Composable
+private fun WineTestTestingProgressCard(message: String) {
+ Card(
+  modifier = Modifier.fillMaxWidth(),
+  colors = CardDefaults.cardColors(
+   containerColor = MaterialTheme.colorScheme.primaryContainer
   ),
   shape = MaterialTheme.shapes.large,
   elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -1328,30 +1397,59 @@ private fun WineTestContent(
    modifier = Modifier
     .fillMaxWidth()
     .padding(20.dp),
-   verticalArrangement = Arrangement.spacedBy(16.dp)
+   horizontalAlignment = Alignment.CenterHorizontally,
+   verticalArrangement = Arrangement.spacedBy(12.dp)
+  ) {
+   LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+   Text(
+    text = message,
+    style = MaterialTheme.typography.bodyMedium,
+    fontWeight = FontWeight.Bold,
+    color = MaterialTheme.colorScheme.onPrimaryContainer
+   )
+  }
+ }
+}
+
+@Composable
+private fun WineTestTestResultCard(
+ title: String,
+ message: String,
+ isSuccess: Boolean
+) {
+ Card(
+  modifier = Modifier.fillMaxWidth(),
+  colors = CardDefaults.cardColors(
+   containerColor = if (isSuccess)
+    MaterialTheme.colorScheme.primaryContainer
+   else
+    MaterialTheme.colorScheme.errorContainer
+  ),
+  shape = MaterialTheme.shapes.large,
+  elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+ ) {
+  Column(
+   modifier = Modifier
+    .fillMaxWidth()
+    .padding(20.dp),
+   verticalArrangement = Arrangement.spacedBy(8.dp)
   ) {
    Text(
-    text = "🚧 Windows game runtime (experimental)",
-    style = MaterialTheme.typography.bodyMedium,
-    color = MaterialTheme.colorScheme.onSurfaceVariant
+    text = title,
+    style = MaterialTheme.typography.titleMedium,
+    fontWeight = FontWeight.Bold,
+    color = if (isSuccess)
+     MaterialTheme.colorScheme.onPrimaryContainer
+    else
+     MaterialTheme.colorScheme.onErrorContainer
    )
-
-   FilledTonalButton(
-    onClick = onNavigateToWineTest,
-    modifier = Modifier.fillMaxWidth()
-   ) {
-    Icon(
-     imageVector = Icons.Default.Refresh,
-     contentDescription = "Test"
-    )
-    Spacer(modifier = Modifier.width(8.dp))
-    Text("Test Wine Environment")
-   }
-
    Text(
-    text = "※ Wine environment download required (~100MB)",
-    style = MaterialTheme.typography.bodySmall,
-    color = MaterialTheme.colorScheme.error
+    text = message,
+    style = MaterialTheme.typography.bodyMedium,
+    color = if (isSuccess)
+     MaterialTheme.colorScheme.onPrimaryContainer
+    else
+     MaterialTheme.colorScheme.onErrorContainer
    )
   }
  }
@@ -1501,4 +1599,5 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
    }
   }
  }
+}
 }

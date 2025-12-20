@@ -4,37 +4,47 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.steamdeck.mobile.R
+
+// Dialog UI constants for maintainability
+private object AddGameDialogDefaults {
+    val CardElevation = 2.dp
+    val CardPadding = 20.dp
+    val PathDisplayMaxLength = 40
+}
 
 /**
- * gameaddダイアログ - BackboneOne風フルスクリーンダイアログ
+ * Add Game Dialog - BackboneOne-style fullscreen dialog
  *
- * 横画面最適化:
- * - フルスクリーンDialog（usePlatformDefaultWidth = false）
- * - 2カラムレイアウト（横画面 左右minutes割）
- * - スクロール可能
+ * Landscape optimized:
+ * - Fullscreen Dialog (usePlatformDefaultWidth = false)
+ * - 2-column layout (landscape left/right split)
+ * - Scrollable content
  *
- * ベストプラクティス:
- * - 状態所有権 明確化（親 選択パス管理、子 表示状態 み管理）
- * - Derived state パス表示管理
+ * Best Practices:
+ * - Clear state ownership (parent manages selection paths, child manages display state only)
+ * - Derived state for path display management
  * - Material3 Card design: elevation 2dp, padding 20dp
+ * - String resources for all user-facing text
  *
- * @param onDismiss ダイアログClose
- * @param onConfirm game情報確定 (name, executablePath, installPath)
- * @param onSelectExecutable Executable選択ボタン 押された
- * @param onSelectInstallFolder installationフォルダ選択ボタン 押された
- * @param selectedExecutablePath 選択された実行File Paths（親 from 渡される、変更不可）
- * @param selectedInstallPath 選択されたinstallationパス（親 from 渡される、変更不可）
+ * @param onDismiss Dialog close callback
+ * @param onConfirm Game info confirmation (name, executablePath, installPath)
+ * @param onSelectExecutable Executable selection button pressed
+ * @param onSelectInstallFolder Installation folder selection button pressed
+ * @param selectedExecutablePath Selected executable file path (passed from parent, immutable)
+ * @param selectedInstallPath Selected installation path (passed from parent, immutable)
  */
 @Composable
 fun AddGameDialog(
@@ -45,15 +55,16 @@ fun AddGameDialog(
  selectedExecutablePath: String = "",
  selectedInstallPath: String = ""
 ) {
- // ダイアログ内部 状態
+ // Dialog internal state
  var gameName by remember { mutableStateOf("") }
  var showError by remember { mutableStateOf(false) }
 
- // 表示用 パス文字列（Derived state）
+ // Display path strings (Derived state)
  val displayExecutablePath = remember(selectedExecutablePath) {
   if (selectedExecutablePath.isNotBlank()) {
    if (selectedExecutablePath.startsWith("content://")) {
-    selectedExecutablePath.substringAfterLast("/").take(40)
+    selectedExecutablePath.substringAfterLast("/")
+     .take(AddGameDialogDefaults.PathDisplayMaxLength)
    } else {
     selectedExecutablePath
    }
@@ -65,7 +76,8 @@ fun AddGameDialog(
  val displayInstallPath = remember(selectedInstallPath) {
   if (selectedInstallPath.isNotBlank()) {
    if (selectedInstallPath.startsWith("content://")) {
-    selectedInstallPath.substringAfterLast("/").take(40)
+    selectedInstallPath.substringAfterLast("/")
+     .take(AddGameDialogDefaults.PathDisplayMaxLength)
    } else {
     selectedInstallPath
    }
@@ -74,11 +86,11 @@ fun AddGameDialog(
   }
  }
 
- // フルスクリーンDialog（横画面対応）
+ // Fullscreen Dialog (landscape support)
  Dialog(
   onDismissRequest = onDismiss,
   properties = DialogProperties(
-   usePlatformDefaultWidth = false, // フルスクリーン化
+   usePlatformDefaultWidth = false, // Enable fullscreen
    dismissOnBackPress = true,
    dismissOnClickOutside = false
   )
@@ -88,7 +100,7 @@ fun AddGameDialog(
    color = MaterialTheme.colorScheme.background
   ) {
    Column(modifier = Modifier.fillMaxSize()) {
-    // BackboneOne風customヘッダー
+    // BackboneOne-style custom header
     Row(
      modifier = Modifier
       .fillMaxWidth()
@@ -102,20 +114,20 @@ fun AddGameDialog(
      ) {
       IconButton(onClick = onDismiss) {
        Icon(
-        imageVector = Icons.Default.ArrowBack,
-        contentDescription = "Back",
+        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+        contentDescription = stringResource(R.string.content_desc_back),
         tint = MaterialTheme.colorScheme.primary
        )
       }
       Text(
-       text = "Add Game",
+       text = stringResource(R.string.dialog_add_game_title),
        style = MaterialTheme.typography.headlineMedium,
        fontWeight = FontWeight.Bold,
        color = MaterialTheme.colorScheme.primary
       )
      }
 
-     // addボタン（ヘッダー内）
+     // Add button (in header)
      Button(
       onClick = {
        if (gameName.isNotBlank() &&
@@ -129,11 +141,11 @@ fun AddGameDialog(
      ) {
       Icon(Icons.Default.Add, contentDescription = null)
       Spacer(modifier = Modifier.width(8.dp))
-      Text("Add")
+      Text(stringResource(R.string.dialog_add_game_button))
      }
     }
 
-    // コンテンツエリア（スクロール可能）
+    // Content area (scrollable)
     Column(
      modifier = Modifier
       .fillMaxSize()
@@ -141,23 +153,25 @@ fun AddGameDialog(
       .padding(24.dp),
      verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-     // Game Name入力カード
+     // Game Name input card
      Card(
       modifier = Modifier.fillMaxWidth(),
       colors = CardDefaults.cardColors(
        containerColor = MaterialTheme.colorScheme.surfaceVariant
       ),
       shape = MaterialTheme.shapes.large,
-      elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+      elevation = CardDefaults.cardElevation(
+       defaultElevation = AddGameDialogDefaults.CardElevation
+      )
      ) {
       Column(
        modifier = Modifier
         .fillMaxWidth()
-        .padding(20.dp),
+        .padding(AddGameDialogDefaults.CardPadding),
        verticalArrangement = Arrangement.spacedBy(12.dp)
       ) {
        Text(
-        text = "Game Name",
+        text = stringResource(R.string.dialog_add_game_name_label),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary
@@ -169,7 +183,7 @@ fun AddGameDialog(
          gameName = it
          showError = false
         },
-        placeholder = { Text("例: Portal 2") },
+        placeholder = { Text(stringResource(R.string.dialog_add_game_name_placeholder)) },
         isError = showError && gameName.isBlank(),
         modifier = Modifier.fillMaxWidth(),
         singleLine = true
@@ -177,23 +191,25 @@ fun AddGameDialog(
       }
      }
 
-     // ファイル選択カード
+     // File selection card
      Card(
       modifier = Modifier.fillMaxWidth(),
       colors = CardDefaults.cardColors(
        containerColor = MaterialTheme.colorScheme.surfaceVariant
       ),
       shape = MaterialTheme.shapes.large,
-      elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+      elevation = CardDefaults.cardElevation(
+       defaultElevation = AddGameDialogDefaults.CardElevation
+      )
      ) {
       Column(
        modifier = Modifier
         .fillMaxWidth()
-        .padding(20.dp),
+        .padding(AddGameDialogDefaults.CardPadding),
        verticalArrangement = Arrangement.spacedBy(12.dp)
       ) {
        Text(
-        text = "Executable",
+        text = stringResource(R.string.dialog_add_game_executable_label),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary
@@ -202,37 +218,44 @@ fun AddGameDialog(
        OutlinedTextField(
         value = displayExecutablePath,
         onValueChange = { },
-        placeholder = { Text("Select using file picker") },
+        placeholder = {
+         Text(stringResource(R.string.dialog_add_game_executable_placeholder))
+        },
         isError = showError && selectedExecutablePath.isBlank(),
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         readOnly = true,
         trailingIcon = {
          IconButton(onClick = onSelectExecutable) {
-          Icon(Icons.Default.Folder, contentDescription = "Select File")
+          Icon(
+           Icons.Default.Folder,
+           contentDescription = stringResource(R.string.content_desc_select_file)
+          )
          }
         }
        )
       }
      }
 
-     // フォルダ選択カード
+     // Folder selection card
      Card(
       modifier = Modifier.fillMaxWidth(),
       colors = CardDefaults.cardColors(
        containerColor = MaterialTheme.colorScheme.surfaceVariant
       ),
       shape = MaterialTheme.shapes.large,
-      elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+      elevation = CardDefaults.cardElevation(
+       defaultElevation = AddGameDialogDefaults.CardElevation
+      )
      ) {
       Column(
        modifier = Modifier
         .fillMaxWidth()
-        .padding(20.dp),
+        .padding(AddGameDialogDefaults.CardPadding),
        verticalArrangement = Arrangement.spacedBy(12.dp)
       ) {
        Text(
-        text = "Install Folder",
+        text = stringResource(R.string.dialog_add_game_install_label),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary
@@ -241,21 +264,26 @@ fun AddGameDialog(
        OutlinedTextField(
         value = displayInstallPath,
         onValueChange = { },
-        placeholder = { Text("Select using folder picker") },
+        placeholder = {
+         Text(stringResource(R.string.dialog_add_game_install_placeholder))
+        },
         isError = showError && selectedInstallPath.isBlank(),
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         readOnly = true,
         trailingIcon = {
          IconButton(onClick = onSelectInstallFolder) {
-          Icon(Icons.Default.Folder, contentDescription = "Select Folder")
+          Icon(
+           Icons.Default.Folder,
+           contentDescription = stringResource(R.string.content_desc_select_folder)
+          )
          }
         }
        )
       }
      }
 
-     // Errorメッセージ
+     // Error message
      if (showError) {
       Card(
        modifier = Modifier.fillMaxWidth(),
@@ -263,40 +291,44 @@ fun AddGameDialog(
         containerColor = MaterialTheme.colorScheme.errorContainer
        ),
        shape = MaterialTheme.shapes.large,
-       elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+       elevation = CardDefaults.cardElevation(
+        defaultElevation = AddGameDialogDefaults.CardElevation
+       )
       ) {
        Text(
-        text = "Please fill in all fields",
+        text = stringResource(R.string.dialog_add_game_error),
         color = MaterialTheme.colorScheme.onErrorContainer,
         style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(20.dp)
+        modifier = Modifier.padding(AddGameDialogDefaults.CardPadding)
        )
       }
      }
 
-     // 説明カード
+     // Notes card
      Card(
       modifier = Modifier.fillMaxWidth(),
       colors = CardDefaults.cardColors(
        containerColor = MaterialTheme.colorScheme.secondaryContainer
       ),
       shape = MaterialTheme.shapes.large,
-      elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+      elevation = CardDefaults.cardElevation(
+       defaultElevation = AddGameDialogDefaults.CardElevation
+      )
      ) {
       Column(
        modifier = Modifier
         .fillMaxWidth()
-        .padding(20.dp),
+        .padding(AddGameDialogDefaults.CardPadding),
        verticalArrangement = Arrangement.spacedBy(8.dp)
       ) {
        Text(
-        text = "Notes",
+        text = stringResource(R.string.dialog_add_game_notes_title),
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSecondaryContainer
        )
        Text(
-        text = "• Please specify a Windows .exe file\n• Install path is the game root folder\n• Use file picker to select file/folder",
+        text = stringResource(R.string.dialog_add_game_notes_content),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSecondaryContainer
        )

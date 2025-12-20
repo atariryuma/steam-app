@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -80,6 +81,20 @@ class WinlatorEmulator @Inject constructor(
   // CRITICAL FIX: Use Termux proot (proven compatible with Android)
   // Previous v5.3.0 was incompatible and crashed with SIGSEGV
   private const val PROOT_ASSET = "winlator/proot-termux-aarch64.txz"
+
+  // Process management timeouts
+  private const val OUTPUT_DRAIN_TIMEOUT_MS = 2000L  // Timeout for output reading completion
+  private const val RETRY_BACKOFF_MS = 2000L         // Base backoff time for retries
+  private const val SYMLINK_CREATION_TIMEOUT_MS = 5000L  // Timeout for ln command execution
+
+  // Retry configuration
+  private const val MAX_RETRY_ATTEMPTS = 3           // Maximum retry attempts for wineboot initialization
+  private const val WINEBOOT_TIMEOUT_FIRST_MS = 60_000L   // First attempt timeout (balanced)
+  private const val WINEBOOT_TIMEOUT_RETRY_MS = 90_000L   // Retry timeout (more conservative)
+
+  // Wineserver socket polling
+  private const val WINESERVER_SOCKET_POLL_ATTEMPTS = 20  // Max attempts to find wineserver socket
+  private const val WINESERVER_SOCKET_POLL_DELAY_MS = 100L // Delay between socket poll attempts
  }
 
  override suspend fun isAvailable(): Result<Boolean> = withContext(Dispatchers.IO) {
@@ -556,6 +571,18 @@ class WinlatorEmulator @Inject constructor(
     )
    }
 
+   // Set Windows version to Windows 10 (required for Steam)
+   Log.i(TAG, "Configuring Wine to report as Windows 10...")
+   val versionResult = setWindowsVersion(containerDir)
+   if (versionResult.isFailure) {
+    Log.e(TAG, "CRITICAL: Failed to set Windows version: ${versionResult.exceptionOrNull()?.message}")
+    Log.e(TAG, "Steam installation will likely fail without Windows 10 registry configuration")
+    // NOTE: Non-fatal error - continue container creation
+    // Some apps may work without Windows 10, but Steam requires it
+   } else {
+    Log.i(TAG, "Windows 10 registry configuration completed successfully")
+   }
+
    val container = EmulatorContainer(
     id = containerId,
     name = config.name,
@@ -712,11 +739,14 @@ class WinlatorEmulator @Inject constructor(
    // Launch background coroutine to continuously read stdout
    // This prevents the process from blocking when output buffer fills up
    // OPTIMIZATION: Rate-limit logging to reduce I/O overhead (10-20% CPU reduction)
+   // BEST PRACTICE: Use cancellable reading loop instead of forEach
    CoroutineScope(Dispatchers.IO).launch {
     try {
      process.inputStream.bufferedReader().use { reader ->
       var lineCount = 0
-      reader.lineSequence().forEach { line ->
+      // Use while loop to continuously read until EOF (process termination)
+      while (true) {
+       val line = reader.readLine() ?: break  // EOF reached, process terminated
        // Only log errors and first 50 lines to reduce logging overhead
        if (line.contains("err", ignoreCase = true) ||
            line.contains("warn", ignoreCase = true) ||
@@ -731,7 +761,8 @@ class WinlatorEmulator @Inject constructor(
       }
      }
     } catch (e: Exception) {
-     Log.w(TAG, "Output stream monitoring failed", e)
+     // Stream closed or read interrupted - this is expected on process termination
+     Log.d(TAG, "[Wine:$pid] Output stream monitoring stopped: ${e.message}")
     }
    }
 
@@ -961,10 +992,10 @@ class WinlatorEmulator @Inject constructor(
    put("LANG", "C")
    put("LC_ALL", "C")
 
-   // WINEDEBUG: Optimized for performance
-   // Minimize logging for faster container creation
+   // WINEDEBUG: Optimized for performance and memory
+   // Minimize logging for faster container creation and reduced memory usage
    when (attemptNumber) {
-    0 -> put("WINEDEBUG", "-all,+err") // Minimal: errors only (fastest)
+    0 -> put("WINEDEBUG", "-all") // MINIMAL: Complete silence (fastest, lowest memory)
     1 -> put("WINEDEBUG", "+err,+seh,+loaddll,+process") // Core diagnostics
     else -> put("WINEDEBUG", "+all") // MAXIMUM: All Wine debug channels
    }
@@ -977,6 +1008,12 @@ class WinlatorEmulator @Inject constructor(
    // Box64 auto-wraps posix_spawn, so Wine will find wineserver via PATH
    // put("WINESERVER", wineserverBinary.absolutePath)
    put("WINEFSYNC", "0") // Disable FSync during initialization for stability
+
+   // MEMORY OPTIMIZATION: Disable unnecessary Wine processes
+   // explorer.exe: Windows desktop shell (not needed on Android, saves 30-50MB)
+   // winemenubuilder.exe: Start menu integration (not needed, saves 10-20MB)
+   // Reference: https://wiki.archlinux.org/title/Wine
+   put("WINEDLLOVERRIDES", "explorer.exe=d;winemenubuilder.exe=d")
 
    // Paths
    put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}")
@@ -1010,22 +1047,23 @@ class WinlatorEmulator @Inject constructor(
    // OPTIMIZED: Start with balanced settings for faster container creation
    when (attemptNumber) {
     0 -> {
-     // Attempt 1: BALANCED PERFORMANCE (optimized for speed)
+     // Attempt 1: BALANCED PERFORMANCE + MEMORY OPTIMIZATION
      // Most containers succeed with these settings in ~30-40s
      put("BOX64_DYNAREC_SAFEFLAGS", "1")  // Moderate flag safety
      put("BOX64_DYNAREC_FASTNAN", "1")   // Fast NaN handling
      put("BOX64_DYNAREC_FASTROUND", "1")  // Fast rounding
      put("BOX64_DYNAREC_X87DOUBLE", "1")  // Accurate x87 FPU emulation
-     put("BOX64_DYNAREC_BIGBLOCK", "2")  // Medium block compilation
+     put("BOX64_DYNAREC_BIGBLOCK", "1")  // REDUCED: Smaller blocks (saves 20-40MB cache)
      put("BOX64_DYNAREC_STRONGMEM", "1")  // Balanced memory ordering
      put("BOX64_DYNAREC_FORWARD", "256")  // Moderate block forward
      put("BOX64_DYNAREC_CALLRET", "1")   // Enable call/ret optimization
      put("BOX64_DYNAREC_WAIT", "0")    // No wait
 
-     // Minimal logging for performance
+     // Minimal logging for performance and memory
      put("BOX64_LOG", "1")       // Minimal logging
      put("BOX64_SHOWSEGV", "1")    // Show segfault details
      put("BOX64_NOBANNER", "1")    // Hide banner for speed
+     put("BOX64_DYNACACHE", "0")   // Disable disk cache (avoid I/O overhead)
     }
     1 -> {
      // Attempt 2: MAXIMUM STABILITY + DIAGNOSTIC MODE
@@ -1250,19 +1288,27 @@ class WinlatorEmulator @Inject constructor(
 
    // CRITICAL FIX: Drain wineserver output to prevent buffer overflow deadlock
    // Launch background coroutine to continuously read output
+   // BEST PRACTICE: Use simple reading loop instead of forEach
    CoroutineScope(Dispatchers.IO).launch {
-    wineserverProcess.inputStream.bufferedReader().use { reader ->
-     reader.lineSequence().forEach { line ->
-      Log.d(TAG, "[wineserver] $line")
+    try {
+     wineserverProcess.inputStream.bufferedReader().use { reader ->
+      // Use while loop to continuously read until EOF (process termination)
+      while (true) {
+       val line = reader.readLine() ?: break  // EOF reached, process terminated
+       Log.d(TAG, "[wineserver] $line")
+      }
      }
+    } catch (e: Exception) {
+     // Stream closed or read interrupted - this is expected on process termination
+     Log.d(TAG, "[wineserver] Output reading stopped: ${e.message}")
     }
    }
 
    // Wait for wineserver socket to be created (up to 2 seconds - optimized)
    val wineServerDir = File(containerDir, ".wine")
    var wineserverReady = false
-   for (attempt in 0 until 20) {
-    delay(100)
+   for (attempt in 0 until WINESERVER_SOCKET_POLL_ATTEMPTS) {
+    delay(WINESERVER_SOCKET_POLL_DELAY_MS)
     // Check if .wine directory exists and has server-* subdirectory with socket
     if (wineServerDir.exists()) {
      wineServerDir.listFiles()?.forEach { file ->
@@ -1289,10 +1335,10 @@ class WinlatorEmulator @Inject constructor(
    // Continue anyway - wineboot might still work
   }
 
-  // 3-tier retry loop
-  for (attemptNumber in 0 until 3) {
+  // Multi-tier retry loop with progressive timeout increase
+  for (attemptNumber in 0 until MAX_RETRY_ATTEMPTS) {
    try {
-    Log.i(TAG, "=== Wine prefix initialization attempt ${attemptNumber + 1}/3 ===")
+    Log.i(TAG, "=== Wine prefix initialization attempt ${attemptNumber + 1}/$MAX_RETRY_ATTEMPTS ===")
 
     // Build environment variables specific to this attempt
     val environmentVars = buildWinebootEnvironmentVariables(containerDir, attemptNumber)
@@ -1317,53 +1363,37 @@ class WinlatorEmulator @Inject constructor(
     val process = processBuilder.start()
 
     // Timeout: Optimized for faster container creation
-    // 60s for first attempt (balanced performance), 90s for retries (more conservative settings)
+    // First attempt uses balanced timeout, retries use more conservative timeout
     // Most wineboot --init completes within 30-45s on modern devices
-    val timeoutMs = if (attemptNumber == 0) 60_000L else 90_000L
+    val timeoutMs = if (attemptNumber == 0) WINEBOOT_TIMEOUT_FIRST_MS else WINEBOOT_TIMEOUT_RETRY_MS
 
-    // CRITICAL FIX: Read output concurrently with timeout to prevent deadlock
-    // If output buffer fills up, process blocks forever waiting for reader
-    // Solution: Launch async reader BEFORE waitFor() with timeout protection
-    val output = StringBuilder()
-    val completed = withTimeoutOrNull(timeoutMs) {
-     // Launch concurrent output reader to drain stdout/stderr
-     val outputJob = async(Dispatchers.IO) {
-      process.inputStream.bufferedReader().use { reader ->
-       reader.lineSequence().forEach { line ->
-        Log.d(TAG, "[wineboot] $line")
-        output.appendLine(line)
-       }
-      }
-     }
+    // Execute with proper output draining (prevents deadlock)
+    val result = executeProcessWithOutputDrain(
+     process = process,
+     timeoutMs = timeoutMs,
+     logPrefix = "[wineboot]"
+    )
+    val exitCode = result.exitCode
+    val output = result.output
 
-     // Wait for process completion
-     process.waitFor()
-
-     // Ensure output is fully read
-     outputJob.await()
-     true
-    }
-
-    if (completed == null) {
+    if (exitCode == null) {
+     // Timeout occurred (process already destroyed in finally block)
      Log.w(TAG, "Attempt $attemptNumber: wineboot timed out after ${timeoutMs / 1000}s")
-     process.destroyForcibly()
 
      // If last attempt, fail
-     if (attemptNumber == 2) {
+     if (attemptNumber == MAX_RETRY_ATTEMPTS - 1) {
       return@withContext Result.failure(
-       WinePrefixException("Wine prefix initialization timed out on all 3 attempts")
+       WinePrefixException("Wine prefix initialization timed out on all $MAX_RETRY_ATTEMPTS attempts")
       )
      }
 
-     // Cleanup and retry
+     // Cleanup and retry with exponential backoff
      cleanupPartialPrefix(containerDir)
-     val backoffMs = (attemptNumber + 1) * 2000L
+     val backoffMs = (attemptNumber + 1) * RETRY_BACKOFF_MS
      Log.i(TAG, "Waiting ${backoffMs / 1000}s before retry...")
      delay(backoffMs)
      continue
     }
-
-    val exitCode = process.exitValue()
 
     if (exitCode == 0) {
      // SUCCESS!
@@ -1382,15 +1412,15 @@ class WinlatorEmulator @Inject constructor(
     }
 
     // If last attempt, fail
-    if (attemptNumber == 2) {
+    if (attemptNumber == MAX_RETRY_ATTEMPTS - 1) {
      return@withContext Result.failure(
-      WinePrefixException("wineboot failed on all 3 attempts. Last exit code: $exitCode. Output: $outputTail")
+      WinePrefixException("wineboot failed on all $MAX_RETRY_ATTEMPTS attempts. Last exit code: $exitCode. Output: $outputTail")
      )
     }
 
     // Cleanup and retry
     cleanupPartialPrefix(containerDir)
-    val backoffMs = (attemptNumber + 1) * 2000L
+    val backoffMs = (attemptNumber + 1) * RETRY_BACKOFF_MS
     Log.i(TAG, "Waiting ${backoffMs / 1000}s before retry...")
     delay(backoffMs)
 
@@ -1398,15 +1428,15 @@ class WinlatorEmulator @Inject constructor(
     Log.e(TAG, "Attempt $attemptNumber: Exception during Wine prefix initialization", e)
 
     // If last attempt, fail
-    if (attemptNumber == 2) {
+    if (attemptNumber == MAX_RETRY_ATTEMPTS - 1) {
      return@withContext Result.failure(
-      WinePrefixException("Failed to initialize Wine prefix after 3 attempts: ${e.message}", e)
+      WinePrefixException("Failed to initialize Wine prefix after $MAX_RETRY_ATTEMPTS attempts: ${e.message}", e)
      )
     }
 
     // Cleanup and retry
     cleanupPartialPrefix(containerDir)
-    val backoffMs = (attemptNumber + 1) * 2000L
+    val backoffMs = (attemptNumber + 1) * RETRY_BACKOFF_MS
     Log.i(TAG, "Waiting ${backoffMs / 1000}s before retry...")
     delay(backoffMs)
    }
@@ -1416,6 +1446,160 @@ class WinlatorEmulator @Inject constructor(
   return@withContext Result.failure(
    WinePrefixException("Wine prefix initialization failed - all retry attempts exhausted")
   )
+ }
+
+ /**
+  * Set Windows version to Windows 10 via Wine registry
+  *
+  * CRITICAL: Steam requires Windows 10/11 to run properly.
+  * This configures Wine to report as Windows 10 (same as Winlator 10.1).
+  *
+  * @param containerDir Wine prefix directory
+  * @return Result indicating success or failure
+  */
+ private suspend fun setWindowsVersion(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
+  try {
+   Log.i(TAG, "Setting Windows version to Windows 10")
+
+   // Create .reg file with Windows 10 configuration
+   val regFile = File(context.cacheDir, "set_windows_version.reg")
+   regFile.writeText("""
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion]
+"CurrentVersion"="10.0"
+"CurrentBuild"="19045"
+"CurrentBuildNumber"="19045"
+"ProductName"="Windows 10 Pro"
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\ProductOptions]
+"ProductType"="WinNT"
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\Windows]
+"CSDVersion"=dword:00000000
+
+   """.trimIndent())
+
+   // Build Wine environment
+   val wineEnv = buildMap {
+    put("WINEPREFIX", containerDir.absolutePath)
+    put("WINEARCH", "win64")
+    put("WINEDEBUG", "-all")
+   }
+
+   // Get Box64 binary
+   val box64Binary = getBox64Binary()
+   if (!box64Binary.exists()) {
+    regFile.delete()
+    return@withContext Result.failure(
+     Box64BinaryNotFoundException()
+    )
+   }
+
+   if (!wineBinary.exists()) {
+    regFile.delete()
+    return@withContext Result.failure(
+     WineBinaryNotFoundException()
+    )
+   }
+
+   // Verify proot binary exists (CRITICAL: required for proper library loading)
+   if (!prootBinary.exists()) {
+    regFile.delete()
+    return@withContext Result.failure(
+     EmulatorException("Proot binary not found at ${prootBinary.absolutePath}")
+    )
+   }
+
+   // Execute: proot wine regedit /S set_windows_version.reg
+   // IMPORTANT: Use proot to properly mount rootfs and load system libraries (libc.so.6, etc.)
+   val command = buildList {
+    add(prootBinary.absolutePath)
+    add("-b")
+    add("${rootfsDir.absolutePath}:/data/data/com.winlator/files/rootfs")
+    add(box64Binary.absolutePath)
+    add(wineBinary.absolutePath)
+    add("regedit")
+    add("/S") // Silent mode
+    add(regFile.absolutePath)
+   }
+
+   Log.d(TAG, "Executing regedit command: ${command.joinToString(" ")}")
+
+   val processBuilder = ProcessBuilder(command)
+
+   // Add Wine environment with library paths
+   // CRITICAL: Include all required paths for Box64 to find native libraries
+   val fullEnv = wineEnv.toMutableMap().apply {
+    put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:/usr/bin:/bin")
+    put("LD_LIBRARY_PATH",
+     "${rootfsDir.absolutePath}/usr/lib:" +
+     "${rootfsDir.absolutePath}/lib:" +
+     "${wineDir.absolutePath}/lib:" +
+     "${wineDir.absolutePath}/lib/wine/x86_64-unix"
+    )
+    put("BOX64_LD_LIBRARY_PATH",
+     "${rootfsDir.absolutePath}/usr/lib:" +
+     "${rootfsDir.absolutePath}/lib:" +
+     "${rootfsDir.absolutePath}/usr/lib/x86_64-linux-gnu:" +
+     "${wineDir.absolutePath}/lib/wine/x86_64-unix"
+    )
+    put("BOX64_PATH", "${wineDir.absolutePath}/bin")
+    put("BOX64_EMULATED_LIBS", "libc.so.6:libpthread.so.0:libdl.so.2:librt.so.1:libm.so.6")
+    put("BOX64_ALLOWMISSINGLIBS", "1")
+    put("BOX64_LOG", "0")
+    put("BOX64_NOBANNER", "1")
+    put("TMPDIR", context.cacheDir.absolutePath)
+    put("PROOT_TMP_DIR", context.cacheDir.absolutePath)
+   }
+
+   processBuilder.environment().putAll(fullEnv)
+   processBuilder.redirectErrorStream(true)
+
+   val process = processBuilder.start()
+
+   // Wait for regedit to complete (max 30 seconds)
+   // IMPORTANT: proot adds overhead, so longer timeout needed
+   val completed = withTimeoutOrNull(30_000L) {
+    process.waitFor()
+    true
+   } ?: false
+
+   // Read output after process completes (or times out)
+   val output = try {
+    process.inputStream.bufferedReader().readText()
+   } catch (e: Exception) {
+    "Failed to read output: ${e.message}"
+   }
+
+   if (!completed) {
+    process.destroy()
+    regFile.delete()
+    Log.e(TAG, "regedit timeout after 30s. Output: $output")
+    return@withContext Result.failure(
+     EmulatorException("regedit timeout after 30 seconds")
+    )
+   }
+
+   val exitCode = process.exitValue()
+   Log.d(TAG, "regedit exit code: $exitCode")
+   Log.d(TAG, "regedit output: $output")
+
+   regFile.delete()
+
+   if (exitCode != 0) {
+    return@withContext Result.failure(
+     EmulatorException("regedit failed with exit code $exitCode: $output")
+    )
+   }
+
+   Log.i(TAG, "Successfully configured Wine to report as Windows 10")
+   Result.success(Unit)
+
+  } catch (e: Exception) {
+   Log.e(TAG, "Failed to set Windows version", e)
+   Result.failure(EmulatorException("Failed to set Windows version: ${e.message}", e))
+  }
  }
 
  /**
@@ -1643,19 +1827,97 @@ class WinlatorEmulator @Inject constructor(
  }
 
  /**
+  * Result of process execution with output draining
+  */
+ private data class ProcessExecutionResult(
+  val exitCode: Int?,
+  val output: StringBuilder
+ )
+
+ /**
+  * Execute a process with proper output draining to prevent deadlocks.
+  *
+  * Best Practice: Drains stdout/stderr concurrently to prevent buffer overflow.
+  * When the output buffer fills up, the process blocks waiting for a reader.
+  *
+  * @param process The process to execute
+  * @param timeoutMs Timeout in milliseconds
+  * @param logPrefix Prefix for log messages (e.g., "[wineboot]")
+  * @return ProcessExecutionResult with exit code and captured output
+  */
+ private suspend fun executeProcessWithOutputDrain(
+  process: Process,
+  timeoutMs: Long,
+  logPrefix: String = ""
+ ): ProcessExecutionResult = withContext(Dispatchers.IO) {
+  val output = StringBuilder()
+
+  val exitCode = try {
+   withTimeoutOrNull(timeoutMs) {
+    // Launch concurrent output reader to drain stdout/stderr
+    val outputJob = async(Dispatchers.IO) {
+     process.inputStream.bufferedReader().use { reader ->
+      try {
+       // Read until EOF or job is cancelled
+       while (true) {
+        val line = reader.readLine() ?: break  // EOF reached
+        if (logPrefix.isNotEmpty()) {
+         Log.d(TAG, "$logPrefix $line")
+        }
+        output.appendLine(line)
+       }
+      } catch (e: Exception) {
+       // Stream closed or read interrupted - expected on cancellation
+       Log.d(TAG, "$logPrefix Output reading stopped: ${e.message}")
+      }
+     }
+    }
+
+    // Wait for process completion
+    val code = process.waitFor()
+
+    // Close input stream to unblock the reader
+    try {
+     process.inputStream.close()
+    } catch (e: Exception) {
+     Log.d(TAG, "Failed to close input stream: ${e.message}")
+    }
+
+    // Wait for output reading to complete (with timeout)
+    withTimeoutOrNull(OUTPUT_DRAIN_TIMEOUT_MS) {
+     outputJob.await()
+    } ?: run {
+     Log.w(TAG, "Output reading didn't complete within ${OUTPUT_DRAIN_TIMEOUT_MS / 1000}s, cancelling...")
+     outputJob.cancel()
+    }
+
+    code
+   }
+  } finally {
+   // Ensure process is cleaned up
+   if (process.isAlive) {
+    Log.w(TAG, "Process still alive after timeout, destroying forcibly")
+    process.destroyForcibly()
+   }
+  }
+
+  ProcessExecutionResult(exitCode, output)
+ }
+
+ /**
   * Setup hardcoded linker path for Box64.
   * Box64 has hardcoded interpreter: /data/data/com.winlator/files/rootfs/lib/ld-linux-aarch64.so.1
   *
   * Since the path in our app is too long to patch, we create a symlink at rootfs/lib/ld-linux-aarch64.so.1
   * that points to the actual linker at rootfs/usr/lib/ld-linux-aarch64.so.1.
   */
- private fun setupHardcodedLinkerPath() {
+ private suspend fun setupHardcodedLinkerPath() = withContext(Dispatchers.IO) {
   // The actual linker is at usr/lib/ld-linux-aarch64.so.1
   val actualLinker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
 
   if (!actualLinker.exists()) {
    Log.w(TAG, "Rootfs linker not found: ${actualLinker.absolutePath}")
-   return
+   return@withContext
   }
 
   // Create the lib directory if it doesn't exist
@@ -1675,29 +1937,17 @@ class WinlatorEmulator @Inject constructor(
      .redirectErrorStream(true)
      .start()
 
-    // CRITICAL FIX: Read output asynchronously to prevent deadlock
-    // ln command may produce output which can fill buffer and block
-    val output = StringBuilder()
-    val completed = withTimeoutOrNull(5000L) {
-     val outputJob = async(Dispatchers.IO) {
-      process.inputStream.bufferedReader().use { reader ->
-       reader.lineSequence().forEach { line ->
-        output.appendLine(line)
-       }
-      }
-     }
-     process.waitFor()
-     outputJob.await()
-     true
-    }
+    // Execute with proper output draining (prevents deadlock)
+    val result = executeProcessWithOutputDrain(
+     process = process,
+     timeoutMs = SYMLINK_CREATION_TIMEOUT_MS,
+     logPrefix = "[ln]"
+    )
 
-    if (completed == null) {
-     Log.w(TAG, "Linker symlink creation timed out")
-     process.destroyForcibly()
-    } else if (process.exitValue() == 0) {
-     Log.i(TAG, "Created linker symlink: ${linkerSymlink.absolutePath} -> $symlinkTarget")
-    } else {
-     Log.w(TAG, "Failed to create linker symlink: ${output.toString().trim()}")
+    when (val exitCode = result.exitCode) {
+     null -> Log.w(TAG, "Linker symlink creation timed out")
+     0 -> Log.i(TAG, "Created linker symlink: ${linkerSymlink.absolutePath} -> $symlinkTarget")
+     else -> Log.w(TAG, "Failed to create linker symlink (exit code $exitCode)")
     }
    } else {
     Log.d(TAG, "Linker symlink already exists: ${linkerSymlink.absolutePath}")

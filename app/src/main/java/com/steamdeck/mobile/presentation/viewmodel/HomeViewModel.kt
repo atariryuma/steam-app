@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ホーム画面 ViewModel
+ * Home Screen ViewModel
  */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -39,7 +39,7 @@ class HomeViewModel @Inject constructor(
  }
 
  /**
-  * gamelist読み込み
+  * Load game list
   */
  private fun loadGames() {
   viewModelScope.launch {
@@ -53,13 +53,13 @@ class HomeViewModel @Inject constructor(
     }
    } catch (e: Exception) {
     AppLogger.e(TAG, "Failed to load games", e)
-    _uiState.value = HomeUiState.Error(e.message ?: "不明なError")
+    _uiState.value = HomeUiState.Error(e.message ?: "Unknown error")
    }
   }
  }
 
  /**
-  * gameSearch
+  * Search games
   */
  fun searchGames(query: String) {
   _searchQuery.value = query
@@ -79,13 +79,13 @@ class HomeViewModel @Inject constructor(
     }
    } catch (e: Exception) {
     AppLogger.e(TAG, "Game search failed: $query", e)
-    _uiState.value = HomeUiState.Error(e.message ?: "SearchError")
+    _uiState.value = HomeUiState.Error(e.message ?: "Search error")
    }
   }
  }
 
  /**
-  * favorite状態切り替え
+  * Toggle favorite status
   */
  fun toggleFavorite(gameId: Long, isFavorite: Boolean) {
   viewModelScope.launch {
@@ -99,7 +99,7 @@ class HomeViewModel @Inject constructor(
  }
 
  /**
-  * gamelistリフレッシュ
+  * Refresh game list
   */
  fun refresh() {
   _uiState.value = HomeUiState.Loading
@@ -107,28 +107,28 @@ class HomeViewModel @Inject constructor(
  }
 
  /**
-  * 手動 gameadd
+  * Add game manually
   *
-  * ベストプラクティス:
-  * - 入力値 バリデーション
-  * - 重複check
-  * - insertGame 戻り値verify
-  * - 適切なErrorハンドリング
+  * Best practices:
+  * - Validate input values
+  * - Check for duplicates
+  * - Verify insertGame return value
+  * - Proper error handling
   */
  fun addGame(name: String, executablePath: String, installPath: String) {
   viewModelScope.launch {
    try {
-    // 1. 入力値 バリデーション
+    // 1. Validate input values
     if (name.isBlank()) {
-     _uiState.value = HomeUiState.Error("game名入力please")
+     _uiState.value = HomeUiState.Error("Please enter game name")
      return@launch
     }
     if (executablePath.isBlank()) {
-     _uiState.value = HomeUiState.Error("Executable選択please")
+     _uiState.value = HomeUiState.Error("Please select executable")
      return@launch
     }
     if (installPath.isBlank()) {
-     _uiState.value = HomeUiState.Error("installationフォルダ選択please")
+     _uiState.value = HomeUiState.Error("Please select installation folder")
      return@launch
     }
 
@@ -151,15 +151,15 @@ class HomeViewModel @Inject constructor(
           installPath.startsWith("/")
 
     if (!isValidExecutablePath) {
-     _uiState.value = HomeUiState.Error("Executable パス Disabled す")
+     _uiState.value = HomeUiState.Error("Executable path is invalid")
      return@launch
     }
     if (!isValidInstallPath) {
-     _uiState.value = HomeUiState.Error("installationフォルダ パス Disabled す")
+     _uiState.value = HomeUiState.Error("Installation folder path is invalid")
      return@launch
     }
 
-    // Android 10 (API 29) 以降 、content:// URI推奨（Scoped Storage）
+    // For Android 10 (API 29) and above, content:// URI is recommended (Scoped Storage)
     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
      if (!executablePath.startsWith("content://")) {
       AppLogger.w(TAG,
@@ -171,7 +171,7 @@ class HomeViewModel @Inject constructor(
      }
     }
 
-    // 3. 重複check（同じ名前 or 同じ実行パス）
+    // 3. Check for duplicates (same name or same executable path)
     val currentGames = when (val state = _uiState.value) {
      is HomeUiState.Success -> state.games
      else -> emptyList()
@@ -181,15 +181,15 @@ class HomeViewModel @Inject constructor(
     val isDuplicatePath = currentGames.any { it.executablePath == executablePath }
 
     if (isDuplicateName) {
-     _uiState.value = HomeUiState.Error("同じ名前 game 既 existします: $name")
+     _uiState.value = HomeUiState.Error("A game with the same name already exists: $name")
      return@launch
     }
     if (isDuplicatePath) {
-     _uiState.value = HomeUiState.Error("同じExecutable 既 登録されています")
+     _uiState.value = HomeUiState.Error("The same executable is already registered")
      return@launch
     }
 
-    // 4. gamecreate
+    // 4. Create game
     val game = Game(
      name = name,
      executablePath = executablePath,
@@ -197,28 +197,28 @@ class HomeViewModel @Inject constructor(
      source = com.steamdeck.mobile.domain.model.GameSource.IMPORTED
     )
 
-    // 5. データベース 挿入し、IDretrieve
+    // 5. Insert into database and get ID
     val insertedId = gameRepository.insertGame(game)
 
-    // 6. 挿入結果verify
+    // 6. Verify insertion result
     if (insertedId <= 0) {
-     _uiState.value = HomeUiState.Error("game add failed（DisabledなID: $insertedId）")
+     _uiState.value = HomeUiState.Error("Failed to add game (invalid ID: $insertedId)")
      AppLogger.e(TAG, "Invalid game ID returned: $insertedId")
      return@launch
     }
 
     AppLogger.i(TAG, "Game added successfully: $name (ID: $insertedId)")
 
-    // 7. add後、リストUpdate
-    // Note: Flow 自動Updateされる 、明示的 refresh()呼ぶこ 即座 反映
+    // 7. Update list after adding
+    // Note: Flow updates automatically, but explicitly calling refresh() ensures immediate reflection
     refresh()
 
    } catch (e: android.database.sqlite.SQLiteConstraintException) {
-    // データベース制約違反（UNIQUE制約等）
-    _uiState.value = HomeUiState.Error("game 既 existします")
+    // Database constraint violation (UNIQUE constraint etc.)
+    _uiState.value = HomeUiState.Error("Game already exists")
     AppLogger.e(TAG, "SQLite constraint error while adding game", e)
    } catch (e: Exception) {
-    _uiState.value = HomeUiState.Error("game add failed: ${e.message}")
+    _uiState.value = HomeUiState.Error("Failed to add game: ${e.message}")
     AppLogger.e(TAG, "Error adding game: $name", e)
    }
   }
@@ -274,8 +274,14 @@ class HomeViewModel @Inject constructor(
     return false
    }
 
+   // CRITICAL FIX: Ensure parent directory exists to prevent NPE security bypass
    // Additional check: ensure canonical path doesn't escape original path
-   if (!canonicalPath.startsWith(file.parent ?: "")) {
+   val parentPath = file.parent
+   if (parentPath == null) {
+    AppLogger.w(TAG, "File has no parent directory (root-level file)")
+    return false
+   }
+   if (!canonicalPath.startsWith(parentPath)) {
     AppLogger.w(TAG, "Canonical path escapes parent directory")
     return false
    }

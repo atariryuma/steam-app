@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * gamelaunchdoUseCase
+ * Use case for launching games
  *
  * 2025 Best Practice:
  * - DataResult<T> for type-safe error handling
@@ -33,19 +33,19 @@ class LaunchGameUseCase @Inject constructor(
  // Background scope for process monitoring (survives ViewModel lifecycle)
  private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
  /**
-  * gamelaunch
-  * @param gameId gameID
-  * @return launchresult
+  * Launch game
+  * @param gameId Game ID
+  * @return Launch result
   */
  suspend operator fun invoke(gameId: Long): DataResult<Int> {
   return try {
-   // gameinformationretrieve
+   // Get game information
    val game = gameRepository.getGameById(gameId)
     ?: return DataResult.Error(
-     AppError.DatabaseError("game not found", null)
+     AppError.DatabaseError("Game not found", null)
     )
 
-   // containerinformationretrieve（configurationされているcase）
+   // Get container information (if configured)
    val container = game.winlatorContainerId?.let { containerId ->
     containerRepository.getContainerById(containerId)
    }
@@ -62,12 +62,12 @@ class LaunchGameUseCase @Inject constructor(
     )
    }
 
-   // gamelaunch
+   // Launch game
    when (val result = winlatorEngine.launchGame(game, container)) {
     is LaunchResult.Success -> {
      val startTime = System.currentTimeMillis()
 
-     // プレイstart時刻記録
+     // Record play start time
      try {
       gameRepository.updatePlayTime(gameId, 0, startTime)
      } catch (e: Exception) {
@@ -95,7 +95,7 @@ class LaunchGameUseCase @Inject constructor(
  }
 
  /**
-  * processmonitorしてplay time記録
+  * Monitor process and record play time
   */
  private fun startProcessMonitoring(gameId: Long, processId: Int, startTime: Long) {
   monitoringScope.launch {
@@ -123,6 +123,15 @@ class LaunchGameUseCase @Inject constructor(
      } else {
       AppLogger.w(TAG, "Process monitoring error: ${cause.message}", cause)
      }
+
+     // CRITICAL FIX: Clean up engine resources to prevent memory leak
+     // This prevents process references from accumulating over app lifetime
+     try {
+      winlatorEngine.cleanup()
+      AppLogger.d(TAG, "Cleaned up WinlatorEngine resources after process termination")
+     } catch (e: Exception) {
+      AppLogger.w(TAG, "Failed to cleanup WinlatorEngine", e)
+     }
     }
     .catch { e ->
      AppLogger.e(TAG, "Process monitoring exception", e)
@@ -148,52 +157,52 @@ class LaunchGameUseCase @Inject constructor(
  }
 
  /**
-  * gameinstallationstateverification
+  * Validate game installation status
   *
   * Best Practice (2025):
-  * - executionfile existconfirmation
-  * - installationpath existconfirmation
-  * - Steam AppManifestconfirmation（Steamlaunch時）
+  * - Check executable file exists
+  * - Check installation path exists
+  * - Verify Steam AppManifest (when launching via Steam)
   *
-  * @param game gameinformation
-  * @return errorメッセージ（問題なければnull）
+  * @param game Game information
+  * @return Error message (null if no issues)
   */
  private fun validateGameInstallation(game: com.steamdeck.mobile.domain.model.Game): String? {
-  // 1. executionfilepath 空白 ないかconfirmation
+  // 1. Check if executable file path is not blank
   if (game.executablePath.isBlank()) {
    return "Executable file is not configured.\nPlease install the game before launching."
   }
 
-  // 2. executionfile existdoかconfirmation
+  // 2. Check if executable file exists
   val executableFile = java.io.File(game.executablePath)
   if (!executableFile.exists()) {
-   return "executionfile not found:\n${game.executablePath}\n\ngame 正しくinstallationされていない可能性 あります。"
+   return "Executable file not found:\n${game.executablePath}\n\nThe game may not be installed correctly."
   }
 
-  // 3. executionfile 通常fileかconfirmation（directory ない）
+  // 3. Check if executable file is a regular file (not a directory)
   if (!executableFile.isFile) {
-   return "executionfile 無効 す（directoryor特殊file）:\n${game.executablePath}"
+   return "Executable file is invalid (directory or special file):\n${game.executablePath}"
   }
 
-  // 4. installationpath existdoかconfirmation
+  // 4. Check if installation path exists
   val installDir = java.io.File(game.installPath)
   if (!installDir.exists()) {
-   return "installationdirectory not found:\n${game.installPath}\n\ngame再installationplease。"
+   return "Installation directory not found:\n${game.installPath}\n\nPlease reinstall the game."
   }
 
-  // 5. installationpath directoryかconfirmation
+  // 5. Check if installation path is a directory
   if (!installDir.isDirectory) {
-   return "installationpath 無効 す（directory ありません）:\n${game.installPath}"
+   return "Installation path is invalid (not a directory):\n${game.installPath}"
   }
 
-  // 6. Steamgame case、addverification（オプション - future extension用）
+  // 6. For Steam games, additional validation (optional - for future extension)
   if (game.source == com.steamdeck.mobile.domain.model.GameSource.STEAM && game.steamAppId != null) {
-   // TODO: Steam AppManifestverification（futureimplementation）
-   // Example: C:/Steam/steamapps/appmanifest_${steamAppId}.acf existconfirmation
+   // TODO: Verify Steam AppManifest (future implementation)
+   // Example: Check if C:/Steam/steamapps/appmanifest_${steamAppId}.acf exists
    AppLogger.d(TAG, "Steam game detected (AppID: ${game.steamAppId}) - additional validation possible in future")
   }
 
-  // 全て verificationpath
+  // All validation passed
   AppLogger.d(TAG, "Game installation validation passed for: ${game.name}")
   return null
  }

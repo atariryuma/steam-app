@@ -12,8 +12,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Winlatorエンジン implementation
- * WinlatorEmulatoruseしてWindowsgameexecution
+ * Winlator Engine Implementation
+ * Executes Windows games using WinlatorEmulator
  */
 @Singleton
 class WinlatorEngineImpl @Inject constructor(
@@ -33,12 +33,12 @@ class WinlatorEngineImpl @Inject constructor(
  private val cachedDefaultContainer = AtomicReference<com.steamdeck.mobile.domain.emulator.EmulatorContainer?>(null)
 
  /**
-  * cleanupmethod（メモリリーク防止）
+  * Cleanup method (prevents memory leaks)
   *
   * Best Practice (2025):
-  * - ViewModel onCleared()from呼び出す
-  * - process参照nullクリアしてGC可能 do
-  * - アプリend時 gameend時 呼び出すこ 推奨
+  * - Call from ViewModel onCleared()
+  * - Clear process references to null to enable GC
+  * - Recommended to call when app exits or game terminates
   */
  fun cleanup() {
   Log.d(TAG, "Cleaning up WinlatorEngine resources")
@@ -54,7 +54,7 @@ class WinlatorEngineImpl @Inject constructor(
    Log.d(TAG, "Container: ${container?.name ?: "Default"}")
    Log.d(TAG, "Source: ${game.source}, SteamAppId: ${game.steamAppId}")
 
-   // Steamgame case 、download 必要
+   // For Steam games, download is required
    if (game.source == com.steamdeck.mobile.domain.model.GameSource.STEAM) {
     if (game.executablePath.isBlank()) {
      Log.w(TAG, "Steam game not downloaded: ${game.name} (AppID: ${game.steamAppId})")
@@ -65,7 +65,7 @@ class WinlatorEngineImpl @Inject constructor(
     }
    }
 
-   // 1. Winlator initializationconfirmation 自動initialization
+   // 1. Check Winlator initialization and auto-initialize if needed
    val available = winlatorEmulator.isAvailable().getOrNull() ?: false
    if (!available) {
     Log.i(TAG, "Winlator not initialized, starting automatic initialization...")
@@ -87,28 +87,28 @@ class WinlatorEngineImpl @Inject constructor(
     Log.i(TAG, "Winlator initialization completed successfully")
    }
 
-   // 2. executionfile existconfirmation
+   // 2. Check executable file exists
    if (game.executablePath.isBlank()) {
     return LaunchResult.Error("Executable file is not configured")
    }
 
    val execFile = File(game.executablePath)
    if (!execFile.exists()) {
-    return LaunchResult.Error("executionfile not found:\n${game.executablePath}")
+    return LaunchResult.Error("Executable file not found:\n${game.executablePath}")
    }
 
-   // 3. gameエンジンdetection
+   // 3. Detect game engine
    val engine = detectGameEngine(game.executablePath)
    Log.d(TAG, "Detected engine: ${engine.displayName}")
 
-   // 4. optimizationconfigurationapply
+   // 4. Apply optimization configuration
    val optimizedContainer = container ?: getOptimizedContainerSettings(engine)
    Log.d(TAG, "Using container settings: Box64Preset=${optimizedContainer.box64Preset}, Wine=${optimizedContainer.wineVersion}")
 
-   // 5. EmulatorContainercreateorretrieve
+   // 5. Create or get EmulatorContainer
    val emulatorContainer = getOrCreateEmulatorContainer(game, optimizedContainer)
 
-   // 6. gamelaunch
+   // 6. Launch game
    Log.i(TAG, "Launching executable via Winlator: ${execFile.absolutePath}")
    val launchResult = winlatorEmulator.launchExecutable(
     container = emulatorContainer,
@@ -127,7 +127,7 @@ class WinlatorEngineImpl @Inject constructor(
     launchResult.isFailure -> {
      val error = launchResult.exceptionOrNull()
      Log.e(TAG, "Game launch failed", error)
-     LaunchResult.Error("launchfailure: ${error?.message}", error)
+     LaunchResult.Error("Launch failed: ${error?.message}", error)
     }
     else -> {
      LaunchResult.Error("Unknown error")
@@ -135,7 +135,7 @@ class WinlatorEngineImpl @Inject constructor(
    }
   } catch (e: Exception) {
    Log.e(TAG, "Failed to launch game", e)
-   LaunchResult.Error("gamelauncherror: ${e.message}", e)
+   LaunchResult.Error("Game launch error: ${e.message}", e)
   }
  }
 
@@ -182,7 +182,7 @@ class WinlatorEngineImpl @Inject constructor(
  override suspend fun createContainer(container: WinlatorContainer): Result<WinlatorContainer> {
   return try {
    Log.d(TAG, "Creating container: ${container.name}")
-   // TODO: Winlatorcontainercreate
+   // TODO: Create Winlator container
    Result.success(container)
   } catch (e: Exception) {
    Log.e(TAG, "Failed to create container", e)
@@ -193,7 +193,7 @@ class WinlatorEngineImpl @Inject constructor(
  override suspend fun deleteContainer(containerId: Long): Result<Unit> {
   return try {
    Log.d(TAG, "Deleting container: $containerId")
-   // TODO: Winlatorcontainerdelete
+   // TODO: Delete Winlator container
    Result.success(Unit)
   } catch (e: Exception) {
    Log.e(TAG, "Failed to delete container", e)
@@ -206,17 +206,17 @@ class WinlatorEngineImpl @Inject constructor(
    val file = File(executablePath)
    val parentDir = file.parentFile ?: return GameEngine.UNKNOWN
 
-   // Unity Enginedetection
+   // Detect Unity Engine
    if (parentDir.list()?.any { it.contains("UnityPlayer.dll", ignoreCase = true) } == true) {
     return GameEngine.UNITY
    }
 
-   // Unreal Enginedetection
+   // Detect Unreal Engine
    if (parentDir.list()?.any { it.contains("UE4", ignoreCase = true) || it.contains("UE5", ignoreCase = true) } == true) {
     return GameEngine.UNREAL
    }
 
-   // .NET Frameworkdetection（.exeextension子 みcheck）
+   // Detect .NET Framework (check .exe extension only)
    if (file.extension.equals("exe", ignoreCase = true)) {
     return GameEngine.DOTNET
    }
@@ -229,7 +229,7 @@ class WinlatorEngineImpl @Inject constructor(
  }
 
  /**
-  * WinlatorContainerEmulatorContainer conversionしてcreateorretrieve
+  * Convert WinlatorContainer to EmulatorContainer and create or get
   *
   * Best Practice (2025): Shared default container pattern + caching for efficiency
   * - Most games share a single "Default Container" (saves 90% disk space)
@@ -311,7 +311,7 @@ class WinlatorEngineImpl @Inject constructor(
  }
 
  /**
-  * customargument解析
+  * Parse custom arguments
   */
  private fun parseCustomArgs(customArgs: String): List<String> {
   return if (customArgs.isBlank()) {
@@ -322,7 +322,7 @@ class WinlatorEngineImpl @Inject constructor(
  }
 
  /**
-  * 解像度文字列from幅解析（Example: "1280x720" -> 1280）
+  * Parse width from resolution string (Example: "1280x720" -> 1280)
   */
  private fun parseResolutionWidth(resolution: String): Int {
   return try {
@@ -333,7 +333,7 @@ class WinlatorEngineImpl @Inject constructor(
  }
 
  /**
-  * 解像度文字列from高さ解析（Example: "1280x720" -> 720）
+  * Parse height from resolution string (Example: "1280x720" -> 720)
   */
  private fun parseResolutionHeight(resolution: String): Int {
   return try {
@@ -346,7 +346,7 @@ class WinlatorEngineImpl @Inject constructor(
  override fun getOptimizedContainerSettings(engine: GameEngine): WinlatorContainer {
   return when (engine) {
    GameEngine.UNITY -> {
-    // Unity Enginerecommendedconfiguration
+    // Unity Engine recommended configuration
     WinlatorContainer(
      name = "Unity Optimized",
      box64Preset = Box64Preset.STABILITY,
@@ -361,7 +361,7 @@ class WinlatorEngineImpl @Inject constructor(
     )
    }
    GameEngine.UNREAL -> {
-    // Unreal Enginerecommendedconfiguration
+    // Unreal Engine recommended configuration
     WinlatorContainer(
      name = "Unreal Optimized",
      box64Preset = Box64Preset.PERFORMANCE,
@@ -373,7 +373,7 @@ class WinlatorEngineImpl @Inject constructor(
     )
    }
    GameEngine.DOTNET -> {
-    // .NET Frameworkrecommendedconfiguration
+    // .NET Framework recommended configuration
     WinlatorContainer(
      name = ".NET Optimized",
      box64Preset = Box64Preset.STABILITY,
@@ -387,7 +387,7 @@ class WinlatorEngineImpl @Inject constructor(
     )
    }
    GameEngine.UNKNOWN -> {
-    // defaultconfiguration
+    // Default configuration
     WinlatorContainer.createDefault()
    }
   }

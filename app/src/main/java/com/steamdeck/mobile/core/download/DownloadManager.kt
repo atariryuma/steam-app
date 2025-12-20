@@ -221,7 +221,11 @@ class DownloadWorker @AssistedInject constructor(
 
    // Get file size
    val totalSize = getFileSize(url)
-   database.downloadDao().updateDownloadTotalBytes(downloadId, totalSize)
+   database.downloadDao().updateDownloadTotalBytes(
+    downloadId = downloadId,
+    totalBytes = totalSize,
+    updatedAt = System.currentTimeMillis()
+   )
 
    // Get current progress
    val download = database.downloadDao().getDownloadByIdDirect(downloadId)
@@ -350,16 +354,18 @@ class DownloadWorker @AssistedInject constructor(
      inputStream.use { input ->
       var bytesRead: Int
       var chunkTransferred = 0L
+      val updateIntervalBytes = 5 * 1024 * 1024L // OPTIMIZATION: Update every 5MB instead of 1MB (80% fewer DB writes)
 
       while (input.read(buffer).also { bytesRead = it } != -1) {
        randomAccessFile.write(buffer, 0, bytesRead)
        chunkTransferred += bytesRead
        currentByte += bytesRead
 
-       // Fix: Update progress every 1MB (check accurately)
-       val currentMB = currentByte / (1024 * 1024)
-       if (currentMB > lastUpdateMB) {
-        lastUpdateMB = currentMB
+       // OPTIMIZATION: Reduce database write frequency from every 1MB to every 5MB
+       // This reduces DB overhead by 80% (20 writes instead of 100 for a 100MB file)
+       val currentChunk = currentByte / updateIntervalBytes
+       if (currentChunk > lastUpdateMB) {
+        lastUpdateMB = currentChunk
 
         // Speed calculation
         val currentTime = System.currentTimeMillis()
@@ -382,7 +388,8 @@ class DownloadWorker @AssistedInject constructor(
         database.downloadDao().updateDownloadProgress(
          downloadId = downloadId,
          downloadedBytes = currentByte,
-         progress = progressPercent
+         progress = progressPercent,
+         updatedAt = System.currentTimeMillis()
         )
         setProgress(
          workDataOf(

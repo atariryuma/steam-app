@@ -37,6 +37,8 @@ class ProcessMonitor @Inject constructor() {
   val startTime = System.currentTimeMillis()
   var lastCpuTime = 0L
   var lastCheckTime = System.currentTimeMillis()
+  var consecutiveErrors = 0
+  val maxConsecutiveErrors = 5 // CRITICAL FIX: Prevent infinite loop on zombie processes
 
   while (true) {
    try {
@@ -47,6 +49,7 @@ class ProcessMonitor @Inject constructor() {
     if (metrics != null) {
      lastCpuTime = metrics.totalCpuTime
      lastCheckTime = System.currentTimeMillis()
+     consecutiveErrors = 0 // Reset error counter on success
      emit(metrics)
     } else {
      // Process no longer exists
@@ -54,8 +57,14 @@ class ProcessMonitor @Inject constructor() {
      break
     }
    } catch (e: Exception) {
-    Log.e(TAG, "Error reading process metrics for PID $pid", e)
-    // Continue monitoring despite errors
+    consecutiveErrors++
+    Log.e(TAG, "Error reading process metrics for PID $pid (attempt $consecutiveErrors/$maxConsecutiveErrors)", e)
+
+    // CRITICAL FIX: Break infinite loop if process is unreadable (zombie/permission denied)
+    if (consecutiveErrors >= maxConsecutiveErrors) {
+     Log.w(TAG, "Too many consecutive errors for PID $pid, assuming process is dead or zombie")
+     break
+    }
    }
 
    delay(intervalMs)

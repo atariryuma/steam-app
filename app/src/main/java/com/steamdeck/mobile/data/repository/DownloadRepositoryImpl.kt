@@ -73,7 +73,8 @@ class DownloadRepositoryImpl @Inject constructor(
   downloadDao.updateDownloadProgress(
    downloadId = downloadId,
    downloadedBytes = downloadedBytes,
-   progress = progress
+   progress = progress,
+   updatedAt = System.currentTimeMillis()
   )
   downloadDao.updateDownloadStatus(downloadId, entityStatus)
  }

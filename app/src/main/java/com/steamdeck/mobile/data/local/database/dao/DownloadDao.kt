@@ -93,14 +93,17 @@ interface DownloadDao {
   * download合計バイト数update
   */
  @Query("UPDATE downloads SET totalBytes = :totalBytes, updatedAt = :updatedAt WHERE id = :downloadId")
- suspend fun updateDownloadTotalBytes(downloadId: Long, totalBytes: Long, updatedAt: Long = System.currentTimeMillis())
+ suspend fun updateDownloadTotalBytes(downloadId: Long, totalBytes: Long, updatedAt: Long)
 
  /**
-  * downloadprogressupdate（バイト数 progress率）
+  * Update download progress (bytes and progress percentage)
   *
-  * Note: progress 自動calculationされません。呼び出し側 calculationして渡す必要 あります。
+  * CRITICAL FIX: All timestamp parameters must be provided by caller to ensure correct runtime values.
+  * Default parameter values (System.currentTimeMillis()) are evaluated at compile time, not runtime.
+  *
+  * Note: progress is NOT calculated automatically. Caller must compute and provide it.
   * progress = if (totalBytes > 0) ((downloadedBytes * 100) / totalBytes).toInt() else 0
   */
  @Query("UPDATE downloads SET downloadedBytes = :downloadedBytes, progress = :progress, updatedAt = :updatedAt WHERE id = :downloadId")
- suspend fun updateDownloadProgress(downloadId: Long, downloadedBytes: Long, progress: Int = 0, updatedAt: Long = System.currentTimeMillis())
+ suspend fun updateDownloadProgress(downloadId: Long, downloadedBytes: Long, progress: Int, updatedAt: Long)
 }

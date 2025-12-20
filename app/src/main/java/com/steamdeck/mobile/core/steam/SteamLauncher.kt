@@ -14,9 +14,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Steam Client ランチャー
+ * Steam Client Launcher
  *
- * Steam Client経由でゲームを起動します
+ * Launches games through Steam Client
  */
 @Singleton
 class SteamLauncher @Inject constructor(
@@ -28,7 +28,7 @@ class SteamLauncher @Inject constructor(
  }
 
  /**
-  * Steam経由でゲームを起動
+  * Launch game via Steam
   */
  suspend fun launchGameViaSteam(
   containerId: String,
@@ -37,7 +37,7 @@ class SteamLauncher @Inject constructor(
   try {
    Log.i(TAG, "Launching game via Steam: appId=$appId, containerId=$containerId")
 
-   // 1. Winlator containerretrieve
+   // 1. Get Winlator container
    val container = getEmulatorContainer(containerId)
    if (container.isFailure) {
     return@withContext Result.failure(
@@ -51,7 +51,7 @@ class SteamLauncher @Inject constructor(
     )
    }
 
-   // 2. Steam.exe path構築
+   // 2. Build Steam.exe path
    val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/steam.exe")
 
    if (!steamExe.exists()) {
@@ -60,8 +60,8 @@ class SteamLauncher @Inject constructor(
     )
    }
 
-   // 3. Steam launchargument構築
-   // -applaunch <appId> gamedirectlylaunch
+   // 3. Build Steam launch arguments
+   // -applaunch <appId> launches game directly
    val arguments = listOf(
     "-applaunch",
     appId.toString()
@@ -69,7 +69,7 @@ class SteamLauncher @Inject constructor(
 
    Log.i(TAG, "Launching Steam with arguments: $arguments")
 
-   // 4. Wine via Steam launch
+   // 4. Launch Steam via Wine
    val processResult = winlatorEmulator.launchExecutable(
     container = emulatorContainer,
     executable = steamExe,
@@ -98,14 +98,14 @@ class SteamLauncher @Inject constructor(
  }
 
  /**
-  * Steam Client launch
+  * Launch Steam Client
   */
  suspend fun launchSteamClient(containerId: String): Result<Unit> =
   withContext(Dispatchers.IO) {
    try {
     Log.i(TAG, "Launching Steam Client for container: $containerId")
 
-    // 1. Winlator containerretrieve
+    // 1. Get Winlator container
     val container = getEmulatorContainer(containerId)
     if (container.isFailure) {
      return@withContext Result.failure(
@@ -119,7 +119,7 @@ class SteamLauncher @Inject constructor(
      )
     }
 
-    // 2. Steam.exe path構築
+    // 2. Build Steam.exe path
     val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/steam.exe")
 
     if (!steamExe.exists()) {
@@ -130,7 +130,7 @@ class SteamLauncher @Inject constructor(
 
     Log.i(TAG, "Launching Steam from: ${steamExe.absolutePath}")
 
-    // 3. Wine via Steam Client launch
+    // 3. Launch Steam Client via Wine
     val processResult = winlatorEmulator.launchExecutable(
      container = emulatorContainer,
      executable = steamExe,
@@ -159,12 +159,12 @@ class SteamLauncher @Inject constructor(
   }
 
  /**
-  * Winlator EmulatorContainer retrieve
+  * Get Winlator EmulatorContainer
   */
  private suspend fun getEmulatorContainer(containerId: String): Result<com.steamdeck.mobile.domain.emulator.EmulatorContainer> =
   withContext(Dispatchers.IO) {
    try {
-    // Winlatorfromcontainerリストretrieve
+    // Get container list from Winlator
     val containersResult = winlatorEmulator.listContainers()
     if (containersResult.isFailure) {
      return@withContext Result.failure(
@@ -174,7 +174,7 @@ class SteamLauncher @Inject constructor(
 
     val containers = containersResult.getOrNull() ?: emptyList()
 
-    // containerID マッチング（Stringtype ID directly比較）
+    // Match container ID (String type ID direct comparison)
     val container = containers.firstOrNull { it.id == containerId }
      ?: return@withContext Result.failure(
       Exception("Container not found in Winlator: $containerId")
@@ -189,20 +189,20 @@ class SteamLauncher @Inject constructor(
   }
 
  /**
-  * Steam Deep Link を使ってゲームのインストール画面を開く
+  * Open game installation page using Steam Deep Link
   *
-  * Steam ToS Compliance: Android 版 Steam アプリの steam:// プロトコルを使用して、
-  * 公式 Steam アプリでゲームのダウンロード/インストールを促す
+  * Steam ToS Compliance: Uses the steam:// protocol of the Android Steam app
+  * to prompt game download/installation in the official Steam app
   *
   * @param appId Steam App ID
-  * @return 成功した場合は Result.success、失敗した場合は Result.failure
+  * @return Result.success if successful, Result.failure if failed
   */
  fun openSteamInstallPage(appId: Long): Result<Unit> {
   return try {
-   // steam://install/<appId> で Steam アプリのインストール画面を開く
+   // Open Steam app install page with steam://install/<appId>
    val intent = Intent(Intent.ACTION_VIEW).apply {
     data = Uri.parse("steam://install/$appId")
-    // FLAG_ACTIVITY_NEW_TASK を追加して、Application Context から起動可能にする
+    // Add FLAG_ACTIVITY_NEW_TASK to enable launch from Application Context
     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
    }
 
@@ -213,7 +213,7 @@ class SteamLauncher @Inject constructor(
   } catch (e: Exception) {
    Log.e(TAG, "Failed to open Steam install page", e)
    Result.failure(
-    Exception("Steam アプリが見つかりません。Google Play Store から Steam をインストールしてください。")
+    Exception("Steam app not found. Please install Steam from Google Play Store.")
    )
   }
  }

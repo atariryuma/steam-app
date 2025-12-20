@@ -102,7 +102,6 @@ fun GameDetailScreen(
      onLaunchGame = { viewModel.launchGame(gameId) },
      onLaunchViaSteam = { viewModel.launchGameViaSteam(gameId) },
      onOpenSteamClient = { viewModel.openSteamClient(gameId) },
-     onOpenSteamInstallPage = { viewModel.openSteamInstallPage(gameId) },
      onScanForInstalledGame = { viewModel.scanForInstalledGame(gameId) },
      onNavigateBack = onNavigateBack,
      onNavigateToSettings = onNavigateToSettings,
@@ -171,7 +170,6 @@ fun GameDetailContent(
  onLaunchGame: () -> Unit,
  onLaunchViaSteam: () -> Unit,
  onOpenSteamClient: () -> Unit,
- onOpenSteamInstallPage: () -> Unit,
  onScanForInstalledGame: () -> Unit,
  onNavigateBack: () -> Unit,
  onNavigateToSettings: () -> Unit,
@@ -325,26 +323,26 @@ fun GameDetailContent(
 
       // Simplified description
       Text(
-       "Download \"${game.name}\" from the official Steam app, then return here to play.",
+       "Open Steam Client (in Winlator) to download \"${game.name}\", then return here to play.",
        style = MaterialTheme.typography.bodyMedium,
        color = MaterialTheme.colorScheme.onPrimaryContainer
       )
 
-      // Primary action button - Download via Steam App
+      // Primary action button - Open Steam Client
       Button(
-       onClick = onOpenSteamInstallPage,
+       onClick = onOpenSteamClient,
        modifier = Modifier.fillMaxWidth(),
        colors = ButtonDefaults.buttonColors(
         containerColor = MaterialTheme.colorScheme.primary
        )
       ) {
        Icon(
-        Icons.Default.Download,
+        Icons.Default.SportsEsports,
         contentDescription = null,
         modifier = Modifier.size(20.dp)
        )
        Spacer(modifier = Modifier.width(8.dp))
-       Text("Download via Steam App", style = MaterialTheme.typography.titleSmall)
+       Text("Open Steam Client", style = MaterialTheme.typography.titleSmall)
       }
 
       // Secondary action button - Rescan (implemented)
@@ -374,7 +372,7 @@ fun GameDetailContent(
 
       // Info footer
       Text(
-       "Tip: Click \"Download via Steam App\" to open ${game.name}'s download page directly",
+       "All downloads happen inside Winlator's Steam Client - no external app needed",
        style = MaterialTheme.typography.bodySmall,
        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
       )

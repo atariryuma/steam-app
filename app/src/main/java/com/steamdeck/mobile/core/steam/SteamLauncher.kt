@@ -1,8 +1,6 @@
 package com.steamdeck.mobile.core.steam
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.util.Log
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
@@ -187,34 +185,4 @@ class SteamLauncher @Inject constructor(
     Result.failure(e)
    }
   }
-
- /**
-  * Steam Deep Link を使ってゲームのインストール画面を開く
-  *
-  * Steam ToS Compliance: Android 版 Steam アプリの steam:// プロトコルを使用して、
-  * 公式 Steam アプリでゲームのダウンロード/インストールを促す
-  *
-  * @param appId Steam App ID
-  * @return 成功した場合は Result.success、失敗した場合は Result.failure
-  */
- fun openSteamInstallPage(appId: Long): Result<Unit> {
-  return try {
-   // steam://install/<appId> で Steam アプリのインストール画面を開く
-   val intent = Intent(Intent.ACTION_VIEW).apply {
-    data = Uri.parse("steam://install/$appId")
-    // FLAG_ACTIVITY_NEW_TASK を追加して、Application Context から起動可能にする
-    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-   }
-
-   context.startActivity(intent)
-   Log.i(TAG, "Opened Steam install page for appId=$appId")
-   Result.success(Unit)
-
-  } catch (e: Exception) {
-   Log.e(TAG, "Failed to open Steam install page", e)
-   Result.failure(
-    Exception("Steam アプリが見つかりません。Google Play Store から Steam をインストールしてください。")
-   )
-  }
- }
 }

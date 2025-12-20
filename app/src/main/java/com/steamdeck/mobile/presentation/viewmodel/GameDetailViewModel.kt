@@ -282,55 +282,6 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * Steam Deep Link でゲームのインストール画面を開く
-  *
-  * Android版Steamアプリの steam://install/<appId> プロトコルを使用して、
-  * 公式Steamアプリでゲームをダウンロード/インストールできるようにする
-  */
- fun openSteamInstallPage(gameId: Long) {
-  viewModelScope.launch {
-   try {
-    // 現在のゲーム情報を取得
-    val currentState = _uiState.value
-    if (currentState !is GameDetailUiState.Success) {
-     AppLogger.e(TAG, "Cannot open Steam install page: game info not loaded")
-     return@launch
-    }
-
-    val game = currentState.game
-
-    // Steam App IDチェック
-    if (game.steamAppId == null) {
-     _steamLaunchState.value = SteamLaunchState.Error(
-      "This game has no Steam App ID"
-     )
-     return@launch
-    }
-
-    // Steam Deep Link で開く
-    val result = steamLauncher.openSteamInstallPage(game.steamAppId)
-
-    result
-     .onSuccess {
-      AppLogger.i(TAG, "Opened Steam install page for: ${game.name} (appId=${game.steamAppId})")
-     }
-     .onFailure { error ->
-      _steamLaunchState.value = SteamLaunchState.Error(
-       error.message ?: "Failed to open Steam install page"
-      )
-      AppLogger.e(TAG, "Failed to open Steam install page", error)
-     }
-
-   } catch (e: Exception) {
-    _steamLaunchState.value = SteamLaunchState.Error(
-     e.message ?: "An unexpected error occurred"
-    )
-    AppLogger.e(TAG, "Exception while opening Steam install page", e)
-   }
-  }
- }
-
- /**
   * インストール済みゲームをスキャンして実行ファイルパスを更新
   */
  fun scanForInstalledGame(gameId: Long) {

@@ -388,88 +388,49 @@ fun GameDetailContent(
 
       // Simplified description
       Text(
-       "Download \"${game.name}\" via Steam client in Winlator container, then return here to play.",
+       "Open Steam in Big Picture mode to download this game.",
        style = MaterialTheme.typography.bodyMedium,
        color = MaterialTheme.colorScheme.onPrimaryContainer
       )
 
-      // Primary action button - Download via Steam (in-app)
+      // Single action button - Open Steam Big Picture
       Button(
        onClick = onOpenSteamInstallPage,
        modifier = Modifier.fillMaxWidth(),
-       enabled = steamLaunchState !is SteamLaunchState.InitiatingDownload,
        colors = ButtonDefaults.buttonColors(
         containerColor = MaterialTheme.colorScheme.primary
        )
       ) {
-       if (steamLaunchState is SteamLaunchState.InitiatingDownload) {
-        CircularProgressIndicator(
-         modifier = Modifier.size(20.dp),
-         strokeWidth = 2.dp,
-         color = MaterialTheme.colorScheme.onPrimary
-        )
-       } else {
-        Icon(
-         Icons.Default.Download,
-         contentDescription = null,
-         modifier = Modifier.size(20.dp)
-        )
-       }
+       Icon(
+        Icons.Default.SportsEsports,
+        contentDescription = null,
+        modifier = Modifier.size(20.dp)
+       )
        Spacer(modifier = Modifier.width(8.dp))
        Text(
-        if (steamLaunchState is SteamLaunchState.InitiatingDownload)
-         stringResource(R.string.button_initiating_download)
-        else
-         stringResource(R.string.button_download_via_steam),
+        "Open Steam Big Picture",
         style = MaterialTheme.typography.titleSmall
        )
       }
-
-      // Secondary action button - Rescan (implemented)
-      OutlinedButton(
-       onClick = onScanForInstalledGame,
-       modifier = Modifier.fillMaxWidth(),
-       enabled = !isScanning
-      ) {
-       if (isScanning) {
-        CircularProgressIndicator(
-         modifier = Modifier.size(18.dp),
-         strokeWidth = 2.dp
-        )
-       } else {
-        Icon(
-         Icons.Default.Refresh,
-         contentDescription = null,
-         modifier = Modifier.size(18.dp)
-        )
-       }
-       Spacer(modifier = Modifier.width(8.dp))
-       Text(
-        if (isScanning) "Scanning..." else "Check If Downloaded",
-        style = MaterialTheme.typography.bodyMedium
-       )
-      }
-
-      // Info footer
-      Text(
-       "Tip: Click \"Download via Steam App\" to open ${game.name}'s download page directly",
-       style = MaterialTheme.typography.bodySmall,
-       color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-      )
      }
     }
    }
 
-   // Split launch button
-   SplitLaunchButton(
-    game = game,
-    isSteamInstalled = isSteamInstalled,
-    onDirectLaunch = onLaunchGame,
-    onSteamLaunch = onLaunchViaSteam,
-    onOpenSteamClient = onOpenSteamClient,
-    onNavigateToSettings = onNavigateToSettings,
-    modifier = Modifier.fillMaxWidth()
-   )
+   // Simplified launch button - Always use direct launch if executable exists
+   if (game.executablePath.isNotBlank()) {
+    Button(
+     onClick = onLaunchGame,
+     modifier = Modifier.fillMaxWidth(),
+     shape = RoundedCornerShape(20.dp)
+    ) {
+     Icon(
+      imageVector = Icons.Default.PlayArrow,
+      contentDescription = "Launch game"
+     )
+     Spacer(modifier = Modifier.width(8.dp))
+     Text("Launch Game")
+    }
+   }
 
    // Game info card
    InfoCard(

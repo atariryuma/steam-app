@@ -114,4 +114,8 @@ class GameRepositoryImpl @Inject constructor(
    GameMapper.toDomainList(entities)
   }
  }
+
+ override suspend fun updateGameExecutablePath(gameId: Long, executablePath: String) {
+  gameDao.updateGameExecutablePath(gameId, executablePath)
+ }
 }

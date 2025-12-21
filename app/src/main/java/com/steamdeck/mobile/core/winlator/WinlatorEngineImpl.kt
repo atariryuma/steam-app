@@ -18,7 +18,8 @@ import javax.inject.Singleton
 @Singleton
 class WinlatorEngineImpl @Inject constructor(
  @ApplicationContext private val context: Context,
- private val winlatorEmulator: WinlatorEmulator
+ private val winlatorEmulator: WinlatorEmulator,
+ private val wineMonoInstaller: WineMonoInstaller
 ) : WinlatorEngine {
 
  companion object {
@@ -306,6 +307,10 @@ class WinlatorEngineImpl @Inject constructor(
 
   val createResult = winlatorEmulator.createContainer(config)
   val createdContainer = createResult.getOrThrow()
+
+  // Install Wine Mono for .NET and Windows DLL support
+  installWineMonoIfNeeded(createdContainer)
+
   cachedDefaultContainer.set(createdContainer) // Cache newly created container (thread-safe)
   return createdContainer
  }
@@ -390,6 +395,54 @@ class WinlatorEngineImpl @Inject constructor(
     // Default configuration
     WinlatorContainer.createDefault()
    }
+  }
+ }
+
+ /**
+  * Install Wine Mono if not already installed in the container
+  * This provides .NET Framework support and common Windows DLLs
+  */
+ private suspend fun installWineMonoIfNeeded(container: com.steamdeck.mobile.domain.emulator.EmulatorContainer) {
+  try {
+   // Check if Wine Mono is already installed
+   val alreadyInstalled = wineMonoInstaller.isWineMonoInstalled(container)
+   if (alreadyInstalled) {
+    AppLogger.d(TAG, "Wine Mono already installed in container: ${container.name}")
+    return
+   }
+
+   AppLogger.i(TAG, "Wine Mono not found, installing to container: ${container.name}")
+
+   // Download Wine Mono (cached if already downloaded)
+   val downloadResult = wineMonoInstaller.downloadWineMono { progress, message ->
+    AppLogger.d(TAG, "Wine Mono download: $message ($progress)")
+   }
+
+   if (downloadResult.isFailure) {
+    AppLogger.e(TAG, "Failed to download Wine Mono", downloadResult.exceptionOrNull())
+    return // Non-fatal: continue without Wine Mono
+   }
+
+   val monoTarball = downloadResult.getOrThrow()
+
+   // Install Wine Mono to container (extract tarball directly)
+   val installResult = wineMonoInstaller.installWineMonoToContainer(
+    container = container,
+    monoTarball = monoTarball
+   ) { progress, message ->
+    AppLogger.d(TAG, "Wine Mono install: $message ($progress)")
+   }
+
+   if (installResult.isSuccess) {
+    AppLogger.i(TAG, "Wine Mono installed successfully to container: ${container.name}")
+   } else {
+    AppLogger.e(TAG, "Failed to install Wine Mono", installResult.exceptionOrNull())
+    // Non-fatal: continue without Wine Mono
+   }
+
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Wine Mono installation error (non-fatal)", e)
+   // Non-fatal: game may still work without Wine Mono
   }
  }
 }

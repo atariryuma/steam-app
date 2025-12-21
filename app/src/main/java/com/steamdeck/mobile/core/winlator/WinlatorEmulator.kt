@@ -771,8 +771,19 @@ class WinlatorEmulator @Inject constructor(
    }
 
    // 3. Build environment variables
-   val environmentVars = buildEnvironmentVariables(container)
+   val environmentVars = buildEnvironmentVariables(container).toMutableMap()
    val rootfsLibraryPath = buildRootfsLibraryPath()
+
+   // Add executable's directory to WINEDLLPATH for DLL loading
+   // Priority: Game DLLs first, then Wine system DLLs
+   // This allows Wine to find both game-specific DLLs (ffmpeg.dll) and Windows system DLLs (winhttp.dll)
+   // IMPORTANT: Use proot-virtualized path for Wine system DLLs (rootfs is mounted to /data/data/com.winlator/files/rootfs)
+   executable.parentFile?.let { exeDir ->
+    val wineSystemDllPath = "/data/data/com.winlator/files/rootfs/opt/wine/lib/wine/x86_64-windows"
+    val combinedPath = "${exeDir.absolutePath}:${wineSystemDllPath}"
+    environmentVars["WINEDLLPATH"] = combinedPath
+    AppLogger.d(TAG, "Set WINEDLLPATH: $combinedPath")
+   }
 
    // 4. Build command - wrap with proot for hardcoded path virtualization
    // CRITICAL FIX: Do NOT pass linker as proot argument
@@ -801,12 +812,19 @@ class WinlatorEmulator @Inject constructor(
    env["LD_LIBRARY_PATH"] = rootfsLibraryPath
    processBuilder.redirectErrorStream(true)
 
-   // CRITICAL FIX: Set working directory to root (/) instead of executable's parent
-   // Wine will use its own internal working directory based on WINEPREFIX
-   // Setting to executable's parent causes "could not open working directory" errors
-   // because Wine tries to access it as a Windows path (C:\...) which doesn't exist
-   processBuilder.directory(File("/"))
-   AppLogger.d(TAG, "Working directory: /")
+   // WORKING DIRECTORY FIX: Set to executable's parent directory
+   // This allows Wine to find DLLs in the same folder as the .exe
+   // Wine will use this as the current working directory when launching the application
+   val workingDir = executable.parentFile ?: File("/sdcard")
+
+   if (workingDir.exists() && workingDir.canRead()) {
+    processBuilder.directory(workingDir)
+    AppLogger.d(TAG, "Working directory: ${workingDir.absolutePath}")
+   } else {
+    // Fallback to root if parent directory is inaccessible
+    processBuilder.directory(File("/"))
+    AppLogger.w(TAG, "Working directory not accessible, using root: ${workingDir.absolutePath}")
+   }
 
    val process = processBuilder.start()
    val pid = getPid(process)
@@ -2517,6 +2535,32 @@ REGEDIT4
 
   } catch (e: Exception) {
    AppLogger.e(TAG, "Failed to execute $executable", e)
+   Result.failure(e)
+  }
+ }
+
+ /**
+  * Open Winlator app
+  *
+  * Launches the Winlator app so users can manually run Steam or other programs
+  */
+ fun openWinlatorApp(): Result<Unit> {
+  return try {
+   AppLogger.i(TAG, "Opening Winlator app")
+
+   val intent = context.packageManager.getLaunchIntentForPackage("com.winlator")
+    ?: return Result.failure(
+     Exception("Winlator app not found. Please install Winlator from Google Play Store or GitHub.")
+    )
+
+   intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+   context.startActivity(intent)
+
+   AppLogger.i(TAG, "Winlator app launched successfully")
+   Result.success(Unit)
+
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Failed to open Winlator app", e)
    Result.failure(e)
   }
  }

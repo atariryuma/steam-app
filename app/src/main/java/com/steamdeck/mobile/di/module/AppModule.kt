@@ -72,4 +72,5 @@ object AppModule {
  ): WineMonoInstaller {
   return WineMonoInstaller(context, okHttpClient)
  }
+
 }

@@ -256,24 +256,24 @@ class GameDetailViewModel @Inject constructor(
      return@launch
     }
 
-    // Launch Steam Client
-    val result = steamLauncher.launchSteamClient(game.winlatorContainerId.toString())
+    // Launch Steam Big Picture mode
+    val result = steamLauncher.launchSteamBigPicture(game.winlatorContainerId.toString())
 
     result
      .onSuccess {
       _steamLaunchState.value = SteamLaunchState.Running(0)
-      AppLogger.i(TAG, "Steam Client opened successfully")
+      AppLogger.i(TAG, "Steam Big Picture opened successfully")
      }
      .onFailure { error ->
       _steamLaunchState.value = SteamLaunchState.Error(
-       error.message ?: "Steam Client launch failed"
+       error.message ?: "Steam Big Picture launch failed"
       )
-      AppLogger.e(TAG, "Failed to open Steam Client", error)
+      AppLogger.e(TAG, "Failed to open Steam Big Picture", error)
      }
 
    } catch (e: Exception) {
     _steamLaunchState.value = SteamLaunchState.Error(
-     e.message ?: "An unexpected error occurred while launching Steam Client"
+     e.message ?: "An unexpected error occurred while launching Steam Big Picture"
     )
     AppLogger.e(TAG, "Exception while opening Steam Client", e)
    }

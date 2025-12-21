@@ -147,9 +147,10 @@ fun HomeScreen(
 ) {
  val context = LocalContext.current
  val uiState by viewModel.uiState.collectAsState()
- var showAddGameDialog by remember { mutableStateOf(showAddGameDialogInitially) }
+ var showAddGameDialog by remember { mutableStateOf(false) }
  var executableUri by remember { mutableStateOf<Uri?>(null) }
  var installFolderUri by remember { mutableStateOf<Uri?>(null) }
+ var suggestedGameName by remember { mutableStateOf("") }
 
  // BackHandler for dialog (Steam Big Picture style)
  BackHandler(enabled = showAddGameDialog) {
@@ -158,7 +159,23 @@ fun HomeScreen(
 
  val executableLauncher = rememberLauncherForActivityResult(
   contract = ActivityResultContracts.OpenDocument()
- ) { uri -> uri?.let { executableUri = it } }
+ ) { uri ->
+  uri?.let {
+   executableUri = it
+   // Auto-suggest game name from filename (remove extension)
+   val fileName = it.lastPathSegment?.substringAfterLast("/") ?: ""
+   suggestedGameName = fileName.removeSuffix(".exe").removeSuffix(".bat").removeSuffix(".msi")
+   // Open dialog automatically after file selection
+   showAddGameDialog = true
+  }
+ }
+
+ // Launch file picker immediately if showAddGameDialogInitially is true
+ LaunchedEffect(showAddGameDialogInitially) {
+  if (showAddGameDialogInitially) {
+   executableLauncher.launch(arrayOf("*/*"))
+  }
+ }
 
  val folderLauncher = rememberLauncherForActivityResult(
   contract = ActivityResultContracts.OpenDocumentTree()
@@ -192,7 +209,7 @@ fun HomeScreen(
        onToggleFavorite = viewModel::toggleFavorite
       )
      }
-     is HomeUiState.Empty -> EmptyContent(onAddGame = { showAddGameDialog = true })
+     is HomeUiState.Empty -> EmptyContent(onAddGame = { executableLauncher.launch(arrayOf("*/*")) })
      is HomeUiState.Error -> ErrorContent(state.message, viewModel::refresh)
     }
    }
@@ -204,15 +221,26 @@ fun HomeScreen(
    exit = AnimationDefaults.DialogExit
   ) {
    AddGameDialog(
-    onDismiss = { showAddGameDialog = false },
+    onDismiss = {
+     showAddGameDialog = false
+     // Reset state when dialog is closed
+     executableUri = null
+     installFolderUri = null
+     suggestedGameName = ""
+    },
     onConfirm = { name, execPath, instPath ->
      viewModel.addGame(name, execPath, instPath)
      showAddGameDialog = false
+     // Reset state after adding game
+     executableUri = null
+     installFolderUri = null
+     suggestedGameName = ""
     },
     onSelectExecutable = { executableLauncher.launch(arrayOf("*/*")) },
     onSelectInstallFolder = { folderLauncher.launch(null) },
     selectedExecutablePath = executableUri?.toString() ?: "",
-    selectedInstallPath = installFolderUri?.toString() ?: ""
+    selectedInstallPath = installFolderUri?.toString() ?: "",
+    initialGameName = suggestedGameName
    )
   }
  }

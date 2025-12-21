@@ -116,4 +116,10 @@ interface GameDao {
   */
  @Query("SELECT * FROM games WHERE installationStatus = :status ORDER BY addedTimestamp DESC")
  fun getGamesByInstallationStatus(status: String): Flow<List<GameEntity>>
+
+ /**
+  * Update game executable path
+  */
+ @Query("UPDATE games SET executablePath = :executablePath WHERE id = :gameId")
+ suspend fun updateGameExecutablePath(gameId: Long, executablePath: String)
 }

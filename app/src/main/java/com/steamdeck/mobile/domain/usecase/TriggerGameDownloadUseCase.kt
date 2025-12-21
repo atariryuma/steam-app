@@ -20,8 +20,8 @@ import javax.inject.Inject
 /**
  * Trigger Steam game download/installation use case
  *
- * Starts Steam game download via `steam.exe -applaunch <appId>` command
- * and launches FileObserver service to monitor installation progress.
+ * Launches Steam Big Picture mode where users can browse and install games,
+ * and starts FileObserver service to monitor installation progress.
  *
  * Flow:
  * 1. Validate game has Steam App ID
@@ -30,10 +30,11 @@ import javax.inject.Inject
  * 4. Create DownloadEntity for DownloadScreen tracking
  * 5. Start SteamInstallMonitorService (FileObserver)
  * 6. Update GameEntity status to DOWNLOADING
- * 7. Launch steam.exe -applaunch <appId> (auto-triggers download)
+ * 7. Launch Steam Big Picture mode (fullscreen console-like UI)
  *
  * Steam ToS Compliance:
- * - Uses official Steam client (no protocol emulation)
+ * - Uses official Steam client Big Picture mode
+ * - Users manually select games to download (respects Steam UX)
  * - Respects Steam's download infrastructure
  */
 class TriggerGameDownloadUseCase @Inject constructor(
@@ -140,11 +141,10 @@ class TriggerGameDownloadUseCase @Inject constructor(
                 progress = 0
             )
 
-            // 8. Launch steam.exe -applaunch <appId>
-            // This will auto-trigger download if game is not installed
-            val launchResult = steamLauncher.launchGameViaSteam(
-                containerId = containerId,
-                appId = steamAppId
+            // 8. Launch Steam Big Picture mode
+            // This opens fullscreen Steam UI where users can browse and install games
+            val launchResult = steamLauncher.launchSteamBigPicture(
+                containerId = containerId
             )
 
             if (launchResult.isFailure) {

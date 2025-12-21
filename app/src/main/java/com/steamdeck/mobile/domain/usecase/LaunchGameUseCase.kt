@@ -1,5 +1,7 @@
 package com.steamdeck.mobile.domain.usecase
 
+import android.content.Context
+import android.net.Uri
 import com.steamdeck.mobile.core.error.AppError
 import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.result.DataResult
@@ -8,12 +10,16 @@ import com.steamdeck.mobile.core.winlator.WinlatorEngine
 import com.steamdeck.mobile.domain.emulator.WindowsEmulator
 import com.steamdeck.mobile.domain.repository.GameRepository
 import com.steamdeck.mobile.domain.repository.WinlatorContainerRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import javax.inject.Inject
 
 /**
@@ -26,6 +32,7 @@ import javax.inject.Inject
  * - Pre-launch validation (executable, Steam manifest, DLLs)
  */
 class LaunchGameUseCase @Inject constructor(
+ @ApplicationContext private val context: Context,
  private val gameRepository: GameRepository,
  private val containerRepository: WinlatorContainerRepository,
  private val winlatorEngine: WinlatorEngine,
@@ -54,6 +61,27 @@ class LaunchGameUseCase @Inject constructor(
 
    AppLogger.i(TAG, "Launching game: ${game.name} (ID: $gameId)")
 
+   // If executable is a content URI, copy it to internal storage first
+   val gameToLaunch = if (game.executablePath.startsWith("content://")) {
+    AppLogger.d(TAG, "Copying executable from content URI to internal storage")
+    val copiedPath = copyContentUriToFile(game.executablePath, game.name)
+    if (copiedPath.isFailure) {
+     return DataResult.Error(
+      AppError.FileError(
+       "Failed to copy game file: ${copiedPath.exceptionOrNull()?.message}",
+       copiedPath.exceptionOrNull()
+      )
+     )
+    }
+    // Update game in database with new path
+    val newPath = copiedPath.getOrThrow()
+    gameRepository.updateGameExecutablePath(gameId, newPath)
+    AppLogger.i(TAG, "Copied executable to: $newPath")
+    game.copy(executablePath = newPath)
+   } else {
+    game
+   }
+
    // Best Practice (2025): Comprehensive 3-level validation before launch
    // 1. Executable file exists
    // 2. Steam manifest StateFlags = 4 (fully installed)
@@ -68,7 +96,7 @@ class LaunchGameUseCase @Inject constructor(
    }
 
    // Launch game
-   when (val result = winlatorEngine.launchGame(game, container)) {
+   when (val result = winlatorEngine.launchGame(gameToLaunch, container)) {
     is LaunchResult.Success -> {
      val startTime = System.currentTimeMillis()
 
@@ -96,6 +124,46 @@ class LaunchGameUseCase @Inject constructor(
   } catch (e: Exception) {
    AppLogger.e(TAG, "Exception during game launch", e)
    DataResult.Error(AppError.from(e))
+  }
+ }
+
+ /**
+  * Copy file from content URI to internal storage
+  *
+  * @param contentUri Content URI from document picker
+  * @param gameName Game name for file naming
+  * @return Result with absolute file path
+  */
+ private suspend fun copyContentUriToFile(contentUri: String, gameName: String): Result<String> = withContext(Dispatchers.IO) {
+  try {
+   val uri = Uri.parse(contentUri)
+   val fileName = gameName.replace(Regex("[^a-zA-Z0-9_\\-]"), "_") + ".exe"
+
+   // Create imported_games directory
+   val importDir = File(context.filesDir, "imported_games")
+   if (!importDir.exists()) {
+    importDir.mkdirs()
+   }
+
+   val destFile = File(importDir, fileName)
+
+   // Copy file from content URI
+   context.contentResolver.openInputStream(uri)?.use { input ->
+    FileOutputStream(destFile).use { output ->
+     val buffer = ByteArray(8192)
+     var bytesRead: Int
+     while (input.read(buffer).also { bytesRead = it } != -1) {
+      output.write(buffer, 0, bytesRead)
+     }
+    }
+   } ?: return@withContext Result.failure(Exception("Cannot open input stream for URI: $contentUri"))
+
+   AppLogger.i(TAG, "Successfully copied file from content URI to: ${destFile.absolutePath}")
+   Result.success(destFile.absolutePath)
+
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Failed to copy content URI to file", e)
+   Result.failure(e)
   }
  }
 

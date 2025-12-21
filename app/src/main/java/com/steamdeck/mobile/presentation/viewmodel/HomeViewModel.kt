@@ -5,6 +5,7 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.steamdeck.mobile.core.logging.AppLogger
+import com.steamdeck.mobile.core.util.UriUtils
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.repository.GameRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -127,10 +128,7 @@ class HomeViewModel @Inject constructor(
      _uiState.value = HomeUiState.Error("Please select executable")
      return@launch
     }
-    if (installPath.isBlank()) {
-     _uiState.value = HomeUiState.Error("Please select installation folder")
-     return@launch
-    }
+    // Install path is optional - will be auto-derived from executable path
 
     // 2. Path validation (prevent path traversal attacks)
     // Validate both file:// paths and content:// URIs
@@ -138,7 +136,8 @@ class HomeViewModel @Inject constructor(
      _uiState.value = HomeUiState.Error("Invalid executable path - potential security risk detected")
      return@launch
     }
-    if (!isPathSafe(installPath)) {
+    // Only validate install path if it's provided
+    if (installPath.isNotBlank() && !isPathSafe(installPath)) {
      _uiState.value = HomeUiState.Error("Invalid install path - potential security risk detected")
      return@launch
     }
@@ -147,13 +146,17 @@ class HomeViewModel @Inject constructor(
     // Storage Access Framework URIs are recommended
     val isValidExecutablePath = executablePath.startsWith("content://") ||
            executablePath.startsWith("/")
-    val isValidInstallPath = installPath.startsWith("content://") ||
-          installPath.startsWith("/")
 
     if (!isValidExecutablePath) {
      _uiState.value = HomeUiState.Error("Executable path is invalid")
      return@launch
     }
+
+    // Install path is optional - will be auto-derived from executable if not provided
+    val isValidInstallPath = installPath.isBlank() ||
+          installPath.startsWith("content://") ||
+          installPath.startsWith("/")
+
     if (!isValidInstallPath) {
      _uiState.value = HomeUiState.Error("Installation folder path is invalid")
      return@launch
@@ -165,20 +168,47 @@ class HomeViewModel @Inject constructor(
       AppLogger.w(TAG,
        "Executable path should use content:// URI on Android 10+: $executablePath")
      }
-     if (!installPath.startsWith("content://")) {
+     if (installPath.isNotBlank() && !installPath.startsWith("content://")) {
       AppLogger.w(TAG,
        "Install path should use content:// URI on Android 10+: $installPath")
      }
     }
 
-    // 3. Check for duplicates (same name or same executable path)
+    // 3. Convert content:// URIs to file paths
+    val resolvedExecutablePath = if (executablePath.startsWith("content://")) {
+     AppLogger.d(TAG, "Converting executable URI to file path: $executablePath")
+     UriUtils.getFilePathFromUri(context, executablePath) ?: run {
+      _uiState.value = HomeUiState.Error("Failed to access executable file. Please try selecting the file again.")
+      return@launch
+     }
+    } else {
+     executablePath
+    }
+
+    // For install path: Use the directory containing the executable
+    val resolvedInstallPath = if (installPath.startsWith("content://")) {
+     AppLogger.d(TAG, "Install path is content URI, deriving from executable path")
+     // Get parent directory of the executable
+     val execFile = java.io.File(resolvedExecutablePath)
+     execFile.parent ?: resolvedExecutablePath
+    } else if (installPath.isNotBlank()) {
+     installPath
+    } else {
+     // Default: Use executable's parent directory
+     val execFile = java.io.File(resolvedExecutablePath)
+     execFile.parent ?: resolvedExecutablePath
+    }
+
+    AppLogger.i(TAG, "Resolved paths - Executable: $resolvedExecutablePath, Install: $resolvedInstallPath")
+
+    // 4. Check for duplicates (same name or same executable path)
     val currentGames = when (val state = _uiState.value) {
      is HomeUiState.Success -> state.games
      else -> emptyList()
     }
 
     val isDuplicateName = currentGames.any { it.name.equals(name, ignoreCase = true) }
-    val isDuplicatePath = currentGames.any { it.executablePath == executablePath }
+    val isDuplicatePath = currentGames.any { it.executablePath == resolvedExecutablePath }
 
     if (isDuplicateName) {
      _uiState.value = HomeUiState.Error("A game with the same name already exists: $name")
@@ -189,11 +219,11 @@ class HomeViewModel @Inject constructor(
      return@launch
     }
 
-    // 4. Create game
+    // 5. Create game with resolved file paths
     val game = Game(
      name = name,
-     executablePath = executablePath,
-     installPath = installPath,
+     executablePath = resolvedExecutablePath,
+     installPath = resolvedInstallPath,
      source = com.steamdeck.mobile.domain.model.GameSource.IMPORTED
     )
 

@@ -98,6 +98,75 @@ class SteamLauncher @Inject constructor(
  }
 
  /**
+  * Launch Steam Big Picture mode
+  *
+  * Opens Steam in Big Picture mode (fullscreen console-like UI)
+  * Users can browse their library and install games
+  * FileObserver will detect installations automatically
+  */
+ suspend fun launchSteamBigPicture(containerId: String): Result<Unit> =
+  withContext(Dispatchers.IO) {
+   try {
+    AppLogger.i(TAG, "Launching Steam Big Picture for container=$containerId")
+
+    // 1. Get Winlator container
+    val container = getEmulatorContainer(containerId)
+    if (container.isFailure) {
+     return@withContext Result.failure(
+      Exception("Failed to get container: ${container.exceptionOrNull()?.message}")
+     )
+    }
+
+    val emulatorContainer = container.getOrElse {
+     return@withContext Result.failure(
+      Exception("Container not available: ${it.message}")
+     )
+    }
+
+    // 2. Build Steam.exe path (case-sensitive on Android)
+    val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/Steam.exe")
+
+    if (!steamExe.exists()) {
+     return@withContext Result.failure(
+      Exception("Steam not found at ${steamExe.absolutePath}. Please install Steam first.")
+     )
+    }
+
+    // 3. Launch Steam Big Picture mode
+    // -bigpicture launches fullscreen console-like UI
+    val arguments = listOf("-bigpicture")
+
+    AppLogger.i(TAG, "Launching Steam Big Picture mode")
+
+    // 4. Launch Steam with Big Picture argument
+    val processResult = winlatorEmulator.launchExecutable(
+     container = emulatorContainer,
+     executable = steamExe,
+     arguments = arguments
+    )
+
+    if (processResult.isFailure) {
+     return@withContext Result.failure(
+      Exception("Failed to launch Steam Big Picture: ${processResult.exceptionOrNull()?.message}")
+     )
+    }
+
+    val process = processResult.getOrElse {
+     return@withContext Result.failure(
+      Exception("Failed to get process handle: ${it.message}")
+     )
+    }
+    AppLogger.i(TAG, "Steam Big Picture launched successfully: PID ${process.pid}")
+
+    Result.success(Unit)
+
+   } catch (e: Exception) {
+    AppLogger.e(TAG, "Failed to launch Steam Big Picture", e)
+    Result.failure(e)
+   }
+  }
+
+ /**
   * Launch Steam Client
   */
  suspend fun launchSteamClient(containerId: String): Result<Unit> =
@@ -216,5 +285,17 @@ class SteamLauncher @Inject constructor(
     Exception("Steam app not found. Please install Steam from Google Play Store.")
    )
   }
+ }
+
+ /**
+  * Open Winlator app
+  *
+  * Opens the Winlator app so users can manually launch Steam from there.
+  * This is useful when direct Steam.exe launch via Wine doesn't work.
+  *
+  * @return Result.success if Winlator app opened, Result.failure otherwise
+  */
+ fun openWinlatorApp(): Result<Unit> {
+  return winlatorEmulator.openWinlatorApp()
  }
 }

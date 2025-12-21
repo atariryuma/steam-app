@@ -1,9 +1,14 @@
 package com.steamdeck.mobile.presentation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -20,8 +25,25 @@ import dagger.hilt.android.AndroidEntryPoint
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    // Permission request launcher
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            // Permission granted - direct file access will now work
+            android.util.Log.d("MainActivity", "READ_EXTERNAL_STORAGE permission granted")
+        } else {
+            // Permission denied - files will be copied to app storage
+            android.util.Log.w("MainActivity", "READ_EXTERNAL_STORAGE permission denied")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Request storage permission if needed (Android 6-12)
+        checkAndRequestStoragePermission()
 
         // Enable immersive fullscreen mode
         enableImmersiveMode()
@@ -30,6 +52,31 @@ class MainActivity : ComponentActivity() {
         setContent {
             SteamDeckMobileTheme {
                 SteamDeckApp()
+            }
+        }
+    }
+
+    /**
+     * Check and request READ_EXTERNAL_STORAGE permission
+     * Only needed for Android 6.0 (API 23) to Android 12 (API 32)
+     * Android 13+ uses granular media permissions
+     */
+    private fun checkAndRequestStoragePermission() {
+        // Only request on Android 6-12 (API 23-32)
+        if (Build.VERSION.SDK_INT in 23..32) {
+            when {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    // Permission already granted
+                    android.util.Log.d("MainActivity", "READ_EXTERNAL_STORAGE already granted")
+                }
+                else -> {
+                    // Request permission
+                    android.util.Log.d("MainActivity", "Requesting READ_EXTERNAL_STORAGE permission")
+                    requestPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                }
             }
         }
     }

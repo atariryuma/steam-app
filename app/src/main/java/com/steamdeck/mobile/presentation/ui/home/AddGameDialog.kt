@@ -45,6 +45,7 @@ private object AddGameDialogDefaults {
  * @param onSelectInstallFolder Installation folder selection button pressed
  * @param selectedExecutablePath Selected executable file path (passed from parent, immutable)
  * @param selectedInstallPath Selected installation path (passed from parent, immutable)
+ * @param initialGameName Auto-suggested game name from filename (optional)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,10 +55,11 @@ fun AddGameDialog(
  onSelectExecutable: () -> Unit = {},
  onSelectInstallFolder: () -> Unit = {},
  selectedExecutablePath: String = "",
- selectedInstallPath: String = ""
+ selectedInstallPath: String = "",
+ initialGameName: String = ""
 ) {
  // Dialog internal state
- var gameName by remember { mutableStateOf("") }
+ var gameName by remember(initialGameName) { mutableStateOf(initialGameName) }
  var showError by remember { mutableStateOf(false) }
 
  // Display path strings (Derived state)
@@ -123,8 +125,8 @@ fun AddGameDialog(
        Button(
         onClick = {
          if (gameName.isNotBlank() &&
-          selectedExecutablePath.isNotBlank() &&
-          selectedInstallPath.isNotBlank()) {
+          selectedExecutablePath.isNotBlank()) {
+          // Install path is optional - will be auto-derived from executable path if not provided
           onConfirm(gameName, selectedExecutablePath, selectedInstallPath)
          } else {
           showError = true
@@ -268,7 +270,7 @@ fun AddGameDialog(
         placeholder = {
          Text(stringResource(R.string.dialog_add_game_install_placeholder))
         },
-        isError = showError && selectedInstallPath.isBlank(),
+        isError = false,  // Install path is optional
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         readOnly = true,

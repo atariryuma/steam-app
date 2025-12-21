@@ -102,4 +102,12 @@ interface GameRepository {
   * @return Flow of games matching the status
   */
  fun getGamesByInstallationStatus(status: InstallationStatus): Flow<List<Game>>
+
+ /**
+  * Update game executable path
+  *
+  * @param gameId Game ID
+  * @param executablePath New executable file path
+  */
+ suspend fun updateGameExecutablePath(gameId: Long, executablePath: String)
 }

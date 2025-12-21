@@ -239,11 +239,11 @@
     <string name="dialog_add_game_name_placeholder">e.g., Portal 2</string>
     <string name="dialog_add_game_executable_label">Executable</string>
     <string name="dialog_add_game_executable_placeholder">Select using file picker</string>
-    <string name="dialog_add_game_install_label">Install Folder</string>
-    <string name="dialog_add_game_install_placeholder">Select using folder picker</string>
-    <string name="dialog_add_game_error">Please fill in all fields</string>
+    <string name="dialog_add_game_install_label">Install Folder (Optional)</string>
+    <string name="dialog_add_game_install_placeholder">Auto-detected from executable location</string>
+    <string name="dialog_add_game_error">Please enter game name and select executable file</string>
     <string name="dialog_add_game_notes_title">Notes</string>
-    <string name="dialog_add_game_notes_content">• Please specify a Windows .exe file\n• Install path is the game root folder\n• Use file picker to select file/folder</string>
+    <string name="dialog_add_game_notes_content">• Please specify a Windows .exe file\n• Install folder is automatically detected\n• Use file picker to select the executable</string>
     <string name="content_desc_select_file">Select File</string>
     <string name="content_desc_select_folder">Select Folder</string>
     <string name="dialog_delete_game_title">Delete \"%1$s\"?</string>

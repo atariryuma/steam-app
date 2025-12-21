@@ -1,6 +1,7 @@
 package com.steamdeck.mobile.domain.usecase
 
 import android.content.Context
+import android.net.Uri
 import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.result.DataResult
 import com.steamdeck.mobile.core.steam.AppManifestParser
@@ -98,8 +99,21 @@ class ValidateGameInstallationUseCase @Inject constructor(
                 )
 
             // Check 1: Executable file exists
-            val executableFile = File(game.executablePath)
-            if (!executableFile.exists()) {
+            val executableExists = if (game.executablePath.startsWith("content://")) {
+                // Handle content URI (document picker)
+                try {
+                    val uri = Uri.parse(game.executablePath)
+                    context.contentResolver.openInputStream(uri)?.use { true } ?: false
+                } catch (e: Exception) {
+                    AppLogger.w(TAG, "Cannot access content URI: ${game.executablePath}", e)
+                    false
+                }
+            } else {
+                // Handle regular file path
+                File(game.executablePath).exists()
+            }
+
+            if (!executableExists) {
                 AppLogger.w(TAG, "Executable not found: ${game.executablePath}")
                 errors.add(ValidationError.ExecutableNotFound(game.executablePath))
             }

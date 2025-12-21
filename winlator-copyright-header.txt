@@ -1,0 +1,6 @@
+/*
+ * Portions of this file are derived from Winlator
+ * Copyright (c) 2023 BrunoSX
+ * https://github.com/brunodev85/winlator
+ * Licensed under the MIT License
+ */

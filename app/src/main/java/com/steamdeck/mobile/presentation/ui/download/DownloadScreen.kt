@@ -215,7 +215,19 @@ private fun DownloadItem(
      )
      Spacer(modifier = Modifier.height(4.dp))
      Text(
-      text = formatDownloadSize(download.downloadedBytes, download.totalBytes),
+      text = if (download.totalBytes > 0) {
+       // File downloads: show "X MB / Y MB"
+       formatDownloadSize(download.downloadedBytes, download.totalBytes)
+      } else {
+       // Steam downloads: show status message
+       when (download.status) {
+        DownloadStatus.DOWNLOADING -> "Downloading via Steam..."
+        DownloadStatus.PAUSED -> "Paused"
+        DownloadStatus.COMPLETED -> "Completed"
+        DownloadStatus.FAILED -> "Failed"
+        else -> "Waiting..."
+       }
+      },
       style = MaterialTheme.typography.bodyMedium,
       color = MaterialTheme.colorScheme.onSurfaceVariant
      )
@@ -228,10 +240,12 @@ private fun DownloadItem(
    // プログレスバー
    when (download.status) {
     DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED -> {
+     // Steam downloads don't provide totalBytes - use progress field directly
      val progress = if (download.totalBytes > 0) {
       (download.downloadedBytes.toFloat() / download.totalBytes.toFloat()).coerceIn(0f, 1f)
      } else {
-      0f
+      // Use progress field (0-100) for Steam downloads
+      (download.progress.toFloat() / 100f).coerceIn(0f, 1f)
      }
 
      if (!progress.isNaN()) {
@@ -250,7 +264,8 @@ private fun DownloadItem(
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary
        )
-       if (download.status == DownloadStatus.DOWNLOADING) {
+       // Show speed only for file downloads (not Steam)
+       if (download.status == DownloadStatus.DOWNLOADING && download.totalBytes > 0) {
         Text(
          text = formatSpeed(download.speedBytesPerSecond),
          style = MaterialTheme.typography.bodyMedium,
@@ -281,7 +296,7 @@ private fun DownloadItem(
     when (download.status) {
      DownloadStatus.DOWNLOADING -> {
       IconButton(onClick = onPause) {
-       Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.content_desc_pause))
+       Icon(Icons.Default.Pause, contentDescription = stringResource(R.string.content_desc_pause))
       }
       IconButton(onClick = onCancel) {
        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.content_desc_cancel))
@@ -355,7 +370,7 @@ private fun DownloadStatusIcon(status: DownloadStatus) {
   )
 
   DownloadStatus.PAUSED -> Icon(
-   Icons.Default.Clear,
+   Icons.Default.Pause,
    contentDescription = stringResource(R.string.content_desc_pause),
    tint = MaterialTheme.colorScheme.secondary
   )

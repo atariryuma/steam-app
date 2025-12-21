@@ -371,38 +371,63 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * Open Steam Client
+  * Open Steam Client in XServer
   *
-  * @param containerId WinlatorContainer ID
+  * TODO: Navigate to SteamDisplayScreen with integrated XServer rendering
+  * Will use SteamDisplayScreen.kt (Compose UI) + XServerView (OpenGL rendering)
+  *
+  * @param containerId WinlatorContainer ID (e.g., "default_shared_container")
   */
  fun openSteamClient(containerId: String) {
   viewModelScope.launch {
    try {
-    AppLogger.i(TAG, "Opening Steam Client for container: $containerId")
+    AppLogger.i(TAG, "Opening Steam Client (XServer integration pending)")
 
-    val result = steamLauncher.launchSteamClient(containerId)
+    // Get Steam.exe path from container
+    val steamInstallPath = getSteamInstallPath(containerId)
+    if (steamInstallPath == null) {
+     _steamInstallState.value = SteamInstallState.Error(
+      "Steam.exe not found. Please install Steam first."
+     )
+     AppLogger.w(TAG, "Steam.exe not found in container: $containerId")
+     return@launch
+    }
 
-    result
-     .onSuccess {
-      AppLogger.i(TAG, "Steam Client opened successfully")
-      // Steam Client launched - notify user
-      _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
-       successMessage = context.getString(com.steamdeck.mobile.R.string.success_steam_client_launched)
-      ) ?: SettingsUiState.Loading
-     }
-     .onFailure { error ->
-      _steamInstallState.value = SteamInstallState.Error(
-       "Steam Client launch failed: ${error.message}"
-      )
-      AppLogger.e(TAG, "Failed to open Steam Client", error)
-     }
+    // TODO: Navigate to Screen.SteamDisplay route
+    // For now, just log the intent
+    AppLogger.d(TAG, "Would navigate to SteamDisplayScreen with steam.exe: $steamInstallPath")
+    _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
+     successMessage = "XServer integration pending - navigation route needed"
+    ) ?: SettingsUiState.Loading
 
    } catch (e: Exception) {
     _steamInstallState.value = SteamInstallState.Error(
-     context.getString(com.steamdeck.mobile.R.string.error_steam_client_launch_unexpected, e.message ?: "Unknown error")
+     "Failed to prepare Steam launch: ${e.message ?: "Unknown error"}"
     )
-    AppLogger.e(TAG, "Exception while opening Steam Client", e)
+    AppLogger.e(TAG, "Exception while preparing Steam launch", e)
    }
+  }
+ }
+
+ /**
+  * Get Steam.exe installation path from container
+  */
+ private fun getSteamInstallPath(containerId: String): String? {
+  return try {
+   // Check standard Steam installation path
+   val steamExe = java.io.File(
+    context.filesDir,
+    "winlator/containers/$containerId/drive_c/Program Files (x86)/Steam/Steam.exe"
+   )
+
+   if (steamExe.exists()) {
+    steamExe.absolutePath
+   } else {
+    null
+   }
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Failed to get Steam install path", e)
+   null
   }
  }
 

@@ -106,7 +106,6 @@ class SteamSetupManager @Inject constructor(
    progressCallback?.invoke(0.4f, "Downloading Steam installer...")
 
    // 1. Download SteamSetup.exe (32-bit NSIS installer)
-   // DEBUG MODE: Enable Wine logging to diagnose installation failure
    val installerResult = steamInstallerService.downloadInstaller()
    if (installerResult.isFailure) {
     return@withContext Result.success(
@@ -148,44 +147,63 @@ class SteamSetupManager @Inject constructor(
     Log.w(TAG, "Expected location: ${monoDir.absolutePath}")
    }
 
-   // progress: 0.6 ~ 0.7 (10%)
-   progressCallback?.invoke(0.6f, "Copying installer to container...")
+   // progress: 0.6 ~ 0.95 (35%)
+   progressCallback?.invoke(0.6f, "Extracting Steam from NSIS installer...")
 
-   // 3. Copy installer to container
-   val copyResult = copyInstallerToContainer(container, installerFile)
-   if (copyResult.isFailure) {
-    return@withContext Result.success(
-     SteamInstallResult.Error("Failed to copy installer: ${copyResult.exceptionOrNull()?.message}")
-    )
-   }
+   // METHOD 1 (PRIORITY): Extract Steam Client directly from NSIS installer
+   // This bypasses the WoW64 requirement by extracting files with 7-Zip
+   Log.i(TAG, "Attempting NSIS extraction (Method 1 - Recommended)...")
 
-   val containerInstaller = copyResult.getOrElse {
-    return@withContext Result.success(
-     SteamInstallResult.Error("Container installer not available: ${it.message}")
-    )
-   }
-   Log.i(TAG, "Installer copied to container: ${containerInstaller.absolutePath}")
+   val steamDir = File(container.rootPath, "drive_c/Program Files (x86)/Steam")
+   val extractResult = steamInstallerService.extractSteamFromNSIS(installerFile, steamDir)
 
-   // progress: 0.7 ~ 0.95 (25%)
-   progressCallback?.invoke(0.7f, "Running Steam installer (DEBUG MODE - check logs)...")
+   if (extractResult.isSuccess) {
+    Log.i(TAG, "Steam Client installed successfully via NSIS extraction")
+    progressCallback?.invoke(0.95f, "NSIS extraction completed successfully")
+   } else {
+    Log.w(TAG, "NSIS extraction failed: ${extractResult.exceptionOrNull()?.message}")
+    Log.i(TAG, "Falling back to Wine installer execution (Method 2 - Requires WoW64)...")
 
-   // 4. Run installer via Wine with DEBUG logging enabled
-   val installResult = runSteamInstaller(
-    container = container,
-    installerFile = containerInstaller,
-    progressCallback = { progress ->
-     // Map installer progress (0.0-1.0) to overall progress (0.7-0.95)
-     val mappedProgress = 0.7f + (progress * 0.25f)
-     progressCallback?.invoke(mappedProgress, "Installing Steam...")
+    // METHOD 2 (FALLBACK): Run SteamSetup.exe via Wine
+    // WARNING: This requires WoW64 support and may fail on 64-bit only Wine builds
+    progressCallback?.invoke(0.6f, "Copying installer to container...")
+
+    // 3. Copy installer to container
+    val copyResult = copyInstallerToContainer(container, installerFile)
+    if (copyResult.isFailure) {
+     return@withContext Result.success(
+      SteamInstallResult.Error("Failed to copy installer: ${copyResult.exceptionOrNull()?.message}")
+     )
     }
-   )
-   if (installResult.isFailure) {
-    return@withContext Result.success(
-     SteamInstallResult.Error("Failed to run installer: ${installResult.exceptionOrNull()?.message}")
-    )
-   }
 
-   progressCallback?.invoke(0.95f, "Steam installer completed")
+    val containerInstaller = copyResult.getOrElse {
+     return@withContext Result.success(
+      SteamInstallResult.Error("Container installer not available: ${it.message}")
+     )
+    }
+    Log.i(TAG, "Installer copied to container: ${containerInstaller.absolutePath}")
+
+    // progress: 0.7 ~ 0.95 (25%)
+    progressCallback?.invoke(0.7f, "Running Steam installer via Wine (WoW64 mode)...")
+
+    // 4. Run installer via Wine with DEBUG logging enabled
+    val installResult = runSteamInstaller(
+     container = container,
+     installerFile = containerInstaller,
+     progressCallback = { progress ->
+      // Map installer progress (0.0-1.0) to overall progress (0.7-0.95)
+      val mappedProgress = 0.7f + (progress * 0.25f)
+      progressCallback?.invoke(mappedProgress, "Installing Steam...")
+     }
+    )
+    if (installResult.isFailure) {
+     return@withContext Result.success(
+      SteamInstallResult.Error("Failed to run installer: ${installResult.exceptionOrNull()?.message}")
+     )
+    }
+
+    progressCallback?.invoke(0.95f, "Wine installer execution completed")
+   }
 
    // progress: 0.95 ~ 1.0 (5%)
    progressCallback?.invoke(0.95f, "Finalizing installation...")

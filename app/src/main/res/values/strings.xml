@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SteamDeck Mobile</string>
+    <string name="home_header">Library</string>
+    <string name="content_desc_back">Back</string>
 
     <!-- Google Password Manager / Autofill support -->
     <!-- Digital Asset Links for Google Credential Manager -->
@@ -164,14 +166,38 @@
     <!-- Install Status -->
     <string name="install_status_not_installed">Steam Client is not installed</string>
 
-    <!-- UI Labels -->
-    <string name="content_desc_back">Back</string>
+    <!-- UI Labels / Content Descriptions for Accessibility -->
     <string name="content_desc_settings">Game Settings</string>
     <string name="content_desc_favorite">Favorite</string>
     <string name="content_desc_delete">Delete</string>
     <string name="content_desc_error">Error</string>
     <string name="content_desc_menu">Open navigation drawer</string>
     <string name="content_desc_add_game">Add game</string>
+    <string name="content_desc_create">Create</string>
+    <string name="content_desc_edit">Edit</string>
+    <string name="content_desc_update">Update</string>
+    <string name="content_desc_info">Info</string>
+    <string name="content_desc_warning">Warning</string>
+    <string name="content_desc_empty">Empty</string>
+    <string name="content_desc_expand_drawer">Expand drawer</string>
+    <string name="content_desc_controller">Controller</string>
+    <string name="content_desc_active">Active</string>
+    <string name="content_desc_download">Download</string>
+    <string name="content_desc_launch_options">Launch options</string>
+    <string name="content_desc_launch_directly">Launch directly</string>
+    <string name="content_desc_launch_steam">Launch via Steam</string>
+    <string name="content_desc_steam_client">Steam Client</string>
+    <string name="content_desc_clear_completed">Clear Completed</string>
+    <string name="content_desc_pause">Pause</string>
+    <string name="content_desc_cancel">Cancel</string>
+    <string name="content_desc_resume">Resume</string>
+    <string name="content_desc_retry">Retry</string>
+    <string name="content_desc_complete">Complete</string>
+    <string name="content_desc_waiting">Waiting</string>
+    <string name="content_desc_downloading">Downloading</string>
+    <string name="content_desc_failed">Failed</string>
+    <string name="content_desc_sync">Sync</string>
+    <string name="content_desc_controller_settings">Controller Settings</string>
 
     <!-- Home Screen -->
     <string name="home_section_favorites">Favorites</string>

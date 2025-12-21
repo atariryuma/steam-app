@@ -1,5 +1,12 @@
 package com.steamdeck.mobile.presentation.ui.download
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -56,7 +63,7 @@ fun DownloadScreen(
      IconButton(onClick = onNavigateBack) {
       Icon(
        imageVector = Icons.Default.ArrowBack,
-       contentDescription = "Back"
+       contentDescription = stringResource(R.string.content_desc_back)
       )
      }
     },
@@ -68,7 +75,7 @@ fun DownloadScreen(
      ) {
       Icon(
        imageVector = Icons.Default.Clear,
-       contentDescription = "Clear Completed"
+       contentDescription = stringResource(R.string.content_desc_clear_completed)
       )
      }
     },
@@ -101,25 +108,36 @@ fun DownloadScreen(
    }
 
    // Download list
-   if (downloads.isEmpty()) {
-    EmptyDownloadsPlaceholder()
-   } else {
-    LazyColumn(
-     modifier = Modifier.fillMaxSize(),
-     contentPadding = PaddingValues(24.dp),
-     verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-     items(
-      items = downloads,
-      key = { it.id }
-     ) { download ->
-      DownloadItem(
-       download = download,
-       onPause = { viewModel.pauseDownload(download.id) },
-       onResume = { viewModel.resumeDownload(download.id) },
-       onCancel = { viewModel.cancelDownload(download.id) },
-       onRetry = { viewModel.retryDownload(download.id) }
-      )
+   AnimatedContent(
+    targetState = downloads.isEmpty(),
+    transitionSpec = {
+     fadeIn(tween(300)) togetherWith fadeOut(tween(300))
+    },
+    label = "DownloadListTransition"
+   ) { isEmpty ->
+    if (isEmpty) {
+     EmptyDownloadsPlaceholder()
+    } else {
+     LazyColumn(
+      modifier = Modifier.fillMaxSize().animateContentSize(),
+      contentPadding = PaddingValues(24.dp),
+      verticalArrangement = Arrangement.spacedBy(16.dp)
+     ) {
+      items(
+       items = downloads,
+       key = { it.id }
+      ) { download ->
+       DownloadItem(
+        download = download,
+        onPause = { viewModel.pauseDownload(download.id) },
+        onResume = { viewModel.resumeDownload(download.id) },
+        onCancel = { viewModel.cancelDownload(download.id) },
+        onRetry = { viewModel.retryDownload(download.id) },
+        modifier = Modifier.animateItemPlacement(
+         animationSpec = tween(300, easing = FastOutSlowInEasing)
+        )
+       )
+      }
      }
     }
    }
@@ -139,7 +157,7 @@ private fun EmptyDownloadsPlaceholder() {
   ) {
    Icon(
     imageVector = Icons.Default.Info,
-    contentDescription = "Info",
+    contentDescription = stringResource(R.string.content_desc_info),
     modifier = Modifier.size(64.dp),
     tint = MaterialTheme.colorScheme.outline
    )
@@ -162,10 +180,11 @@ private fun DownloadItem(
  onPause: () -> Unit,
  onResume: () -> Unit,
  onCancel: () -> Unit,
- onRetry: () -> Unit
+ onRetry: () -> Unit,
+ modifier: Modifier = Modifier
 ) {
  Card(
-  modifier = Modifier.fillMaxWidth(),
+  modifier = modifier.fillMaxWidth(),
   colors = CardDefaults.cardColors(
    containerColor = MaterialTheme.colorScheme.surfaceVariant
   ),
@@ -260,47 +279,47 @@ private fun DownloadItem(
     when (download.status) {
      DownloadStatus.DOWNLOADING -> {
       IconButton(onClick = onPause) {
-       Icon(Icons.Default.Clear, contentDescription = "Pause")
+       Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.content_desc_pause))
       }
       IconButton(onClick = onCancel) {
-       Icon(Icons.Default.Close, contentDescription = "cancel")
+       Icon(Icons.Default.Close, contentDescription = stringResource(R.string.content_desc_cancel))
       }
      }
 
      DownloadStatus.PAUSED -> {
       IconButton(onClick = onResume) {
-       Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
+       Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.content_desc_resume))
       }
       IconButton(onClick = onCancel) {
-       Icon(Icons.Default.Close, contentDescription = "cancel")
+       Icon(Icons.Default.Close, contentDescription = stringResource(R.string.content_desc_cancel))
       }
      }
 
      DownloadStatus.FAILED -> {
       TextButton(onClick = onRetry) {
-       Icon(Icons.Default.Refresh, contentDescription = "retry")
+       Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.content_desc_retry))
        Spacer(modifier = Modifier.width(4.dp))
        Text("Retry")
       }
       IconButton(onClick = onCancel) {
-       Icon(Icons.Default.Delete, contentDescription = "delete")
+       Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.content_desc_delete))
       }
      }
 
      DownloadStatus.COMPLETED -> {
       Icon(
        Icons.Default.CheckCircle,
-       contentDescription = "Complete",
+       contentDescription = stringResource(R.string.content_desc_complete),
        tint = MaterialTheme.colorScheme.primary
       )
       IconButton(onClick = onCancel) {
-       Icon(Icons.Default.Delete, contentDescription = "delete")
+       Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.content_desc_delete))
       }
      }
 
      else -> {
       IconButton(onClick = onCancel) {
-       Icon(Icons.Default.Delete, contentDescription = "delete")
+       Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.content_desc_delete))
       }
      }
     }
@@ -323,37 +342,37 @@ private fun DownloadStatusIcon(status: DownloadStatus) {
  when (status) {
   DownloadStatus.PENDING -> Icon(
    Icons.Default.Info,
-   contentDescription = "Waiting",
+   contentDescription = stringResource(R.string.content_desc_waiting),
    tint = MaterialTheme.colorScheme.outline
   )
 
   DownloadStatus.DOWNLOADING -> Icon(
    Icons.Default.ArrowForward,
-   contentDescription = "Downloading",
+   contentDescription = stringResource(R.string.content_desc_downloading),
    tint = MaterialTheme.colorScheme.primary
   )
 
   DownloadStatus.PAUSED -> Icon(
    Icons.Default.Clear,
-   contentDescription = "Pause",
+   contentDescription = stringResource(R.string.content_desc_pause),
    tint = MaterialTheme.colorScheme.secondary
   )
 
   DownloadStatus.COMPLETED -> Icon(
    Icons.Default.CheckCircle,
-   contentDescription = "Complete",
+   contentDescription = stringResource(R.string.content_desc_complete),
    tint = MaterialTheme.colorScheme.primary
   )
 
   DownloadStatus.FAILED -> Icon(
    Icons.Default.Warning,
-   contentDescription = "Failed",
+   contentDescription = stringResource(R.string.content_desc_failed),
    tint = MaterialTheme.colorScheme.error
   )
 
   DownloadStatus.CANCELLED -> Icon(
    Icons.Default.Close,
-   contentDescription = "cancel",
+   contentDescription = stringResource(R.string.content_desc_cancel),
    tint = MaterialTheme.colorScheme.outline
   )
  }

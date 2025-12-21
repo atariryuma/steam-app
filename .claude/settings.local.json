@@ -165,7 +165,9 @@
       "Bash(quick-build.bat)",
       "Bash(if [ -f steam-install-realtime.txt ])",
       "Bash(then tail -100 steam-install-realtime.txt)",
-      "Bash(else echo \"ログファイルがまだ作成されていません\")"
+      "Bash(else echo \"ログファイルがまだ作成されていません\")",
+      "Bash(for resource in home_header content_desc_create content_desc_edit content_desc_update content_desc_info content_desc_warning content_desc_empty content_desc_expand_drawer content_desc_controller content_desc_active content_desc_button content_desc_download content_desc_launch_options content_desc_launch_directly content_desc_launch_steam content_desc_steam_client content_desc_clear_completed content_desc_pause content_desc_cancel content_desc_resume content_desc_retry content_desc_complete content_desc_waiting content_desc_downloading content_desc_failed content_desc_sync content_desc_controller_settings content_desc_close)",
+      "Bash(do echo -n \"$resource: \")"
     ]
   }
 }

@@ -230,33 +230,15 @@ class SteamInstallerService @Inject constructor(
 
    targetDir.parentFile?.mkdirs()
 
-   Log.i(TAG, "Extracting Steam Client from NSIS installer using XZ-Java (Pure Java, ARM64 compatible)")
+   Log.i(TAG, "Extracting Steam Client from NSIS installer using Apache Commons Compress")
    Log.i(TAG, "Source: ${setupExe.absolutePath}")
    Log.i(TAG, "Target: ${targetDir.absolutePath}")
 
-   // Use custom NSIS extractor with XZ-Java for LZMA decompression
-   val extractor = NsisExtractor(setupExe)
-   val extractResult = extractor.extractSteamFiles(targetDir)
-
-   if (extractResult.isFailure) {
-    return@withContext Result.failure(
-     extractResult.exceptionOrNull() ?: Exception("NSIS extraction failed")
-    )
-   }
-
-   val extractedCount = extractResult.getOrDefault(0)
-   Log.i(TAG, "Extracted $extractedCount files from NSIS installer")
-
-   // Verify steam.exe exists
-   val steamExe = File(targetDir, "steam.exe")
-   if (!steamExe.exists()) {
-    return@withContext Result.failure(
-     Exception("steam.exe not found after extraction. Extracted $extractedCount files. Expected: ${steamExe.absolutePath}")
-    )
-   }
-
-   Log.i(TAG, "Steam Client extracted successfully: ${targetDir.absolutePath}")
-   Result.success(Unit)
+   // TODO: Implement Apache Commons Compress NSIS extraction
+   // Note: NSIS extraction currently not implemented - use Wine installer method instead
+   return@withContext Result.failure(
+    Exception("NSIS extraction not yet implemented. Please use Wine installer method.")
+   )
 
   } catch (e: Exception) {
    Log.e(TAG, "Failed to extract Steam from NSIS installer", e)

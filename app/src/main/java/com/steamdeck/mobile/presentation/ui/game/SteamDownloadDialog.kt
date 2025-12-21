@@ -7,8 +7,10 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.steamdeck.mobile.R
 import com.steamdeck.mobile.domain.model.Game
 
 /**
@@ -33,7 +35,7 @@ fun SteamDownloadDialog(
    icon = {
     Icon(
      imageVector = Icons.Default.CloudDownload,
-     contentDescription = "download",
+     contentDescription = stringResource(R.string.content_desc_download),
      tint = MaterialTheme.colorScheme.primary
     )
    },

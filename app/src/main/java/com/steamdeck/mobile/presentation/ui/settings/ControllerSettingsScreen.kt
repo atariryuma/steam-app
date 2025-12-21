@@ -59,7 +59,7 @@ fun ControllerSettingsScreen(
      IconButton(onClick = onBackClick) {
       Icon(
        imageVector = Icons.Default.ArrowBack,
-       contentDescription = "Back"
+       contentDescription = stringResource(R.string.content_desc_back)
       )
      }
     },
@@ -67,7 +67,7 @@ fun ControllerSettingsScreen(
      IconButton(onClick = { viewModel.refreshControllers() }) {
       Icon(
        imageVector = Icons.Default.Refresh,
-       contentDescription = "Update"
+       contentDescription = stringResource(R.string.content_desc_update)
       )
      }
     },
@@ -314,7 +314,7 @@ private fun ControllerCard(
   ) {
    Icon(
     imageVector = Icons.Default.PlayArrow,
-    contentDescription = "controller",
+    contentDescription = stringResource(R.string.content_desc_controller),
     modifier = Modifier.size(48.dp),
     tint = if (isActive) {
      MaterialTheme.colorScheme.onPrimaryContainer
@@ -342,7 +342,7 @@ private fun ControllerCard(
    if (isActive) {
     Icon(
      Icons.Default.Check,
-     contentDescription = "Active",
+     contentDescription = stringResource(R.string.content_desc_active),
      tint = MaterialTheme.colorScheme.primary
     )
    }
@@ -457,11 +457,11 @@ private fun ProfileCard(
    }
 
    IconButton(onClick = onEdit) {
-    Icon(Icons.Default.Edit, contentDescription = "Edit")
+    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.content_desc_edit))
    }
 
    IconButton(onClick = onDelete) {
-    Icon(Icons.Default.Delete, contentDescription = "Delete")
+    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.content_desc_delete))
    }
   }
  }
@@ -578,7 +578,7 @@ private fun ErrorMessage(
  ) {
   Icon(
    Icons.Default.Warning,
-   contentDescription = "Error",
+   contentDescription = stringResource(R.string.content_desc_error),
    modifier = Modifier.size(64.dp),
    tint = MaterialTheme.colorScheme.error
   )
@@ -603,7 +603,7 @@ private fun NoControllersMessage(modifier: Modifier = Modifier) {
  ) {
   Icon(
    Icons.Default.Info,
-   contentDescription = "Info",
+   contentDescription = stringResource(R.string.content_desc_info),
    modifier = Modifier.size(64.dp),
    tint = MaterialTheme.colorScheme.outline
   )

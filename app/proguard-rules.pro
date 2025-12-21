@@ -95,7 +95,11 @@
 # zstd-jni (JNI bindings)
 -keep class com.github.luben.zstd.** { *; }
 
-# Apache Commons Compress (for NSIS/7z extraction - Pure Java, no special rules needed)
+# 7-Zip-JBinding-4Android - Native library for NSIS extraction
+-keep class net.sf.sevenzipjbinding.** { *; }
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
 
 # Google Error Prone Annotations (used by Tink)
 -dontwarn com.google.errorprone.annotations.**

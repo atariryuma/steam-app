@@ -1,5 +1,10 @@
 package com.steamdeck.mobile.presentation.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -49,7 +54,31 @@ fun SteamDeckNavHost(
      type = NavType.BoolType
      defaultValue = false
     }
-   )
+   ),
+   enterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   exitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   },
+   popEnterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   popExitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   }
   ) { backStackEntry ->
    val showAddGameFromNav = backStackEntry.arguments?.getBoolean("showAddGame") ?: false
    HomeScreen(
@@ -62,7 +91,33 @@ fun SteamDeckNavHost(
   }
 
   // Top-level screen: Downloads
-  composable(Screen.Downloads.route) {
+  composable(
+   route = Screen.Downloads.route,
+   enterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   exitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   },
+   popEnterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   popExitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   }
+  ) {
    DownloadScreen(
     onNavigateBack = {
      if (navController.previousBackStackEntry != null) {
@@ -80,7 +135,31 @@ fun SteamDeckNavHost(
      type = NavType.IntType
      defaultValue = -1
     }
-   )
+   ),
+   enterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   exitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   },
+   popEnterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   popExitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   }
   ) { backStackEntry ->
    val settingsViewModel: com.steamdeck.mobile.presentation.viewmodel.SettingsViewModel = hiltViewModel()
    val initialSection = backStackEntry.arguments?.getInt("section") ?: -1
@@ -104,7 +183,31 @@ fun SteamDeckNavHost(
    route = Screen.GameDetail.route,
    arguments = listOf(
     navArgument("gameId") { type = NavType.LongType }
-   )
+   ),
+   enterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   exitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   },
+   popEnterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   popExitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   }
   ) { backStackEntry ->
    val gameId = backStackEntry.arguments?.getLong("gameId") ?: 0L
    GameDetailScreen(
@@ -117,14 +220,66 @@ fun SteamDeckNavHost(
   }
 
   // Settings sub-screen: Controller settings
-  composable(Screen.ControllerSettings.route) {
+  composable(
+   route = Screen.ControllerSettings.route,
+   enterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   exitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   },
+   popEnterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   popExitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   }
+  ) {
    ControllerSettingsScreen(
     onBackClick = { navController.popBackStack() }
    )
   }
 
   // Settings sub-screen: Container Management
-  composable(Screen.ContainerManagement.route) {
+  composable(
+   route = Screen.ContainerManagement.route,
+   enterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   exitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   },
+   popEnterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   popExitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   }
+  ) {
    val containerViewModel: ContainerViewModel = hiltViewModel()
 
    ContainerScreen(
@@ -138,7 +293,33 @@ fun SteamDeckNavHost(
   }
 
   // Settings sub-screen: Steam Login (OpenID authentication)
-  composable(Screen.SteamLogin.route) {
+  composable(
+   route = Screen.SteamLogin.route,
+   enterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   exitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.Start,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   },
+   popEnterTransition = {
+    slideIntoContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(300))
+   },
+   popExitTransition = {
+    slideOutOfContainer(
+     towards = AnimatedContentTransitionScope.SlideDirection.End,
+     animationSpec = tween(300, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(300))
+   }
+  ) {
    val loginViewModel: SteamLoginViewModel = hiltViewModel()
    val uiState by loginViewModel.uiState.collectAsState()
 

@@ -1,5 +1,12 @@
 package com.steamdeck.mobile.presentation.ui.container
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,10 +17,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.steamdeck.mobile.R
 import com.steamdeck.mobile.domain.emulator.EmulatorContainer
 import com.steamdeck.mobile.presentation.viewmodel.ContainerUiState
 import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
@@ -63,7 +72,7 @@ fun ContainerScreen(
      IconButton(onClick = onNavigateBack) {
       Icon(
        imageVector = Icons.Default.ArrowBack,
-       contentDescription = "Back"
+       contentDescription = stringResource(R.string.content_desc_back)
       )
      }
     },
@@ -71,7 +80,7 @@ fun ContainerScreen(
      IconButton(onClick = { showCreateDialog = true }) {
       Icon(
        imageVector = Icons.Default.Add,
-       contentDescription = "新規create"
+       contentDescription = stringResource(R.string.content_desc_create)
       )
      }
     },
@@ -172,7 +181,7 @@ fun ContainerScreen(
      ) {
       Icon(
        imageVector = Icons.Default.Error,
-       contentDescription = "Error",
+       contentDescription = stringResource(R.string.content_desc_error),
        modifier = Modifier.size(64.dp),
        tint = MaterialTheme.colorScheme.error
       )
@@ -196,7 +205,17 @@ fun ContainerScreen(
   }
 
   // Create container dialog
-  if (showCreateDialog) {
+  AnimatedVisibility(
+   visible = showCreateDialog,
+   enter = fadeIn(animationSpec = tween(150)) + scaleIn(
+    initialScale = 0.9f,
+    animationSpec = tween(150, easing = FastOutSlowInEasing)
+   ),
+   exit = fadeOut(animationSpec = tween(100)) + scaleOut(
+    targetScale = 0.9f,
+    animationSpec = tween(100)
+   )
+  ) {
    CreateContainerDialog(
     onDismiss = { showCreateDialog = false },
     onConfirm = { name ->
@@ -208,7 +227,17 @@ fun ContainerScreen(
 
   // Delete confirmation dialog
   selectedContainer?.let { container ->
-   if (showDeleteDialog) {
+   AnimatedVisibility(
+    visible = showDeleteDialog,
+    enter = fadeIn(animationSpec = tween(150)) + scaleIn(
+     initialScale = 0.9f,
+     animationSpec = tween(150, easing = FastOutSlowInEasing)
+    ),
+    exit = fadeOut(animationSpec = tween(100)) + scaleOut(
+     targetScale = 0.9f,
+     animationSpec = tween(100)
+    )
+   ) {
     DeleteContainerDialog(
      containerName = container.name,
      onDismiss = {
@@ -241,7 +270,7 @@ private fun EmptyContainersPlaceholder(
   ) {
    Icon(
     imageVector = Icons.Default.FolderOpen,
-    contentDescription = "Empty",
+    contentDescription = stringResource(R.string.content_desc_empty),
     modifier = Modifier.size(64.dp),
     tint = MaterialTheme.colorScheme.outline
    )
@@ -325,7 +354,7 @@ private fun ContainerItem(
    IconButton(onClick = onDeleteClick) {
     Icon(
      imageVector = Icons.Default.Delete,
-     contentDescription = "delete",
+     contentDescription = stringResource(R.string.content_desc_delete),
      tint = MaterialTheme.colorScheme.error
     )
    }
@@ -386,7 +415,7 @@ private fun DeleteContainerDialog(
   icon = {
    Icon(
     imageVector = Icons.Default.Warning,
-    contentDescription = "Warning",
+    contentDescription = stringResource(R.string.content_desc_warning),
     tint = MaterialTheme.colorScheme.error
    )
   },

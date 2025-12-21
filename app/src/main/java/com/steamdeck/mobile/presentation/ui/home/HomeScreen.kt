@@ -3,12 +3,20 @@ package com.steamdeck.mobile.presentation.ui.home
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -109,21 +117,39 @@ fun HomeScreen(
     .fillMaxSize()
     .padding(paddingValues)
   ) {
-   when (val state = uiState) {
-    is HomeUiState.Loading -> LoadingContent()
-    is HomeUiState.Success -> {
-     BackboneOneStyleContent(
-      games = state.games,
-      onGameClick = onGameClick,
-      onToggleFavorite = viewModel::toggleFavorite
-     )
+   AnimatedContent(
+    targetState = uiState,
+    transitionSpec = {
+     fadeIn(tween(300)) togetherWith fadeOut(tween(300))
+    },
+    label = "HomeUiStateTransition"
+   ) { state ->
+    when (state) {
+     is HomeUiState.Loading -> LoadingContent()
+     is HomeUiState.Success -> {
+      BackboneOneStyleContent(
+       games = state.games,
+       onGameClick = onGameClick,
+       onToggleFavorite = viewModel::toggleFavorite
+      )
+     }
+     is HomeUiState.Empty -> EmptyContent(onAddGame = { showAddGameDialog = true })
+     is HomeUiState.Error -> ErrorContent(state.message, viewModel::refresh)
     }
-    is HomeUiState.Empty -> EmptyContent(onAddGame = { showAddGameDialog = true })
-    is HomeUiState.Error -> ErrorContent(state.message, viewModel::refresh)
    }
   }
 
-  if (showAddGameDialog) {
+  AnimatedVisibility(
+   visible = showAddGameDialog,
+   enter = fadeIn(animationSpec = tween(150)) + scaleIn(
+    initialScale = 0.9f,
+    animationSpec = tween(150, easing = FastOutSlowInEasing)
+   ),
+   exit = fadeOut(animationSpec = tween(100)) + scaleOut(
+    targetScale = 0.9f,
+    animationSpec = tween(100)
+   )
+  ) {
    AddGameDialog(
     onDismiss = { showAddGameDialog = false },
     onConfirm = { name, execPath, instPath ->
@@ -260,7 +286,7 @@ fun HomeTopBar(
  TopAppBar(
   title = {
    Text(
-    text = stringResource(R.string.app_name),
+    text = stringResource(R.string.home_header),
     style = MaterialTheme.typography.titleLarge,
     fontWeight = FontWeight.Bold
    )
@@ -420,7 +446,7 @@ fun NavigationDrawerContent(
    IconButton(onClick = onExpandDrawer) {
     Icon(
      imageVector = Icons.Default.Menu,
-     contentDescription = "Expand drawer",
+     contentDescription = stringResource(R.string.content_desc_expand_drawer),
      tint = MaterialTheme.colorScheme.onSurfaceVariant,
      modifier = Modifier.size(24.dp)
     )
@@ -716,7 +742,8 @@ fun GameSection(
   // Horizontal scrolling game list
   LazyRow(
    contentPadding = PaddingValues(horizontal = 16.dp),
-   horizontalArrangement = Arrangement.spacedBy(12.dp)
+   horizontalArrangement = Arrangement.spacedBy(12.dp),
+   modifier = Modifier.animateContentSize()
   ) {
    items(
     items = games,
@@ -725,7 +752,10 @@ fun GameSection(
     GameCard(
      game = game,
      onClick = { onGameClick(game.id) },
-     onToggleFavorite = { onToggleFavorite(game.id, !game.isFavorite) }
+     onToggleFavorite = { onToggleFavorite(game.id, !game.isFavorite) },
+     modifier = Modifier.animateItemPlacement(
+      animationSpec = tween(300, easing = FastOutSlowInEasing)
+     )
     )
    }
   }
@@ -783,7 +813,17 @@ fun GameCard(
     verticalArrangement = Arrangement.SpaceBetween
    ) {
     // Favorite badge
-    if (game.isFavorite) {
+    AnimatedVisibility(
+     visible = game.isFavorite,
+     enter = scaleIn(
+      initialScale = 0f,
+      animationSpec = spring(
+       dampingRatio = Spring.DampingRatioMediumBouncy,
+       stiffness = Spring.StiffnessLow
+      )
+     ) + fadeIn(),
+     exit = scaleOut(targetScale = 0f) + fadeOut()
+    ) {
      Surface(
       shape = MaterialTheme.shapes.small,
       color = MaterialTheme.colorScheme.primary
@@ -795,7 +835,8 @@ fun GameCard(
        tint = MaterialTheme.colorScheme.onPrimary
       )
      }
-    } else {
+    }
+    if (!game.isFavorite) {
      Spacer(modifier = Modifier.height(24.dp))
     }
 

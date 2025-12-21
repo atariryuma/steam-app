@@ -112,13 +112,13 @@ fun SteamDeckApp() {
     ) {
      NavigationDrawerContent(
       onNavigateToHome = {
-       closeDrawer()
+       collapseDrawer()
        navController.navigate("home") {
         popUpTo("home") { inclusive = true }
        }
       },
       onNavigateToDownloads = {
-       closeDrawer()
+       collapseDrawer()
        navController.navigate(Screen.Downloads.route)
       },
       onNavigateToSteamLogin = {
@@ -151,7 +151,7 @@ fun SteamDeckApp() {
       },
       onAddGame = {
        // Navigate to home and show add game dialog
-       closeDrawer()
+       collapseDrawer()
        navController.navigate(Screen.Home.createRoute(showAddGame = true)) {
         popUpTo("home") { inclusive = true }
        }

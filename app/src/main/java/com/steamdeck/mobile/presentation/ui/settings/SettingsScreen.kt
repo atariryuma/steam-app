@@ -241,7 +241,7 @@ private fun SettingsContent(
     IconButton(onClick = onNavigateBack) {
      Icon(
       imageVector = Icons.Default.ArrowBack,
-      contentDescription = "Back",
+      contentDescription = stringResource(R.string.content_desc_back),
       tint = MaterialTheme.colorScheme.primary
      )
     }
@@ -1162,7 +1162,7 @@ private fun LibrarySyncContent(
    ) {
     Icon(
      imageVector = Icons.Default.Refresh,
-     contentDescription = "Sync"
+     contentDescription = stringResource(R.string.content_desc_sync)
     )
     Spacer(modifier = Modifier.width(8.dp))
     Text(
@@ -1211,7 +1211,7 @@ private fun ControllerContent(
    ) {
     Icon(
      imageVector = Icons.Default.SportsEsports,
-     contentDescription = "Controller Settings"
+     contentDescription = stringResource(R.string.content_desc_controller_settings)
     )
     Spacer(modifier = Modifier.width(8.dp))
     Text("Open Controller Settings")

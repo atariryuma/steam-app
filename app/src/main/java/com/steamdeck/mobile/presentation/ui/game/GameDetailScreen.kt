@@ -1,5 +1,12 @@
 package com.steamdeck.mobile.presentation.ui.game
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -111,7 +118,17 @@ fun GameDetailScreen(
     )
 
     // deleteconfirmダイアログ
-    if (showDeleteDialog) {
+    AnimatedVisibility(
+     visible = showDeleteDialog,
+     enter = fadeIn(animationSpec = tween(150)) + scaleIn(
+      initialScale = 0.9f,
+      animationSpec = tween(150, easing = FastOutSlowInEasing)
+     ),
+     exit = fadeOut(animationSpec = tween(100)) + scaleOut(
+      targetScale = 0.9f,
+      animationSpec = tween(100)
+     )
+    ) {
      DeleteConfirmDialog(
       gameName = state.game.name,
       onConfirm = {
@@ -123,12 +140,32 @@ fun GameDetailScreen(
     }
 
     // launchinダイアログ (Winlator initialization含む)
-    if (launchState is LaunchState.Launching) {
+    AnimatedVisibility(
+     visible = launchState is LaunchState.Launching,
+     enter = fadeIn(animationSpec = tween(150)) + scaleIn(
+      initialScale = 0.9f,
+      animationSpec = tween(150, easing = FastOutSlowInEasing)
+     ),
+     exit = fadeOut(animationSpec = tween(100)) + scaleOut(
+      targetScale = 0.9f,
+      animationSpec = tween(100)
+     )
+    ) {
      LaunchingDialog()
     }
 
     // launchErrorダイアログ
-    if (showLaunchErrorDialog) {
+    AnimatedVisibility(
+     visible = showLaunchErrorDialog,
+     enter = fadeIn(animationSpec = tween(150)) + scaleIn(
+      initialScale = 0.9f,
+      animationSpec = tween(150, easing = FastOutSlowInEasing)
+     ),
+     exit = fadeOut(animationSpec = tween(100)) + scaleOut(
+      targetScale = 0.9f,
+      animationSpec = tween(100)
+     )
+    ) {
      LaunchErrorDialog(
       message = launchErrorMessage,
       onDismiss = { showLaunchErrorDialog = false }
@@ -136,7 +173,17 @@ fun GameDetailScreen(
     }
 
     // SteamlaunchErrorダイアログ
-    if (showSteamLaunchErrorDialog) {
+    AnimatedVisibility(
+     visible = showSteamLaunchErrorDialog,
+     enter = fadeIn(animationSpec = tween(150)) + scaleIn(
+      initialScale = 0.9f,
+      animationSpec = tween(150, easing = FastOutSlowInEasing)
+     ),
+     exit = fadeOut(animationSpec = tween(100)) + scaleOut(
+      targetScale = 0.9f,
+      animationSpec = tween(100)
+     )
+    ) {
      SteamLaunchErrorDialog(
       message = steamLaunchErrorMessage,
       onDismiss = {
@@ -529,7 +576,7 @@ fun LaunchErrorDialog(
 ) {
  AlertDialog(
   onDismissRequest = onDismiss,
-  icon = { Icon(Icons.Default.Info, contentDescription = "Info") },
+  icon = { Icon(Icons.Default.Info, contentDescription = stringResource(R.string.content_desc_info)) },
   title = { Text("gamelaunch きません") },
   text = { Text(message) },
   confirmButton = {
@@ -577,7 +624,7 @@ fun ErrorContent(
   ) {
    Icon(
     imageVector = Icons.Default.Warning,
-    contentDescription = "Error",
+    contentDescription = stringResource(R.string.content_desc_error),
     modifier = Modifier.size(64.dp),
     tint = MaterialTheme.colorScheme.error
    )
@@ -664,7 +711,7 @@ fun SplitLaunchButton(
   ) {
    Icon(
     imageVector = Icons.Default.ArrowDropDown,
-    contentDescription = "launchオプション"
+    contentDescription = stringResource(R.string.content_desc_launch_options)
    )
   }
 
@@ -688,7 +735,7 @@ fun SplitLaunchButton(
       onDirectLaunch()
      },
      leadingIcon = {
-      Icon(Icons.Default.PlayArrow, contentDescription = "directlylaunch")
+      Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.content_desc_launch_directly))
      },
      enabled = isEnabled
     )
@@ -724,7 +771,7 @@ fun SplitLaunchButton(
       }
      },
      leadingIcon = {
-      Icon(Icons.Default.SportsEsports, contentDescription = "Steamlaunch")
+      Icon(Icons.Default.SportsEsports, contentDescription = stringResource(R.string.content_desc_launch_steam))
      },
      enabled = isSteamInstalled && game.steamAppId != null && isEnabled
     )
@@ -752,7 +799,7 @@ fun SplitLaunchButton(
       }
      },
      leadingIcon = {
-      Icon(Icons.Default.SportsEsports, contentDescription = "Steam Client")
+      Icon(Icons.Default.SportsEsports, contentDescription = stringResource(R.string.content_desc_steam_client))
      },
      enabled = isSteamInstalled && isEnabled
     )
@@ -767,7 +814,7 @@ fun SplitLaunchButton(
      onNavigateToSettings()
     },
     leadingIcon = {
-     Icon(Icons.Default.Settings, contentDescription = "Settings")
+     Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.content_desc_settings))
     }
    )
   }

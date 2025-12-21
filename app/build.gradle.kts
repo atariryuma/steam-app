@@ -181,7 +181,7 @@ dependencies {
 
     // Compression (Wine/Box64 binaries & NSIS extraction)
     implementation(libs.zstd.jni) // Zstandard with JNI (includes Android ARM64 libs)
-    implementation(libs.commons.compress) // Apache Commons Compress for NSIS/7z (Pure Java, ARM64 compatible)
+    implementation(libs.commons.compress) // Apache Commons Compress for tar/zip/NSIS extraction
     implementation(libs.xz) // XZ-Java for .txz decompression
 
     // File Import

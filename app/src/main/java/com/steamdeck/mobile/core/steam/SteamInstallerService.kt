@@ -137,11 +137,11 @@ class SteamInstallerService @Inject constructor(
     }
    }
 
-   // Verify steam.exe exists
-   val steamExe = File(targetDir, "steam.exe")
+   // Verify Steam.exe exists (case-sensitive on Android)
+   val steamExe = File(targetDir, "Steam.exe")
    if (!steamExe.exists()) {
     return@withContext Result.failure(
-     Exception("steam.exe not found after extraction")
+     Exception("Steam.exe not found after extraction")
     )
    }
 
@@ -247,15 +247,15 @@ class SteamInstallerService @Inject constructor(
    val extractedCount = extractResult.getOrDefault(0)
    Log.i(TAG, "Extracted $extractedCount files from NSIS installer")
 
-   // Verify steam.exe exists
-   val steamExe = File(targetDir, "steam.exe")
+   // Verify Steam.exe exists (case-sensitive on Android)
+   val steamExe = File(targetDir, "Steam.exe")
    if (!steamExe.exists()) {
     return@withContext Result.failure(
-     Exception("steam.exe not found after extraction (extracted $extractedCount files)")
+     Exception("Steam.exe not found after extraction (extracted $extractedCount files)")
     )
    }
 
-   Log.i(TAG, "NSIS extraction successful: steam.exe found (${steamExe.length()} bytes)")
+   Log.i(TAG, "NSIS extraction successful: Steam.exe found (${steamExe.length()} bytes)")
    Result.success(Unit)
 
   } catch (e: Exception) {

@@ -59,7 +59,7 @@ class InstallDownloadedGameUseCase @Inject constructor(
     AppLogger.e(TAG, "Downloaded file not found: ${download.destinationPath}")
 
     // installationfailureマーク
-    val updatedDownload = download.copy(installationStatus = InstallationStatus.FAILED)
+    val updatedDownload = download.copy(installationStatus = InstallationStatus.VALIDATION_FAILED)
     downloadRepository.updateDownload(updatedDownload)
 
     return@withContext DataResult.Error(
@@ -80,7 +80,7 @@ class InstallDownloadedGameUseCase @Inject constructor(
     if (!installDir.mkdirs()) {
      AppLogger.e(TAG, "Failed to create install directory: ${installDir.absolutePath}")
 
-     val updatedDownload = download.copy(installationStatus = InstallationStatus.FAILED)
+     val updatedDownload = download.copy(installationStatus = InstallationStatus.VALIDATION_FAILED)
      downloadRepository.updateDownload(updatedDownload)
 
      return@withContext DataResult.Error(
@@ -100,7 +100,7 @@ class InstallDownloadedGameUseCase @Inject constructor(
     AppLogger.e(TAG, "Failed to copy file", e)
 
     // installationfailureマーク
-    val updatedDownload = download.copy(installationStatus = InstallationStatus.FAILED)
+    val updatedDownload = download.copy(installationStatus = InstallationStatus.VALIDATION_FAILED)
     downloadRepository.updateDownload(updatedDownload)
 
     return@withContext DataResult.Error(

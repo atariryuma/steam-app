@@ -116,13 +116,13 @@ class NsisExtractor(private val nsisFile: File) {
             // Extract all items
             archive.extract(null, false, callback)
 
-            // Verify steam.exe exists
-            val steamExe = File(targetDir, "steam.exe")
+            // Verify Steam.exe exists (case-sensitive on Android)
+            val steamExe = File(targetDir, "Steam.exe")
             if (!steamExe.exists()) {
-                Log.w(TAG, "steam.exe not found after extraction. Extracted $extractedFiles files.")
+                Log.w(TAG, "Steam.exe not found after extraction. Extracted $extractedFiles files.")
                 Log.w(TAG, "Directory contents: ${targetDir.listFiles()?.joinToString { it.name }}")
             } else {
-                Log.i(TAG, "Successfully extracted steam.exe (${steamExe.length()} bytes)")
+                Log.i(TAG, "Successfully extracted Steam.exe (${steamExe.length()} bytes)")
             }
 
             Log.i(TAG, "NSIS extraction complete: $extractedFiles files extracted")

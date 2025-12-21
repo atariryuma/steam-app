@@ -22,7 +22,8 @@ import androidx.room.PrimaryKey
   Index(value = ["isFavorite"]),
   Index(value = ["steamAppId"], unique = true),
   Index(value = ["source"]),
-  Index(value = ["name"])
+  Index(value = ["name"]),
+  Index(value = ["installationStatus"])
  ]
 )
 data class GameEntity(
@@ -63,7 +64,16 @@ data class GameEntity(
  val addedTimestamp: Long = System.currentTimeMillis(),
 
  /** favoriteフラグ */
- val isFavorite: Boolean = false
+ val isFavorite: Boolean = false,
+
+ /** Installation status (NOT_INSTALLED, DOWNLOADING, INSTALLING, INSTALLED, etc.) */
+ val installationStatus: String = "NOT_INSTALLED",
+
+ /** Installation progress (0-100) */
+ val installProgress: Int = 0,
+
+ /** Last status update timestamp (Unix timestamp) */
+ val statusUpdatedTimestamp: Long? = null
 )
 
 /**

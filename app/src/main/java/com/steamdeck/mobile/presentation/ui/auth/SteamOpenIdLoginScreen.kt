@@ -16,8 +16,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
+import com.steamdeck.mobile.presentation.theme.SteamColorPalette
 
 /**
  * Steam OpenIDauthentication画面（公式規約準拠）
@@ -49,7 +49,7 @@ fun SteamOpenIdLoginScreen(
  Box(
   modifier = Modifier
    .fillMaxSize()
-   .background(Color(0xFF1B2838)) // Steam dark blue
+   .background(SteamColorPalette.Dark) // Steam dark blue
  ) {
   // WebView（フルスクリーン）
   AndroidView(
@@ -113,7 +113,7 @@ fun SteamOpenIdLoginScreen(
     modifier = Modifier
      .fillMaxWidth()
      .align(Alignment.TopCenter),
-    color = Color(0xFF66C0F4)
+    color = SteamColorPalette.Blue
    )
   }
 
@@ -122,11 +122,11 @@ fun SteamOpenIdLoginScreen(
    Box(
     modifier = Modifier
      .fillMaxSize()
-     .background(Color(0xFF1B2838).copy(alpha = 0.9f)),
+     .background(SteamColorPalette.Dark.copy(alpha = 0.9f)),
     contentAlignment = Alignment.Center
    ) {
     CircularProgressIndicator(
-     color = Color(0xFF66C0F4)
+     color = SteamColorPalette.Blue
     )
    }
   }

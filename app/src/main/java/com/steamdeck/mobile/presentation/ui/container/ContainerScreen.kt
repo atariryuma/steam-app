@@ -1,12 +1,6 @@
 package com.steamdeck.mobile.presentation.ui.container
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.steamdeck.mobile.R
 import com.steamdeck.mobile.domain.emulator.EmulatorContainer
+import com.steamdeck.mobile.presentation.ui.common.AnimationDefaults
 import com.steamdeck.mobile.presentation.viewmodel.ContainerUiState
 import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
 
@@ -207,14 +202,8 @@ fun ContainerScreen(
   // Create container dialog
   AnimatedVisibility(
    visible = showCreateDialog,
-   enter = fadeIn(animationSpec = tween(150)) + scaleIn(
-    initialScale = 0.9f,
-    animationSpec = tween(150, easing = FastOutSlowInEasing)
-   ),
-   exit = fadeOut(animationSpec = tween(100)) + scaleOut(
-    targetScale = 0.9f,
-    animationSpec = tween(100)
-   )
+   enter = AnimationDefaults.DialogEnter,
+   exit = AnimationDefaults.DialogExit
   ) {
    CreateContainerDialog(
     onDismiss = { showCreateDialog = false },
@@ -229,14 +218,8 @@ fun ContainerScreen(
   selectedContainer?.let { container ->
    AnimatedVisibility(
     visible = showDeleteDialog,
-    enter = fadeIn(animationSpec = tween(150)) + scaleIn(
-     initialScale = 0.9f,
-     animationSpec = tween(150, easing = FastOutSlowInEasing)
-    ),
-    exit = fadeOut(animationSpec = tween(100)) + scaleOut(
-     targetScale = 0.9f,
-     animationSpec = tween(100)
-    )
+    enter = AnimationDefaults.DialogEnter,
+    exit = AnimationDefaults.DialogExit
    ) {
     DeleteContainerDialog(
      containerName = container.name,

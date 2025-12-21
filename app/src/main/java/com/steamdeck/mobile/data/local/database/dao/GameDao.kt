@@ -87,4 +87,33 @@ interface GameDao {
   */
  @Query("DELETE FROM games")
  suspend fun deleteAllGames()
+
+ /**
+  * Update game installation status
+  */
+ @Query("""
+  UPDATE games
+  SET installationStatus = :status,
+      installProgress = :progress,
+      statusUpdatedTimestamp = :timestamp
+  WHERE id = :gameId
+ """)
+ suspend fun updateInstallationStatus(
+  gameId: Long,
+  status: String,
+  progress: Int,
+  timestamp: Long
+ )
+
+ /**
+  * Observe game changes (for real-time installation status updates)
+  */
+ @Query("SELECT * FROM games WHERE id = :gameId")
+ fun observeGame(gameId: Long): Flow<GameEntity?>
+
+ /**
+  * Get games by installation status
+  */
+ @Query("SELECT * FROM games WHERE installationStatus = :status ORDER BY addedTimestamp DESC")
+ fun getGamesByInstallationStatus(status: String): Flow<List<GameEntity>>
 }

@@ -142,34 +142,3 @@ enum class DownloadStatus {
   get() = this == DOWNLOADING || this == PENDING
 }
 
-/**
- * Installation status (after download completion)
- */
-enum class InstallationStatus {
- /** Not installed (download only completed) */
- NOT_INSTALLED,
-
- /** Installation queued */
- PENDING,
-
- /** Installing */
- INSTALLING,
-
- /** Installation completed */
- INSTALLED,
-
- /** Installation failed */
- FAILED;
-
- /**
-  * Display name for status
-  */
- val displayName: String
-  get() = when (this) {
-   NOT_INSTALLED -> "Not Installed"
-   PENDING -> "waiting"
-   INSTALLING -> "Installing"
-   INSTALLED -> "Installed"
-   FAILED -> "Failed"
-  }
-}

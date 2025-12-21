@@ -68,6 +68,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.steamdeck.mobile.R
+import com.steamdeck.mobile.presentation.theme.SteamColorPalette
 import com.steamdeck.mobile.presentation.ui.auth.SteamOpenIdLoginScreen
 import com.steamdeck.mobile.presentation.viewmodel.SettingsUiState
 import com.steamdeck.mobile.presentation.viewmodel.SettingsViewModel
@@ -354,7 +355,7 @@ private fun SteamAuthContent(
   Box(
    modifier = Modifier
     .fillMaxSize()
-    .background(Color(0xFF1B2838))
+    .background(SteamColorPalette.Dark)
   ) {
    SteamOpenIdLoginScreen(
     authUrl = authUrl,
@@ -395,10 +396,9 @@ private fun SteamAuthLoggedInSection(
 ) {
  Card(
   modifier = Modifier
-   .fillMaxWidth()
-   .height(340.dp),
+   .fillMaxWidth(),
   colors = CardDefaults.cardColors(
-   containerColor = Color(0xFF1B2838)
+   containerColor = SteamColorPalette.Dark
   ),
   shape = RoundedCornerShape(8.dp),
   elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -409,8 +409,8 @@ private fun SteamAuthLoggedInSection(
     .background(
      brush = Brush.verticalGradient(
       colors = listOf(
-       Color(0xFF1B2838),
-       Color(0xFF0D1217)
+       SteamColorPalette.Dark,
+       SteamColorPalette.DarkerShade
       )
      )
     )
@@ -435,7 +435,7 @@ private fun SteamAuthLoggedInSection(
        fontSize = 30.sp,
        letterSpacing = 2.5.sp
       ),
-      color = Color(0xFF66C0F4)
+      color = SteamColorPalette.Blue
      )
 
      Spacer(modifier = Modifier.height(3.dp))
@@ -443,7 +443,7 @@ private fun SteamAuthLoggedInSection(
      Text(
       text = "Deck Mobile",
       style = MaterialTheme.typography.titleSmall,
-      color = Color(0xFF8F98A0)
+      color = SteamColorPalette.Gray
      )
 
      Spacer(modifier = Modifier.height(20.dp))
@@ -452,7 +452,7 @@ private fun SteamAuthLoggedInSection(
       imageVector = Icons.Default.Check,
       contentDescription = null,
       modifier = Modifier.size(34.dp),
-      tint = Color(0xFF5BA82E) // Steam green
+      tint = SteamColorPalette.Green // Steam green
      )
 
      Spacer(modifier = Modifier.height(8.dp))
@@ -472,13 +472,13 @@ private fun SteamAuthLoggedInSection(
       style = MaterialTheme.typography.bodyLarge.copy(
        fontWeight = FontWeight.SemiBold
       ),
-      color = Color(0xFF66C0F4)
+      color = SteamColorPalette.Blue
      )
 
      Text(
       text = "Steam ID: $steamId",
       style = MaterialTheme.typography.bodySmall,
-      color = Color(0xFF8F98A0)
+      color = SteamColorPalette.Gray
      )
     }
 
@@ -494,7 +494,7 @@ private fun SteamAuthLoggedInSection(
       onClick = onRelogin,
       modifier = Modifier.fillMaxWidth(),
       colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-       containerColor = Color(0xFF66C0F4),
+       containerColor = SteamColorPalette.Blue,
        contentColor = Color.White
       )
      ) {
@@ -510,9 +510,9 @@ private fun SteamAuthLoggedInSection(
       onClick = onLogout,
       modifier = Modifier.fillMaxWidth(),
       colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-       contentColor = Color(0xFF8F98A0)
+       contentColor = SteamColorPalette.Gray
       ),
-      border = BorderStroke(1.dp, Color(0xFF8F98A0))
+      border = BorderStroke(1.dp, SteamColorPalette.Gray)
      ) {
       Text(
        "Logout",
@@ -539,20 +539,12 @@ private fun SteamAuthLoggedInSection(
 private fun SteamOpenIdAuthSection(
  onNavigateToLogin: () -> Unit
 ) {
- // Steam公式カラー
- val steamNavbar = Color(0xFF171A21)
- val steamDark = Color(0xFF1B2838)
- val steamMedium = Color(0xFF2A475E)
- val steamBlue = Color(0xFF66C0F4)
- val steamLightText = Color(0xFFC7D5E0)
- val steamGray = Color(0xFF8F98A0)
- 
  Box(
   modifier = Modifier
    .fillMaxSize()
    .background(
     brush = Brush.verticalGradient(
-     colors = listOf(steamNavbar, steamDark)
+     colors = listOf(SteamColorPalette.Navbar, SteamColorPalette.Dark)
     )
    ),
   contentAlignment = Alignment.Center
@@ -563,7 +555,7 @@ private fun SteamOpenIdAuthSection(
     .fillMaxWidth(0.85f)
     .padding(16.dp),
    colors = CardDefaults.cardColors(
-    containerColor = steamMedium.copy(alpha = 0.6f)
+    containerColor = SteamColorPalette.Medium.copy(alpha = 0.6f)
    ),
    shape = RoundedCornerShape(4.dp),
    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -574,8 +566,8 @@ private fun SteamOpenIdAuthSection(
      .background(
       brush = Brush.verticalGradient(
        colors = listOf(
-        steamMedium.copy(alpha = 0.8f),
-        steamDark.copy(alpha = 0.95f)
+        SteamColorPalette.Medium.copy(alpha = 0.8f),
+        SteamColorPalette.Dark.copy(alpha = 0.95f)
        )
       )
      )
@@ -589,7 +581,7 @@ private fun SteamOpenIdAuthSection(
       fontWeight = FontWeight.Black,
       letterSpacing = 6.sp
      ),
-     color = steamLightText
+     color = SteamColorPalette.LightText
     )
     
     Spacer(modifier = Modifier.height(4.dp))
@@ -603,7 +595,7 @@ private fun SteamOpenIdAuthSection(
        brush = Brush.horizontalGradient(
         colors = listOf(
          Color.Transparent,
-         steamBlue,
+         SteamColorPalette.Blue,
          Color.Transparent
         )
        )
@@ -618,7 +610,7 @@ private fun SteamOpenIdAuthSection(
      style = MaterialTheme.typography.titleLarge.copy(
       fontWeight = FontWeight.Normal
      ),
-     color = steamLightText
+     color = SteamColorPalette.LightText
     )
     
     Spacer(modifier = Modifier.height(32.dp))
@@ -641,8 +633,8 @@ private fun SteamOpenIdAuthSection(
        .background(
         brush = Brush.linearGradient(
          colors = listOf(
-          Color(0xFF47BFFF),
-          Color(0xFF1A9FFF)
+          SteamColorPalette.BrightBlue,
+          SteamColorPalette.DeepBlue
          )
         )
        ),
@@ -665,7 +657,7 @@ private fun SteamOpenIdAuthSection(
     Text(
      text = "Official Steam Authentication (OpenID 2.0)",
      style = MaterialTheme.typography.bodySmall,
-     color = steamGray
+     color = SteamColorPalette.Gray
     )
    }
   }
@@ -683,7 +675,7 @@ private fun SteamClientContent(
  Card(
   modifier = Modifier.fillMaxWidth(),
   colors = CardDefaults.cardColors(
-   containerColor = Color(0xFF1B2838) // Steam dark blue
+   containerColor = SteamColorPalette.Dark // Steam dark blue
   ),
   shape = RoundedCornerShape(8.dp),
   elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -694,8 +686,8 @@ private fun SteamClientContent(
     .background(
      brush = Brush.verticalGradient(
       colors = listOf(
-       Color(0xFF1B2838),
-       Color(0xFF0D1217)
+       SteamColorPalette.Dark,
+       SteamColorPalette.DarkerShade
       )
      )
     )
@@ -711,13 +703,13 @@ private fun SteamClientContent(
       verticalAlignment = Alignment.CenterVertically
      ) {
       CircularProgressIndicator(
-       color = Color(0xFF66C0F4)
+       color = SteamColorPalette.Blue
       )
       Spacer(modifier = Modifier.width(16.dp))
       Text(
        text = "Checking...",
        style = MaterialTheme.typography.bodyLarge,
-       color = Color(0xFFC7D5E0)
+       color = SteamColorPalette.LightText
       )
      }
     }
@@ -731,7 +723,7 @@ private fun SteamClientContent(
      ) {
       Surface(
        shape = RoundedCornerShape(12.dp),
-       color = Color(0xFF2A475E)
+       color = SteamColorPalette.Medium
       ) {
        Icon(
         imageVector = Icons.Default.CloudDownload,
@@ -739,7 +731,7 @@ private fun SteamClientContent(
         modifier = Modifier
          .size(56.dp)
          .padding(12.dp),
-        tint = Color(0xFF66C0F4)
+        tint = SteamColorPalette.Blue
        )
       }
       Column(modifier = Modifier.weight(1f)) {
@@ -753,7 +745,7 @@ private fun SteamClientContent(
        Text(
         text = "Not Installed",
         style = MaterialTheme.typography.bodyMedium,
-        color = Color(0xFF8F98A0)
+        color = SteamColorPalette.Gray
        )
       }
      }
@@ -763,21 +755,21 @@ private fun SteamClientContent(
       modifier = Modifier
        .fillMaxWidth()
        .height(1.dp)
-       .background(Color(0xFF2A475E))
+       .background(SteamColorPalette.Medium)
      )
 
      // Description
      Text(
       text = "Install Steam Client in Wine environment to launch games via Steam.",
       style = MaterialTheme.typography.bodyMedium,
-      color = Color(0xFFC7D5E0),
+      color = SteamColorPalette.LightText,
       lineHeight = 22.sp
      )
 
      // Info box
      Surface(
       shape = RoundedCornerShape(6.dp),
-      color = Color(0xFF2A475E).copy(alpha = 0.5f)
+      color = SteamColorPalette.Medium.copy(alpha = 0.5f)
      ) {
       Column(
        modifier = Modifier
@@ -792,7 +784,7 @@ private fun SteamClientContent(
         Icon(
          imageVector = Icons.Default.Info,
          contentDescription = null,
-         tint = Color(0xFF66C0F4),
+         tint = SteamColorPalette.Blue,
          modifier = Modifier.size(20.dp)
         )
         Text(
@@ -800,13 +792,13 @@ private fun SteamClientContent(
          style = MaterialTheme.typography.titleSmall.copy(
           fontWeight = FontWeight.Bold
          ),
-         color = Color(0xFF66C0F4)
+         color = SteamColorPalette.Blue
         )
        }
        Text(
         text = "• Download size: ~100MB\n• Install time: 2-3 minutes\n• First time requires Box64/Wine setup",
         style = MaterialTheme.typography.bodySmall,
-        color = Color(0xFF8F98A0),
+        color = SteamColorPalette.Gray,
         lineHeight = 20.sp
        )
       }
@@ -830,8 +822,8 @@ private fun SteamClientContent(
         .background(
          brush = Brush.linearGradient(
           colors = listOf(
-           Color(0xFF5BA82E),
-           Color(0xFF4A8F26)
+           SteamColorPalette.Green,
+           SteamColorPalette.Green.copy(alpha = 0.8f)
           )
          )
         ),
@@ -871,7 +863,7 @@ private fun SteamClientContent(
      ) {
       Surface(
        shape = RoundedCornerShape(12.dp),
-       color = Color(0xFF5BA82E).copy(alpha = 0.2f)
+       color = SteamColorPalette.Green.copy(alpha = 0.2f)
       ) {
        Icon(
         imageVector = Icons.Default.CheckCircle,
@@ -879,7 +871,7 @@ private fun SteamClientContent(
         modifier = Modifier
          .size(56.dp)
          .padding(12.dp),
-        tint = Color(0xFF5BA82E)
+        tint = SteamColorPalette.Green
        )
       }
       Column(modifier = Modifier.weight(1f)) {
@@ -893,7 +885,7 @@ private fun SteamClientContent(
        Text(
         text = "Installed",
         style = MaterialTheme.typography.bodyMedium,
-        color = Color(0xFF5BA82E)
+        color = SteamColorPalette.Green
        )
       }
      }
@@ -903,20 +895,20 @@ private fun SteamClientContent(
       modifier = Modifier
        .fillMaxWidth()
        .height(1.dp)
-       .background(Color(0xFF2A475E))
+       .background(SteamColorPalette.Medium)
      )
 
      // Install path
      Surface(
       shape = RoundedCornerShape(6.dp),
-      color = Color(0xFF2A475E).copy(alpha = 0.3f)
+      color = SteamColorPalette.Medium.copy(alpha = 0.3f)
      ) {
       Text(
        text = "Install path:\n${state.installPath}",
        style = MaterialTheme.typography.bodySmall.copy(
         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
        ),
-       color = Color(0xFF8F98A0),
+       color = SteamColorPalette.Gray,
        modifier = Modifier
         .fillMaxWidth()
         .padding(12.dp)
@@ -941,8 +933,8 @@ private fun SteamClientContent(
         .background(
          brush = Brush.linearGradient(
           colors = listOf(
-           Color(0xFF47BFFF),
-           Color(0xFF1A9FFF)
+           SteamColorPalette.BrightBlue,
+           SteamColorPalette.DeepBlue
           )
          )
         ),
@@ -973,9 +965,9 @@ private fun SteamClientContent(
       onClick = { onUninstall(state.containerId) },
       modifier = Modifier.fillMaxWidth(),
       colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-       contentColor = Color(0xFF8F98A0)
+       contentColor = SteamColorPalette.Gray
       ),
-      border = BorderStroke(1.dp, Color(0xFF8F98A0)),
+      border = BorderStroke(1.dp, SteamColorPalette.Gray),
       shape = RoundedCornerShape(4.dp)
      ) {
       Icon(
@@ -997,7 +989,7 @@ private fun SteamClientContent(
      ) {
       Surface(
        shape = RoundedCornerShape(12.dp),
-       color = Color(0xFFD32F2F).copy(alpha = 0.2f)
+       color = MaterialTheme.colorScheme.errorContainer
       ) {
        Icon(
         imageVector = Icons.Default.Warning,
@@ -1005,7 +997,7 @@ private fun SteamClientContent(
         modifier = Modifier
          .size(56.dp)
          .padding(12.dp),
-        tint = Color(0xFFFF6B6B)
+        tint = MaterialTheme.colorScheme.error
        )
       }
       Column(modifier = Modifier.weight(1f)) {
@@ -1014,12 +1006,12 @@ private fun SteamClientContent(
         style = MaterialTheme.typography.titleLarge.copy(
          fontWeight = FontWeight.Bold
         ),
-        color = Color(0xFFFF6B6B)
+        color = MaterialTheme.colorScheme.error
        )
        Text(
         text = "Installation Failed",
         style = MaterialTheme.typography.bodyMedium,
-        color = Color(0xFF8F98A0)
+        color = SteamColorPalette.Gray
        )
       }
      }
@@ -1029,13 +1021,13 @@ private fun SteamClientContent(
       modifier = Modifier
        .fillMaxWidth()
        .height(1.dp)
-       .background(Color(0xFF2A475E))
+       .background(SteamColorPalette.Medium)
      )
 
      // Error message
      Surface(
       shape = RoundedCornerShape(6.dp),
-      color = Color(0xFFD32F2F).copy(alpha = 0.15f)
+      color = MaterialTheme.colorScheme.errorContainer
      ) {
       Column(
        modifier = Modifier
@@ -1048,12 +1040,12 @@ private fun SteamClientContent(
         style = MaterialTheme.typography.titleSmall.copy(
          fontWeight = FontWeight.Bold
         ),
-        color = Color(0xFFFF6B6B)
+        color = MaterialTheme.colorScheme.error
        )
        Text(
         text = state.message,
         style = MaterialTheme.typography.bodyMedium,
-        color = Color(0xFFC7D5E0),
+        color = SteamColorPalette.LightText,
         lineHeight = 20.sp
        )
       }
@@ -1077,8 +1069,8 @@ private fun SteamClientContent(
         .background(
          brush = Brush.linearGradient(
           colors = listOf(
-           Color(0xFF47BFFF),
-           Color(0xFF1A9FFF)
+           SteamColorPalette.BrightBlue,
+           SteamColorPalette.DeepBlue
           )
          )
         ),
@@ -1507,11 +1499,11 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
     Text(
      text = "${(state.progress * 100).toInt()}% Complete",
      style = MaterialTheme.typography.bodyMedium,
-     color = Color(0xFF66C0F4)
+     color = SteamColorPalette.Blue
     )
    }
    CircularProgressIndicator(
-    color = Color(0xFF66C0F4),
+    color = SteamColorPalette.Blue,
     modifier = Modifier.size(40.dp)
    )
   }
@@ -1523,20 +1515,20 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
     modifier = Modifier
      .fillMaxWidth()
      .height(8.dp),
-    color = Color(0xFF66C0F4),
-    trackColor = Color(0xFF2A475E),
+    color = SteamColorPalette.Blue,
+    trackColor = SteamColorPalette.Medium,
    )
    Text(
     text = state.message,
     style = MaterialTheme.typography.bodyMedium,
-    color = Color(0xFFC7D5E0)
+    color = SteamColorPalette.LightText
    )
   }
 
   // Info box
   Surface(
    shape = RoundedCornerShape(6.dp),
-   color = Color(0xFF2A475E).copy(alpha = 0.5f)
+   color = SteamColorPalette.Medium.copy(alpha = 0.5f)
   ) {
    Column(
     modifier = Modifier
@@ -1551,7 +1543,7 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
      Icon(
       imageVector = Icons.Default.Info,
       contentDescription = null,
-      tint = Color(0xFF66C0F4),
+      tint = SteamColorPalette.Blue,
       modifier = Modifier.size(20.dp)
      )
      Text(
@@ -1559,7 +1551,7 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
       style = MaterialTheme.typography.titleSmall.copy(
        fontWeight = FontWeight.Bold
       ),
-      color = Color(0xFF66C0F4)
+      color = SteamColorPalette.Blue
      )
     }
 
@@ -1570,7 +1562,7 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
       "Running Steam installer.\nPlease wait for completion."
      },
      style = MaterialTheme.typography.bodySmall,
-     color = Color(0xFF8F98A0),
+     color = SteamColorPalette.Gray,
      lineHeight = 20.sp
     )
    }
@@ -1579,7 +1571,7 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
   // Warning
   Surface(
    shape = RoundedCornerShape(6.dp),
-   color = Color(0xFFD32F2F).copy(alpha = 0.15f)
+   color = MaterialTheme.colorScheme.errorContainer
   ) {
    Row(
     modifier = Modifier
@@ -1591,7 +1583,7 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
     Icon(
      imageVector = Icons.Default.Warning,
      contentDescription = null,
-     tint = Color(0xFFFF6B6B),
+     tint = MaterialTheme.colorScheme.error,
      modifier = Modifier.size(20.dp)
     )
     Text(
@@ -1599,7 +1591,7 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
      style = MaterialTheme.typography.bodySmall.copy(
       fontWeight = FontWeight.Bold
      ),
-     color = Color(0xFFFF6B6B)
+     color = MaterialTheme.colorScheme.error
     )
    }
   }

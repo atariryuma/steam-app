@@ -265,4 +265,32 @@
     <string name="controller_tap_to_create">Tap \"New Profile\" to create one</string>
     <string name="controller_delete_profile_title">Delete Profile</string>
     <string name="controller_edit_profile_title">Edit Profile: %1$s</string>
+
+    <!-- Steam Download/Install UI -->
+    <string name="game_status_not_installed">Not Installed</string>
+    <string name="game_status_downloading">Downloading via Steam</string>
+    <string name="game_status_installing">Installing</string>
+    <string name="game_status_installed">Ready to Play</string>
+    <string name="game_status_validation_failed">Installation Error</string>
+    <string name="game_status_update_required">Update Required</string>
+    <string name="game_status_update_paused">Update Paused</string>
+
+    <string name="button_download_via_steam">Download via Steam</string>
+    <string name="button_initiating_download">Starting Download…</string>
+    <string name="button_retry_download">Retry Download</string>
+
+    <string name="download_progress_text">%1$d%%</string>
+    <string name="install_progress_text">Installing… %1$d%%</string>
+
+    <string name="validation_error_executable_not_found">Game executable not found at:\n%1$s</string>
+    <string name="validation_error_manifest_not_found">Steam manifest file not found. Game may not be installed via Steam.</string>
+    <string name="validation_error_state_flags_not_ready">Game is %1$s. Please wait for installation to complete.</string>
+    <string name="validation_error_missing_dll">Missing required DLL: %1$s\nPlease install Visual C++ Redistributable.</string>
+
+    <string name="dialog_validation_error_title">Cannot Launch Game</string>
+    <string name="button_rescan">Rescan</string>
+    <string name="button_open_steam">Open Steam</string>
+
+    <string name="install_complete_notification">%1$s is ready to play!</string>
+    <string name="install_monitoring_notification">Monitoring installation…</string>
 </resources>

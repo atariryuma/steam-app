@@ -92,6 +92,17 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
+  * Get Steam container ID (the container where Steam client is installed)
+  * Returns null if Steam is not installed
+  */
+ fun getSteamContainerId(): Long? {
+  return when (val state = _steamInstallState.value) {
+   is SteamInstallState.Installed -> state.containerId.toLongOrNull()
+   else -> null
+  }
+ }
+
+ /**
   * settingsデータロード
   *
   * Note: ユーザー 自身 Steam Web API Key登録do必要 あります
@@ -154,11 +165,19 @@ class SettingsViewModel @Inject constructor(
     return@launch
    }
 
+   // Get Steam container ID (where Steam client is installed)
+   val containerId = getSteamContainerId()
+   if (containerId == null) {
+    AppLogger.w(TAG, "Sync attempted without Steam container")
+    _syncState.value = SyncState.Error("Steam not installed. Please install Steam first.")
+    return@launch
+   }
+
    _syncState.value = SyncState.Syncing(progress = 0f, message = "Starting sync...")
-   AppLogger.i(TAG, "Starting library sync for Steam ID: $steamId")
+   AppLogger.i(TAG, "Starting library sync for Steam ID: $steamId, Container ID: $containerId")
 
    // DataResult<Int>useした型安全なErrorハンドリング
-   when (val result = syncSteamLibraryUseCase(steamId)) {
+   when (val result = syncSteamLibraryUseCase(steamId, containerId)) {
     is DataResult.Success -> {
      val syncedCount = result.data
      securePreferences.setLastSyncTimestamp(System.currentTimeMillis())
@@ -224,7 +243,7 @@ class SettingsViewModel @Inject constructor(
     securePreferences.clearSteamSettings()
     loadSettings()
     _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
-     successMessage = "Steamsettingsクリアしました"
+     successMessage = context.getString(com.steamdeck.mobile.R.string.success_steam_settings_cleared)
     ) ?: SettingsUiState.Loading
    } catch (e: Exception) {
     _uiState.value = SettingsUiState.Error("クリア failed: ${e.message}")
@@ -331,9 +350,9 @@ class SettingsViewModel @Inject constructor(
     result
      .onSuccess {
       AppLogger.i(TAG, "Steam Client opened successfully")
-      // Steam Client launchしたこ ユーザー 通知
+      // Steam Client launched - notify user
       _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
-       successMessage = "Steam Clientlaunchしました"
+       successMessage = context.getString(com.steamdeck.mobile.R.string.success_steam_client_launched)
       ) ?: SettingsUiState.Loading
      }
      .onFailure { error ->
@@ -345,7 +364,7 @@ class SettingsViewModel @Inject constructor(
 
    } catch (e: Exception) {
     _steamInstallState.value = SteamInstallState.Error(
-     "Steam Clientlaunchin 予期しないError 発生しました: ${e.message}"
+     context.getString(com.steamdeck.mobile.R.string.error_steam_client_launch_unexpected, e.message ?: "Unknown error")
     )
     AppLogger.e(TAG, "Exception while opening Steam Client", e)
    }
@@ -362,10 +381,10 @@ class SettingsViewModel @Inject constructor(
    try {
     AppLogger.i(TAG, "Uninstalling Steam Client for container: $containerId")
 
-    // 将来的 実際 アンinstallation処理実装
-    // 現時点 データベース 状態クリア
+    // TODO: Implement actual uninstallation logic
+    // Currently just clears database state
     _steamInstallState.value = SteamInstallState.NotInstalled(
-     "Steam Client アンinstallationされました"
+     context.getString(com.steamdeck.mobile.R.string.success_steam_uninstalled)
     )
 
     AppLogger.i(TAG, "Steam Client uninstalled (placeholder)")

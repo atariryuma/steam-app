@@ -2,6 +2,7 @@ package com.steamdeck.mobile.domain.repository
 
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.model.GameSource
+import com.steamdeck.mobile.domain.model.InstallationStatus
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -72,4 +73,33 @@ interface GameRepository {
   * all gamedelete
   */
  suspend fun deleteAllGames()
+
+ /**
+  * Update game installation status
+  *
+  * @param gameId Game ID
+  * @param status Installation status (NOT_INSTALLED, DOWNLOADING, INSTALLING, INSTALLED, etc.)
+  * @param progress Installation progress (0-100)
+  */
+ suspend fun updateInstallationStatus(
+  gameId: Long,
+  status: InstallationStatus,
+  progress: Int = 0
+ )
+
+ /**
+  * Observe game installation status changes
+  *
+  * @param gameId Game ID
+  * @return Flow of game updates
+  */
+ fun observeGame(gameId: Long): Flow<Game?>
+
+ /**
+  * Get games by installation status
+  *
+  * @param status Installation status filter
+  * @return Flow of games matching the status
+  */
+ fun getGamesByInstallationStatus(status: InstallationStatus): Flow<List<Game>>
 }

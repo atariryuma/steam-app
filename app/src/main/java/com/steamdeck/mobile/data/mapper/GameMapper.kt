@@ -2,6 +2,7 @@ package com.steamdeck.mobile.data.mapper
 
 import com.steamdeck.mobile.data.local.database.entity.GameEntity
 import com.steamdeck.mobile.domain.model.Game
+import com.steamdeck.mobile.domain.model.InstallationStatus
 import com.steamdeck.mobile.domain.model.GameSource as DomainGameSource
 import com.steamdeck.mobile.data.local.database.entity.GameSource as EntityGameSource
 
@@ -26,7 +27,10 @@ object GameMapper {
    iconPath = entity.iconPath,
    bannerPath = entity.bannerPath,
    addedTimestamp = entity.addedTimestamp,
-   isFavorite = entity.isFavorite
+   isFavorite = entity.isFavorite,
+   installationStatus = InstallationStatus.valueOf(entity.installationStatus),
+   installProgress = entity.installProgress,
+   statusUpdatedTimestamp = entity.statusUpdatedTimestamp
   )
  }
 
@@ -47,7 +51,10 @@ object GameMapper {
    iconPath = domain.iconPath,
    bannerPath = domain.bannerPath,
    addedTimestamp = domain.addedTimestamp,
-   isFavorite = domain.isFavorite
+   isFavorite = domain.isFavorite,
+   installationStatus = domain.installationStatus.name,
+   installProgress = domain.installProgress,
+   statusUpdatedTimestamp = domain.statusUpdatedTimestamp
   )
  }
 

@@ -51,8 +51,8 @@ class SteamLauncher @Inject constructor(
     )
    }
 
-   // 2. Build Steam.exe path
-   val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/steam.exe")
+   // 2. Build Steam.exe path (case-sensitive on Android)
+   val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/Steam.exe")
 
    if (!steamExe.exists()) {
     return@withContext Result.failure(
@@ -119,8 +119,8 @@ class SteamLauncher @Inject constructor(
      )
     }
 
-    // 2. Build Steam.exe path
-    val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/steam.exe")
+    // 2. Build Steam.exe path (case-sensitive on Android)
+    val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/Steam.exe")
 
     if (!steamExe.exists()) {
      return@withContext Result.failure(

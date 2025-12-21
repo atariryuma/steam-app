@@ -9,10 +9,14 @@ import com.steamdeck.mobile.core.result.DataResult
 import com.steamdeck.mobile.core.steam.SteamLauncher
 import com.steamdeck.mobile.core.steam.SteamSetupManager
 import com.steamdeck.mobile.domain.model.Game
+import com.steamdeck.mobile.domain.model.InstallationStatus
+import com.steamdeck.mobile.domain.repository.GameRepository
 import com.steamdeck.mobile.domain.usecase.DeleteGameUseCase
 import com.steamdeck.mobile.domain.usecase.GetGameByIdUseCase
 import com.steamdeck.mobile.domain.usecase.LaunchGameUseCase
+import com.steamdeck.mobile.domain.usecase.ScanInstalledGamesUseCase
 import com.steamdeck.mobile.domain.usecase.ToggleFavoriteUseCase
+import com.steamdeck.mobile.domain.usecase.TriggerGameDownloadUseCase
 import com.steamdeck.mobile.presentation.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -39,7 +43,9 @@ class GameDetailViewModel @Inject constructor(
  private val deleteGameUseCase: DeleteGameUseCase,
  private val steamLauncher: SteamLauncher,
  private val steamSetupManager: SteamSetupManager,
- private val scanInstalledGamesUseCase: com.steamdeck.mobile.domain.usecase.ScanInstalledGamesUseCase
+ private val scanInstalledGamesUseCase: ScanInstalledGamesUseCase,
+ private val triggerGameDownloadUseCase: TriggerGameDownloadUseCase,
+ private val gameRepository: GameRepository
 ) : ViewModel() {
 
  companion object {
@@ -376,6 +382,95 @@ class GameDetailViewModel @Inject constructor(
   }
  }
 
+ /**
+  * Trigger game download via Steam Client
+  *
+  * NEW 2025: Automatic download/install through Wine Steam client
+  * - Starts FileObserver monitoring service
+  * - Launches steam.exe -applaunch <appId> (auto-triggers download)
+  * - Monitors installation progress in real-time
+  */
+ fun triggerGameDownload(gameId: Long) {
+  viewModelScope.launch {
+   try {
+    _steamLaunchState.value = SteamLaunchState.InitiatingDownload
+    AppLogger.i(TAG, "Triggering game download for gameId=$gameId")
+
+    when (val result = triggerGameDownloadUseCase(gameId)) {
+     is DataResult.Success -> {
+      _steamLaunchState.value = SteamLaunchState.Downloading(0)
+      AppLogger.i(TAG, "Download initiated successfully")
+
+      // Start observing installation progress
+      observeInstallationProgress(gameId)
+     }
+     is DataResult.Error -> {
+      val errorMessage = result.error.toUserMessage(context)
+      _steamLaunchState.value = SteamLaunchState.Error(errorMessage)
+      AppLogger.e(TAG, "Failed to trigger download: $errorMessage")
+     }
+     is DataResult.Loading -> {
+      // Handled by InitiatingDownload state
+     }
+    }
+
+   } catch (e: Exception) {
+    _steamLaunchState.value = SteamLaunchState.Error(
+     e.message ?: "An unexpected error occurred while starting download"
+    )
+    AppLogger.e(TAG, "Exception during download trigger", e)
+   }
+  }
+ }
+
+ /**
+  * Observe installation progress in real-time
+  *
+  * NEW 2025: Monitors game installation status via Flow
+  * Updates UI with download/install progress
+  */
+ private fun observeInstallationProgress(gameId: Long) {
+  viewModelScope.launch {
+   try {
+    gameRepository.observeGame(gameId).collect { game ->
+     if (game == null) {
+      AppLogger.w(TAG, "Game not found during progress monitoring")
+      return@collect
+     }
+
+     AppLogger.d(TAG, "Installation status: ${game.installationStatus}, progress: ${game.installProgress}%")
+
+     when (game.installationStatus) {
+      InstallationStatus.DOWNLOADING -> {
+       _steamLaunchState.value = SteamLaunchState.Downloading(game.installProgress)
+      }
+      InstallationStatus.INSTALLING -> {
+       _steamLaunchState.value = SteamLaunchState.Installing(game.installProgress)
+      }
+      InstallationStatus.INSTALLED -> {
+       _steamLaunchState.value = SteamLaunchState.InstallComplete(game.name)
+       AppLogger.i(TAG, "Game installation complete: ${game.name}")
+
+       // Reload game information
+       loadGame(gameId)
+      }
+      InstallationStatus.VALIDATION_FAILED -> {
+       _steamLaunchState.value = SteamLaunchState.ValidationFailed(
+        listOf("Installation validation failed. Please check game files.")
+       )
+      }
+      else -> {
+       // Other statuses (NOT_INSTALLED, UPDATE_REQUIRED, etc.)
+       // No UI update needed
+      }
+     }
+    }
+   } catch (e: Exception) {
+    AppLogger.e(TAG, "Exception during installation progress monitoring", e)
+   }
+  }
+ }
+
 }
 
 /**
@@ -424,6 +519,8 @@ sealed class LaunchState {
 
 /**
  * Steam Client launch state
+ *
+ * Added 2025: Download/Install progress tracking
  */
 @Immutable
 sealed class SteamLaunchState {
@@ -434,6 +531,26 @@ sealed class SteamLaunchState {
  /** Checking installation */
  @Immutable
  data object CheckingInstallation : SteamLaunchState()
+
+ /** Initiating download */
+ @Immutable
+ data object InitiatingDownload : SteamLaunchState()
+
+ /** Downloading game files */
+ @Immutable
+ data class Downloading(val progress: Int) : SteamLaunchState()
+
+ /** Installing/extracting game files */
+ @Immutable
+ data class Installing(val progress: Int) : SteamLaunchState()
+
+ /** Installation complete */
+ @Immutable
+ data class InstallComplete(val gameName: String) : SteamLaunchState()
+
+ /** Validation failed (missing DLLs, corrupt files, etc.) */
+ @Immutable
+ data class ValidationFailed(val errors: List<String>) : SteamLaunchState()
 
  /** Launching */
  @Immutable

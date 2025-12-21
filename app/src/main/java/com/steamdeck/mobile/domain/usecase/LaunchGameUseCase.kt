@@ -23,12 +23,14 @@ import javax.inject.Inject
  * - DataResult<T> for type-safe error handling
  * - AppLogger for centralized logging
  * - Process monitoring for accurate play time tracking
+ * - Pre-launch validation (executable, Steam manifest, DLLs)
  */
 class LaunchGameUseCase @Inject constructor(
  private val gameRepository: GameRepository,
  private val containerRepository: WinlatorContainerRepository,
  private val winlatorEngine: WinlatorEngine,
- private val windowsEmulator: WindowsEmulator
+ private val windowsEmulator: WindowsEmulator,
+ private val validateGameInstallationUseCase: ValidateGameInstallationUseCase
 ) {
  // Background scope for process monitoring (survives ViewModel lifecycle)
  private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -52,13 +54,16 @@ class LaunchGameUseCase @Inject constructor(
 
    AppLogger.i(TAG, "Launching game: ${game.name} (ID: $gameId)")
 
-   // Best Practice (2025): Validate game installation before launch
-   // Prevents crashes from missing executables
-   val validationError = validateGameInstallation(game)
-   if (validationError != null) {
-    AppLogger.e(TAG, "Game installation validation failed: $validationError")
+   // Best Practice (2025): Comprehensive 3-level validation before launch
+   // 1. Executable file exists
+   // 2. Steam manifest StateFlags = 4 (fully installed)
+   // 3. Required DLLs present
+   val validationResult = validateGameInstallationUseCase(gameId)
+   if (validationResult is DataResult.Success && !validationResult.data.isValid) {
+    val errorMessage = validationResult.data.getUserMessage() ?: "Game installation validation failed"
+    AppLogger.e(TAG, "Game installation validation failed: $errorMessage")
     return DataResult.Error(
-     AppError.FileError(validationError, null)
+     AppError.FileError(errorMessage, null)
     )
    }
 
@@ -148,57 +153,6 @@ class LaunchGameUseCase @Inject constructor(
      }
     }
   }
- }
-
- /**
-  * Validate game installation status
-  *
-  * Best Practice (2025):
-  * - Check executable file exists
-  * - Check installation path exists
-  * - Verify Steam AppManifest (when launching via Steam)
-  *
-  * @param game Game information
-  * @return Error message (null if no issues)
-  */
- private fun validateGameInstallation(game: com.steamdeck.mobile.domain.model.Game): String? {
-  // 1. Check if executable file path is not blank
-  if (game.executablePath.isBlank()) {
-   return "Executable file is not configured.\nPlease install the game before launching."
-  }
-
-  // 2. Check if executable file exists
-  val executableFile = java.io.File(game.executablePath)
-  if (!executableFile.exists()) {
-   return "Executable file not found:\n${game.executablePath}\n\nThe game may not be installed correctly."
-  }
-
-  // 3. Check if executable file is a regular file (not a directory)
-  if (!executableFile.isFile) {
-   return "Executable file is invalid (directory or special file):\n${game.executablePath}"
-  }
-
-  // 4. Check if installation path exists
-  val installDir = java.io.File(game.installPath)
-  if (!installDir.exists()) {
-   return "Installation directory not found:\n${game.installPath}\n\nPlease reinstall the game."
-  }
-
-  // 5. Check if installation path is a directory
-  if (!installDir.isDirectory) {
-   return "Installation path is invalid (not a directory):\n${game.installPath}"
-  }
-
-  // 6. For Steam games, additional validation (optional - for future extension)
-  if (game.source == com.steamdeck.mobile.domain.model.GameSource.STEAM && game.steamAppId != null) {
-   // TODO: Verify Steam AppManifest (future implementation)
-   // Example: Check if C:/Steam/steamapps/appmanifest_${steamAppId}.acf exists
-   AppLogger.d(TAG, "Steam game detected (AppID: ${game.steamAppId}) - additional validation possible in future")
-  }
-
-  // All validation passed
-  AppLogger.d(TAG, "Game installation validation passed for: ${game.name}")
-  return null
  }
 
  companion object {

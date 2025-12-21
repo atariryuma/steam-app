@@ -1,9 +1,11 @@
 package com.steamdeck.mobile.presentation.ui.home
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -17,8 +19,11 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -32,6 +37,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -45,6 +52,7 @@ import coil.compose.AsyncImage
 import com.steamdeck.mobile.R
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.model.GameSource
+import com.steamdeck.mobile.presentation.ui.common.AnimationDefaults
 import com.steamdeck.mobile.presentation.viewmodel.HomeUiState
 import com.steamdeck.mobile.presentation.viewmodel.HomeViewModel
 import kotlinx.coroutines.launch
@@ -81,7 +89,7 @@ private object HomeScreenDefaults {
  * - https://developer.android.com/develop/ui/compose/system/system-bars
  * - https://m3.material.io/components/navigation-drawer/guidelines
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
  onGameClick: (Long) -> Unit,
@@ -94,6 +102,11 @@ fun HomeScreen(
  var showAddGameDialog by remember { mutableStateOf(showAddGameDialogInitially) }
  var executableUri by remember { mutableStateOf<Uri?>(null) }
  var installFolderUri by remember { mutableStateOf<Uri?>(null) }
+
+ // BackHandler for dialog (Steam Big Picture style)
+ BackHandler(enabled = showAddGameDialog) {
+  showAddGameDialog = false
+ }
 
  val executableLauncher = rememberLauncherForActivityResult(
   contract = ActivityResultContracts.OpenDocument()
@@ -141,14 +154,8 @@ fun HomeScreen(
 
   AnimatedVisibility(
    visible = showAddGameDialog,
-   enter = fadeIn(animationSpec = tween(150)) + scaleIn(
-    initialScale = 0.9f,
-    animationSpec = tween(150, easing = FastOutSlowInEasing)
-   ),
-   exit = fadeOut(animationSpec = tween(100)) + scaleOut(
-    targetScale = 0.9f,
-    animationSpec = tween(100)
-   )
+   enter = AnimationDefaults.DialogEnter,
+   exit = AnimationDefaults.DialogExit
   ) {
    AddGameDialog(
     onDismiss = { showAddGameDialog = false },
@@ -291,18 +298,9 @@ fun HomeTopBar(
     fontWeight = FontWeight.Bold
    )
   },
-  navigationIcon = {
-   IconButton(onClick = onMenuClick) {
-    Icon(
-     imageVector = Icons.Default.Menu,
-     contentDescription = stringResource(R.string.content_desc_menu)
-    )
-   }
-  },
   colors = TopAppBarDefaults.topAppBarColors(
    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-   titleContentColor = MaterialTheme.colorScheme.primary,
-   navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+   titleContentColor = MaterialTheme.colorScheme.primary
   )
  )
 }
@@ -431,7 +429,8 @@ fun NavigationDrawerContent(
  onAddGame: () -> Unit,
  currentRoute: String,
  isCollapsed: Boolean = false,
- onExpandDrawer: () -> Unit = {}
+ onExpandDrawer: () -> Unit = {},
+ onCloseDrawer: () -> Unit = {}
 ) {
  // Icon-only collapsed mode (80.dp width)
  if (isCollapsed) {
@@ -564,11 +563,11 @@ fun NavigationDrawerContent(
    .verticalScroll(rememberScrollState())
    .padding(vertical = 16.dp)
  ) {
-  // Drawer header
+  // Drawer header with close button
   Row(
    modifier = Modifier
     .fillMaxWidth()
-    .padding(horizontal = 28.dp, vertical = 16.dp),
+    .padding(horizontal = 20.dp, vertical = 16.dp),
    verticalAlignment = Alignment.CenterVertically,
    horizontalArrangement = Arrangement.spacedBy(12.dp)
   ) {
@@ -581,8 +580,17 @@ fun NavigationDrawerContent(
    Text(
     text = stringResource(R.string.app_name),
     style = MaterialTheme.typography.titleLarge,
-    fontWeight = FontWeight.Bold
+    fontWeight = FontWeight.Bold,
+    modifier = Modifier.weight(1f)
    )
+   // Close drawer button (Steam Big Picture style)
+   IconButton(onClick = onCloseDrawer) {
+    Icon(
+     imageVector = Icons.Default.Close,
+     contentDescription = "Close menu",
+     tint = MaterialTheme.colorScheme.onSurface
+    )
+   }
   }
 
   HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -711,6 +719,7 @@ fun NavigationDrawerContent(
  * Best Practice: Stable keys for efficient recomposition
  * Uses @StringRes for localization support
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GameSection(
  @androidx.annotation.StringRes titleRes: Int,
@@ -775,10 +784,26 @@ fun GameCard(
  onToggleFavorite: () -> Unit,
  modifier: Modifier = Modifier
 ) {
+ // Focus state for controller/keyboard support
+ var isFocused by remember { mutableStateOf(false) }
+ val scale by animateFloatAsState(
+  targetValue = if (isFocused) 1.03f else 1.0f,
+  animationSpec = tween(300, easing = FastOutSlowInEasing),
+  label = "cardScale"
+ )
+
  Card(
   modifier = modifier
    .width(HomeScreenDefaults.GameCardWidth)
    .height(HomeScreenDefaults.GameCardHeight)
+   .scale(scale)
+   .border(
+    width = if (isFocused) 2.dp else 0.dp,
+    color = Color.White,
+    shape = MaterialTheme.shapes.large
+   )
+   .focusable()
+   .onFocusChanged { isFocused = it.isFocused }
    .clickable(onClick = onClick),
   shape = MaterialTheme.shapes.large,
   elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)

@@ -4,6 +4,7 @@ import com.steamdeck.mobile.data.local.database.dao.GameDao
 import com.steamdeck.mobile.data.mapper.GameMapper
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.model.GameSource
+import com.steamdeck.mobile.domain.model.InstallationStatus
 import com.steamdeck.mobile.domain.repository.GameRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -87,5 +88,30 @@ class GameRepositoryImpl @Inject constructor(
 
  override suspend fun deleteAllGames() {
   gameDao.deleteAllGames()
+ }
+
+ override suspend fun updateInstallationStatus(
+  gameId: Long,
+  status: InstallationStatus,
+  progress: Int
+ ) {
+  gameDao.updateInstallationStatus(
+   gameId = gameId,
+   status = status.name,
+   progress = progress,
+   timestamp = System.currentTimeMillis()
+  )
+ }
+
+ override fun observeGame(gameId: Long): Flow<Game?> {
+  return gameDao.observeGame(gameId).map { entity ->
+   entity?.let { GameMapper.toDomain(it) }
+  }
+ }
+
+ override fun getGamesByInstallationStatus(status: InstallationStatus): Flow<List<Game>> {
+  return gameDao.getGamesByInstallationStatus(status.name).map { entities ->
+   GameMapper.toDomainList(entities)
+  }
  }
 }

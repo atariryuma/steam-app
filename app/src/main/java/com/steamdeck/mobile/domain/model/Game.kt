@@ -31,36 +31,39 @@ data class Game(
  val iconPath: String? = null,
  val bannerPath: String? = null,
  val addedTimestamp: Long = System.currentTimeMillis(),
- val isFavorite: Boolean = false
+ val isFavorite: Boolean = false,
+ val installationStatus: InstallationStatus = InstallationStatus.NOT_INSTALLED,
+ val installProgress: Int = 0,
+ val statusUpdatedTimestamp: Long? = null
 ) {
  /**
-  * play time時間単位 retrieve
+  * Get play time in hours
   */
  val playTimeHours: Double
   get() = playTimeMinutes / 60.0
 
  /**
-  * play time人間 読み すい形式 retrieve
+  * Get play time in human-readable format
   * Example: "2h 30m", "45m"
   */
  val playTimeFormatted: String
   get() {
-   if (playTimeMinutes == 0L) return "未プレイ"
+   if (playTimeMinutes == 0L) return "Not played"
    val hours = playTimeMinutes / 60
    val minutes = playTimeMinutes % 60
    return when {
-    hours > 0 && minutes > 0 -> "${hours}時間${minutes}minutes"
-    hours > 0 -> "${hours}時間"
-    else -> "${minutes}minutes"
+    hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
+    hours > 0 -> "${hours}h"
+    else -> "${minutes}m"
    }
   }
 
  /**
-  * 最終プレイdate and time人間 読み すい形式 retrieve
+  * Get last played timestamp in human-readable format
   */
  val lastPlayedFormatted: String
   get() {
-   if (lastPlayedTimestamp == null) return "プレイ履歴なし"
+   if (lastPlayedTimestamp == null) return "Never played"
    val now = System.currentTimeMillis()
    val diff = now - lastPlayedTimestamp
    val days = diff / (1000 * 60 * 60 * 24)
@@ -68,9 +71,9 @@ data class Game(
    val minutes = diff / (1000 * 60)
 
    return when {
-    minutes < 60 -> "${minutes}minutes前"
-    hours < 24 -> "${hours}時間前"
-    days < 30 -> "${days}日前"
+    minutes < 60 -> "${minutes}m ago"
+    hours < 24 -> "${hours}h ago"
+    days < 30 -> "${days}d ago"
     else -> {
      val date = java.text.SimpleDateFormat("yyyy/MM/dd", java.util.Locale.JAPAN)
       .format(java.util.Date(lastPlayedTimestamp))

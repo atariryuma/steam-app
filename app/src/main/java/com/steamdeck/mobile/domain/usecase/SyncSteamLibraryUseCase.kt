@@ -42,9 +42,10 @@ class SyncSteamLibraryUseCase @Inject constructor(
   * Steamlibrary sync
   *
   * @param steamId Steam ID (from QR authentication)
+  * @param steamContainerId Steam container ID (where Steam client is installed)
   * @return 同期result（successしたcase 同期されたgame数）
   */
- suspend operator fun invoke(steamId: String): DataResult<Int> {
+ suspend operator fun invoke(steamId: String, steamContainerId: Long): DataResult<Int> {
   return try {
    // API Keyretrieve（必須: ユーザー自身 API Key）
    val apiKey = securePreferences.getSteamApiKey()
@@ -88,7 +89,9 @@ class SyncSteamLibraryUseCase @Inject constructor(
        // Convert to domain model with image paths
        val game = SteamGameMapper.toDomain(steamGame).copy(
         iconPath = iconPath,
-        bannerPath = bannerPath
+        bannerPath = bannerPath,
+        // Automatically assign Steam container ID to enable download functionality
+        winlatorContainerId = steamContainerId
        )
 
        // gameDB add

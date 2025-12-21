@@ -101,10 +101,10 @@ object DownloadMapper {
  private fun EntityInstallationStatus.toDomain(): DomainInstallationStatus {
   return when (this) {
    EntityInstallationStatus.NOT_INSTALLED -> DomainInstallationStatus.NOT_INSTALLED
-   EntityInstallationStatus.PENDING -> DomainInstallationStatus.PENDING
+   EntityInstallationStatus.PENDING -> DomainInstallationStatus.INSTALLING // Map PENDING to INSTALLING
    EntityInstallationStatus.INSTALLING -> DomainInstallationStatus.INSTALLING
    EntityInstallationStatus.INSTALLED -> DomainInstallationStatus.INSTALLED
-   EntityInstallationStatus.FAILED -> DomainInstallationStatus.FAILED
+   EntityInstallationStatus.FAILED -> DomainInstallationStatus.VALIDATION_FAILED // Map FAILED to VALIDATION_FAILED
   }
  }
 
@@ -114,10 +114,12 @@ object DownloadMapper {
  private fun DomainInstallationStatus.toEntity(): EntityInstallationStatus {
   return when (this) {
    DomainInstallationStatus.NOT_INSTALLED -> EntityInstallationStatus.NOT_INSTALLED
-   DomainInstallationStatus.PENDING -> EntityInstallationStatus.PENDING
+   DomainInstallationStatus.DOWNLOADING -> EntityInstallationStatus.PENDING // Map DOWNLOADING to PENDING
    DomainInstallationStatus.INSTALLING -> EntityInstallationStatus.INSTALLING
    DomainInstallationStatus.INSTALLED -> EntityInstallationStatus.INSTALLED
-   DomainInstallationStatus.FAILED -> EntityInstallationStatus.FAILED
+   DomainInstallationStatus.VALIDATION_FAILED -> EntityInstallationStatus.FAILED // Map VALIDATION_FAILED to FAILED
+   DomainInstallationStatus.UPDATE_REQUIRED -> EntityInstallationStatus.NOT_INSTALLED // Map UPDATE_REQUIRED to NOT_INSTALLED
+   DomainInstallationStatus.UPDATE_PAUSED -> EntityInstallationStatus.PENDING // Map UPDATE_PAUSED to PENDING
   }
  }
 }

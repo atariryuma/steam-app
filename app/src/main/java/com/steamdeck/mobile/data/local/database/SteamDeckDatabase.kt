@@ -28,6 +28,11 @@ import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
  * Version 7 changes:
  * - Added indexes on DownloadEntity (gameId, status, installationStatus)
  * (faster download queries and UI responsiveness)
+ *
+ * Version 8 changes:
+ * - Added installation status tracking to GameEntity
+ * (installationStatus, installProgress, statusUpdatedTimestamp)
+ * (enables real-time Steam game download/install progress tracking)
  */
 @Database(
  entities = [
@@ -37,7 +42,7 @@ import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
   ControllerProfileEntity::class,
   SteamInstallEntity::class
  ],
- version = 7,
+ version = 8,
  exportSchema = true
 )
 @TypeConverters(Converters::class)

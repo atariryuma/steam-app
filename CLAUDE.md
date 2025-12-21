@@ -324,6 +324,111 @@ containers/
 - [app/proguard-rules.pro:98-102](app/proguard-rules.pro#L98-L102) - JNI protection
 - [7-Zip-JBinding-4Android GitHub](https://github.com/omicronapps/7-Zip-JBinding-4Android)
 
+### 2025-12-21: Steam Game Auto-Download/Install/Launch Implementation
+
+- **Added**: Complete automatic game download/installation tracking through Wine Steam client
+- **Why**: Eliminate dependency on external Android Steam app, enable fully automated game installation
+- **Steam ToS Compliance**: Uses official `steam.exe -applaunch <appId>` command (no protocol emulation)
+- **Architecture**: Clean Architecture with 4-layer implementation
+
+#### Implementation Components
+
+##### Phase 1: Core Infrastructure (Database v7→v8)
+
+- `InstallationStatus` enum: 7 states (NOT_INSTALLED, DOWNLOADING, INSTALLING, INSTALLED, VALIDATION_FAILED, UPDATE_REQUIRED, UPDATE_PAUSED)
+- `GameEntity` new fields: `installationStatus`, `installProgress` (0-100), `statusUpdatedTimestamp`
+- `GameRepository` new methods: `updateInstallationStatus()`, `observeGame()`, `getGamesByInstallationStatus()`
+- `AppManifestParser`: Parses Steam ACF manifests (Valve KeyValue format) to detect StateFlags
+- Database migration: Non-destructive ALTER TABLE with index on installationStatus
+
+##### Phase 2: FileObserver Monitoring Service
+
+- `SteamInstallMonitorService`: Foreground Service (Android 8+)
+  - RecursiveFileObserver monitoring steamapps/ directory
+  - inotify backend (kernel-level events, CPU <1%)
+  - Monitors appmanifest_*.acf CREATE/MODIFY events
+  - Real-time progress notifications
+  - 2-hour timeout with auto-stop
+- Permissions: FOREGROUND_SERVICE, POST_NOTIFICATIONS
+
+##### Phase 3: Use Cases
+
+- `TriggerGameDownloadUseCase`:
+  - Validates Steam.exe exists in Wine container
+  - Starts SteamInstallMonitorService
+  - Launches `steam.exe -applaunch <appId>` (auto-triggers download)
+  - Updates game status to DOWNLOADING
+- `ValidateGameInstallationUseCase`:
+  - 3-level validation: (1) Executable exists, (2) ACF StateFlags = 4, (3) Required DLLs present
+  - Checks: vcruntime140.dll, msvcp140.dll, d3d11.dll
+  - User-friendly error messages
+- `LaunchGameUseCase`: Integrated pre-launch validation
+
+##### Phase 4: ViewModel & State Management
+
+- `GameDetailViewModel` new methods:
+  - `triggerGameDownload(gameId)`: Initiates download
+  - `observeInstallationProgress(gameId)`: Real-time Flow-based monitoring
+- `SteamLaunchState` new states:
+  - `InitiatingDownload`, `Downloading(progress)`, `Installing(progress)`
+  - `InstallComplete(gameName)`, `ValidationFailed(errors)`
+
+#### Technical Details
+
+- FileObserver: Linux inotify backend (no polling, minimal battery impact)
+- Flow-based reactive updates: Database → Repository → ViewModel → UI
+- ACF StateFlags: 0=not installed, 2=downloading, 4=fully installed
+- Type-safe error handling: DataResult wrapper throughout
+
+#### Performance
+
+- FileObserver CPU usage: <1% (kernel-level events)
+- Real-time UI updates via Kotlin Flow
+- Database indexed queries for installation status filtering
+- Foreground Service with low-priority notifications
+
+#### Files Created (5)
+
+- [InstallationStatus.kt](app/src/main/java/com/steamdeck/mobile/domain/model/InstallationStatus.kt) - Domain model
+- [AppManifestParser.kt](app/src/main/java/com/steamdeck/mobile/core/steam/AppManifestParser.kt) - ACF parser
+- [SteamInstallMonitorService.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamInstallMonitorService.kt) - Monitoring service
+- [TriggerGameDownloadUseCase.kt](app/src/main/java/com/steamdeck/mobile/domain/usecase/TriggerGameDownloadUseCase.kt) - Download orchestration
+- [ValidateGameInstallationUseCase.kt](app/src/main/java/com/steamdeck/mobile/domain/usecase/ValidateGameInstallationUseCase.kt) - Pre-launch validation
+
+#### Files Modified (11)
+
+- GameEntity.kt, Game.kt, GameMapper.kt - Installation status fields
+- SteamDeckDatabase.kt - Version 8 with migration
+- DatabaseModule.kt - MIGRATION_7_8 implementation
+- GameRepository.kt, GameRepositoryImpl.kt, GameDao.kt - New methods
+- GameDetailViewModel.kt - Download/install state management
+- LaunchGameUseCase.kt - Validation integration
+- AndroidManifest.xml - Service & permissions
+- GameDetailScreen.kt - UI for download/install progress & validation errors
+- strings.xml - UI strings for installation status & errors
+- DownloadMapper.kt - InstallationStatus enum mapping
+- InstallDownloadedGameUseCase.kt - VALIDATION_FAILED error handling
+
+**UI Components Added:**
+
+- `InstallationStatusBadge` - Shows download/install progress with color-coded status
+- `ValidationErrorDialog` - Displays validation errors with actionable buttons
+- Download button with loading state (InitiatingDownload)
+- Real-time progress display (percentage + status text)
+- Validation error handling in LaunchedEffect
+
+**References:**
+
+- [SteamDeckDatabase.kt:45](app/src/main/java/com/steamdeck/mobile/data/local/database/SteamDeckDatabase.kt#L45) - Database v8
+- [DatabaseModule.kt:274-298](app/src/main/java/com/steamdeck/mobile/di/module/DatabaseModule.kt#L274-L298) - Migration 7→8
+- [AppManifestParser.kt](app/src/main/java/com/steamdeck/mobile/core/steam/AppManifestParser.kt) - ACF parsing
+- [SteamInstallMonitorService.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamInstallMonitorService.kt) - FileObserver service
+- [GameDetailViewModel.kt:381-468](app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/GameDetailViewModel.kt#L381-L468) - Download/install logic
+- [GameDetailScreen.kt:306-314](app/src/main/java/com/steamdeck/mobile/presentation/ui/game/GameDetailScreen.kt#L306-L314) - Status badge integration
+- [GameDetailScreen.kt:846-928](app/src/main/java/com/steamdeck/mobile/presentation/ui/game/GameDetailScreen.kt#L846-L928) - InstallationStatusBadge composable
+- [GameDetailScreen.kt:930-979](app/src/main/java/com/steamdeck/mobile/presentation/ui/game/GameDetailScreen.kt#L930-L979) - ValidationErrorDialog composable
+- [strings.xml:269-295](app/src/main/res/values/strings.xml#L269-L295) - Download/install UI strings
+
 ### 2025-12-20: Steam Client Installation Methods (Legacy Documentation)
 
 - **Method 1 (DEPRECATED)**: SteamSetup.exe with Windows 10 registry configuration

@@ -262,10 +262,46 @@ object DatabaseModule {
  }
 
  /**
+  * Database Migration 7→8
+  *
+  * Changes:
+  * - Add installation status tracking to games table
+  * - Add installationStatus column (NOT_INSTALLED, DOWNLOADING, INSTALLING, INSTALLED, etc.)
+  * - Add installProgress column (0-100)
+  * - Add statusUpdatedTimestamp column for tracking status changes
+  * - Add index on installationStatus for efficient filtering
+  */
+ private val MIGRATION_7_8 = object : Migration(7, 8) {
+  override fun migrate(database: SupportSQLiteDatabase) {
+   // Add installation status columns to games table
+   database.execSQL("""
+    ALTER TABLE games
+    ADD COLUMN installationStatus TEXT NOT NULL DEFAULT 'NOT_INSTALLED'
+   """.trimIndent())
+
+   database.execSQL("""
+    ALTER TABLE games
+    ADD COLUMN installProgress INTEGER NOT NULL DEFAULT 0
+   """.trimIndent())
+
+   database.execSQL("""
+    ALTER TABLE games
+    ADD COLUMN statusUpdatedTimestamp INTEGER
+   """.trimIndent())
+
+   // Add index on installationStatus for filtering (e.g., show only installed games)
+   database.execSQL("""
+    CREATE INDEX IF NOT EXISTS index_games_installationStatus
+    ON games(installationStatus)
+   """.trimIndent())
+  }
+ }
+
+ /**
   * Provides SteamDeckDatabase instance
   *
   * Security & Performance Best Practices 2025:
-  * - All migrations implemented (4→5, 5→6, 6→7)
+  * - All migrations implemented (4→5, 5→6, 6→7, 7→8)
   * - fallbackToDestructiveMigration() REMOVED for production safety
   * - User data is preserved across app updates
   */
@@ -285,7 +321,8 @@ object DatabaseModule {
     MIGRATION_3_4,
     MIGRATION_4_5,
     MIGRATION_5_6,
-    MIGRATION_6_7
+    MIGRATION_6_7,
+    MIGRATION_7_8
    )
    // Production-ready: Destructive migration removed to protect user data
    // Reference: https://developer.android.com/training/data-storage/room/migrating-db-versions

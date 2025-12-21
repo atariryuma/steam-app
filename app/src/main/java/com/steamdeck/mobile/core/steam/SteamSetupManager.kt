@@ -416,7 +416,7 @@ class SteamSetupManager @Inject constructor(
   *
   * Enhanced installation verification:
   * 1. Wait for process to finish
-  * 2. Verify steam.exe exists (retry up to 3 times)
+  * 2. Verify Steam.exe exists (retry up to 3 times, case-sensitive on Android)
   * 3. Return error on timeout
   *
   * NOTE: This method is NOT deprecated. It's the primary installation method.
@@ -507,8 +507,9 @@ class SteamSetupManager @Inject constructor(
     )
    }
 
-   // Verify installation complete: check steam.exe exists (retry up to 3 times)
-   val steamExe = File(container.rootPath, "drive_c/Program Files (x86)/Steam/steam.exe")
+   // Verify installation complete: check Steam.exe exists (retry up to 3 times)
+   // Note: Case-sensitive on Android, SteamSetup.exe extracts as "Steam.exe" (capital S)
+   val steamExe = File(container.rootPath, "drive_c/Program Files (x86)/Steam/Steam.exe")
    var retryCount = 0
    val maxRetries = 3
    val retryDelay = 2000L // 2 seconds
@@ -521,13 +522,13 @@ class SteamSetupManager @Inject constructor(
     }
 
     retryCount++
-    Log.w(TAG, "steam.exe not found, retry $retryCount/$maxRetries")
+    Log.w(TAG, "Steam.exe not found, retry $retryCount/$maxRetries")
     progressCallback?.invoke(0.9f + (retryCount.toFloat() / maxRetries.toFloat()) * 0.1f)
     delay(retryDelay)
    }
 
    // Verification failed - provide detailed error message
-   Log.e(TAG, "Steam installation verification failed: steam.exe not found at ${steamExe.absolutePath}")
+   Log.e(TAG, "Steam installation verification failed: Steam.exe not found at ${steamExe.absolutePath}")
 
    // CRITICAL: Explain the WoW64 issue to the user
    val errorMessage = buildString {

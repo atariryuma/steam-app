@@ -157,10 +157,11 @@ class SteamInstallerService @Inject constructor(
  /**
   * Steam installer download (SteamSetup.exe)
   *
-  * NOTE: This method is NOT deprecated. It's the primary installation method.
-  * Requires Windows 10 registry configuration (handled by WinlatorEmulator.setWindowsVersion()).
+  * Downloads the official Steam installer from Valve CDN.
+  * Used as source for NSIS extraction (primary method) or Wine-based installation (fallback).
   *
-  * @deprecated marking removed - this is the current implementation
+  * @return Result containing downloaded installer file or error
+  * @see extractSteamFromNSIS Primary extraction method using Apache Commons Compress
   */
  suspend fun downloadInstaller(): Result<File> = withContext(Dispatchers.IO) {
   try {

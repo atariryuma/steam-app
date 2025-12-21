@@ -309,17 +309,19 @@ containers/
     - Only used if NSIS extraction fails
 - **Technical Details**:
   - Library: `commons-compress:1.28.0` (already in dependencies)
-  - Implementation: [SteamInstallerService.kt:222-300](app/src/main/java/com/steamdeck/mobile/core/steam/SteamInstallerService.kt#L222-L300)
-  - Integration: [SteamSetupManager.kt:150-206](app/src/main/java/com/steamdeck/mobile/core/steam/SteamSetupManager.kt#L150-L206)
+  - Implementation: [SteamInstallerService.kt:222-264](app/src/main/java/com/steamdeck/mobile/core/steam/SteamInstallerService.kt#L222-L264) - NSIS extraction
+  - Supporting classes: [NsisExtractor.kt](app/src/main/java/com/steamdeck/mobile/core/steam/NsisExtractor.kt), [NsisParser.kt](app/src/main/java/com/steamdeck/mobile/core/steam/NsisParser.kt)
+  - Integration: [SteamSetupManager.kt:150-230](app/src/main/java/com/steamdeck/mobile/core/steam/SteamSetupManager.kt#L150-L230) - Installation workflow
   - Removed: sevenzipjbinding dependencies and ProGuard rules
   - UI strings: NSIS extraction progress messages
 - **Result**: WoW64 problem completely bypassed, Steam installation works on **all ARM64 Android devices**
 
 **References:**
 
-- [gradle/libs.versions.toml](gradle/libs.versions.toml#L20) - commons-compress dependency
-- [SteamInstallerService.kt:234-299](app/src/main/java/com/steamdeck/mobile/core/steam/SteamInstallerService.kt#L234-L299) - Pure Java extraction
-- [strings.xml:142-147](app/src/main/res/values/strings.xml#L142-L147) - Progress messages
+- [gradle/libs.versions.toml](gradle/libs.versions.toml#L82) - commons-compress dependency
+- [SteamInstallerService.kt:222-264](app/src/main/java/com/steamdeck/mobile/core/steam/SteamInstallerService.kt#L222-L264) - NSIS extraction method
+- [NsisExtractor.kt](app/src/main/java/com/steamdeck/mobile/core/steam/NsisExtractor.kt) - Apache Commons Compress integration
+- [strings.xml:146-151](app/src/main/res/values/strings.xml#L146-L151) - Progress messages
 
 ### 2025-12-20: Steam Client Installation Methods (Legacy Documentation)
 
@@ -350,19 +352,24 @@ containers/
 3. **No APK bloat** - Downloads at runtime (~50-80MB) instead of bundling in APK
 4. **Official Valve CDN** - Downloads from `steamcdn-a.akamaihd.net/client/installer/steam.zip`
 
-**Deprecated methods:**
+**Current implementation methods:**
 
-- `SteamInstallerService.downloadInstaller()` (SteamSetup.exe - WoW64 failure)
-- `SteamSetupManager.runSteamInstaller()` (Wine-based execution)
-- `SteamInstallerService.downloadSteamCMD()` (Linux incompatibility)
-- `SteamInstallerService.extractSteamCMD()` (Android tar unavailable)
-- `SteamSetupManager.runSteamCMD()` (Android bash/glibc incompatibility)
+- `SteamInstallerService.downloadInstaller()` (152-192) - Downloads SteamSetup.exe, used as fallback
+- `SteamInstallerService.extractSteamFromNSIS()` (222-264) - **Primary method**: NSIS extraction
+- `SteamSetupManager.runSteamInstaller()` (424-553) - Wine-based installer execution (fallback only)
+- `SteamSetupManager.copyInstallerToContainer()` (388-409) - Copies installer to Wine container
+
+**Removed methods (previously deprecated):**
+
+- `downloadSteamCMD()` - Linux tar.gz download (removed: Android tar unavailable)
+- `extractSteamCMD()` - tar extraction (removed: Android bash/glibc incompatibility)
+- `runSteamCMD()` - SteamCMD execution (removed: Linux binary incompatibility)
 
 **References:**
 
-- [SteamInstallerService.kt:41-146](app/src/main/java/com/steamdeck/mobile/core/steam/SteamInstallerService.kt#L41-L146) - Download & extraction
-- [SteamSetupManager.kt:105-161](app/src/main/java/com/steamdeck/mobile/core/steam/SteamSetupManager.kt#L105-L161) - Installation workflow
-- [strings.xml](app/src/main/res/values/strings.xml) - Error messages
+- [SteamInstallerService.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamInstallerService.kt) - Download & NSIS extraction
+- [SteamSetupManager.kt:64-230](app/src/main/java/com/steamdeck/mobile/core/steam/SteamSetupManager.kt#L64-L230) - Installation workflow
+- [strings.xml](app/src/main/res/values/strings.xml) - Progress and error messages
 
 **2025-12-19: Unified Error Handling**
 

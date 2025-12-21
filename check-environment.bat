@@ -28,10 +28,10 @@ if %errorlevel% neq 0 (
         set JAVA_VERSION=!JAVA_VERSION:"=!
         echo     Version: !JAVA_VERSION!
 
-        REM バージョンが17以上かチェック (簡易版)
+        REM バージョンが17かチェック (簡易版)
         echo !JAVA_VERSION! | findstr /C:"17." >nul
         if !errorlevel! neq 0 (
-            echo [!] WARNING: JDK 17 is recommended for this project
+            echo [!] WARNING: JDK 17 is required for this project
             set /a ERRORS+=1
         )
     )
@@ -43,7 +43,7 @@ echo [2/5] Checking JAVA_HOME...
 if not defined JAVA_HOME (
     echo [!] JAVA_HOME is NOT SET
     echo     Please set JAVA_HOME environment variable
-    echo     Example: set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.10.7-hotspot
+    echo     Example: set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot
     set /a ERRORS+=1
 ) else (
     echo [OK] JAVA_HOME: %JAVA_HOME%
@@ -118,7 +118,7 @@ if %ERRORS% equ 0 (
     echo 1. Install JDK 17 from https://adoptium.net/
     echo 2. Install Android Studio from https://developer.android.com/studio
     echo 3. Set environment variables:
-    echo    - JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.x
+    echo    - JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot
     echo    - ANDROID_HOME=C:\Users\%USERNAME%\AppData\Local\Android\Sdk
     echo 4. Add to PATH:
     echo    - %%ANDROID_HOME%%\platform-tools

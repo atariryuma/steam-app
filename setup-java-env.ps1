@@ -1,7 +1,7 @@
 # SteamDeck Mobile - Java Environment Setup (PowerShell)
 # Sets JAVA_HOME and PATH for current user (no admin rights required)
 
-$javaHome = "C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot"
+$javaHome = "C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot"
 
 Write-Host "Setting up Java environment variables for current user..." -ForegroundColor Cyan
 

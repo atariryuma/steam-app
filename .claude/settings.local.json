@@ -162,7 +162,10 @@
       "Bash(C:Projectssteam-appquick-build.bat)",
       "Bash(git stash:*)",
       "Bash(git revert:*)",
-      "Bash(quick-build.bat)"
+      "Bash(quick-build.bat)",
+      "Bash(if [ -f steam-install-realtime.txt ])",
+      "Bash(then tail -100 steam-install-realtime.txt)",
+      "Bash(else echo \"ログファイルがまだ作成されていません\")"
     ]
   }
 }

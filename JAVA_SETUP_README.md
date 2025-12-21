@@ -1,12 +1,12 @@
 # Java環境変数セットアップガイド
 
 ## 概要
-このプロジェクトのビルドにはJava 17が必要です。JAVA_HOMEとPATHを永続的に設定するスクリプトを提供します。
+このプロジェクトのビルドにはJava 21が必要です。JAVA_HOMEとPATHを永続的に設定するスクリプトを提供します。
 
 ## 前提条件
-- Java 17 (Eclipse Adoptium) が以下のパスにインストールされていること:
+- Java 21 (Eclipse Adoptium) が以下のパスにインストールされていること:
   ```
-  C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot
+  C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot
   ```
 
 ## セットアップ方法
@@ -29,7 +29,7 @@
 
 ### JAVA_HOME
 ```
-C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot
+C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot
 ```
 
 ### PATH
@@ -58,9 +58,9 @@ echo %JAVA_HOME%
 
 ### 期待される出力
 ```
-openjdk version "17.0.17" 2024-10-15
-OpenJDK Runtime Environment Temurin-17.0.17+10 (build 17.0.17+10)
-OpenJDK 64-Bit Server VM Temurin-17.0.17+10 (build 17.0.17+10, mixed mode, sharing)
+openjdk version "21.0.5" 2024-10-15
+OpenJDK Runtime Environment Temurin-21.0.5+11 (build 21.0.5+11)
+OpenJDK 64-Bit Server VM Temurin-21.0.5+11 (build 21.0.5+11, mixed mode, sharing)
 ```
 
 ## ビルド実行

@@ -179,12 +179,10 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
 
-    // Compression (Wine/Box64 binaries)
+    // Compression (Wine/Box64 binaries & NSIS extraction)
     implementation(libs.zstd.jni) // Zstandard with JNI (includes Android ARM64 libs)
-    implementation(libs.commons.compress)
+    implementation(libs.commons.compress) // Apache Commons Compress for NSIS/7z (Pure Java, ARM64 compatible)
     implementation(libs.xz) // XZ-Java for .txz decompression
-    implementation(libs.sevenzipjbinding) // 7-Zip JBinding for NSIS extraction
-    implementation(libs.sevenzipjbinding.allplatforms) // All platform native libraries
 
     // File Import
     // TODO: Re-enable when libaums v0.10.0 migration is complete

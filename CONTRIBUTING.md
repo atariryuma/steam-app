@@ -32,7 +32,7 @@ SteamDeck Mobile aims to be a lightweight, Steam-specialized Android game emulat
 
 1. **Prerequisites**:
    - Android Studio Ladybug 2024.2.1+
-   - JDK 17+
+   - JDK 21+
    - Git
 
 2. **Clone the repository**:

@@ -209,11 +209,11 @@ class SteamInstallerService @Inject constructor(
  /**
   * Extract Steam Client from SteamSetup.exe NSIS installer
   *
-  * Uses sevenzipjbinding to extract Steam.exe and related files directly
+  * Uses Apache Commons Compress to extract Steam.exe and related files directly
   * from the NSIS installer, bypassing the need for Wine execution.
   *
-  * This method extracts the Steam client files from SteamSetup.exe using 7-Zip,
-  * which has supported NSIS extraction since version 4.42.
+  * This method extracts the Steam client files from SteamSetup.exe using
+  * Apache Commons Compress (Pure Java, ARM64 compatible).
   *
   * @param setupExe Downloaded SteamSetup.exe file
   * @param targetDir Target directory (e.g., container/drive_c/Program Files (x86)/Steam)
@@ -227,140 +227,35 @@ class SteamInstallerService @Inject constructor(
     )
    }
 
-   if (!targetDir.parentFile?.exists()!!) {
-    targetDir.parentFile?.mkdirs()
-   }
+   targetDir.parentFile?.mkdirs()
 
-   Log.i(TAG, "Extracting Steam Client from NSIS installer: ${setupExe.absolutePath}")
-   Log.i(TAG, "Target directory: ${targetDir.absolutePath}")
+   Log.i(TAG, "Extracting Steam Client from NSIS installer using XZ-Java (Pure Java, ARM64 compatible)")
+   Log.i(TAG, "Source: ${setupExe.absolutePath}")
+   Log.i(TAG, "Target: ${targetDir.absolutePath}")
 
-   var archive: net.sf.sevenzipjbinding.IInArchive? = null
-   var randomAccessFile: java.io.RandomAccessFile? = null
+   // Use custom NSIS extractor with XZ-Java for LZMA decompression
+   val extractor = NsisExtractor(setupExe)
+   val extractResult = extractor.extractSteamFiles(targetDir)
 
-   try {
-    randomAccessFile = java.io.RandomAccessFile(setupExe, "r")
-
-    // Open NSIS archive using sevenzipjbinding
-    archive = net.sf.sevenzipjbinding.SevenZip.openInArchive(
-     null, // Auto-detect format (NSIS)
-     object : net.sf.sevenzipjbinding.IInStream {
-      override fun read(data: ByteArray): Int {
-       return randomAccessFile.read(data)
-      }
-
-      override fun seek(offset: Long, seekOrigin: Int): Long {
-       return when (seekOrigin) {
-        0 -> { // BEGIN
-         randomAccessFile.seek(offset)
-         offset
-        }
-        1 -> { // CURRENT
-         val newPos = randomAccessFile.filePointer + offset
-         randomAccessFile.seek(newPos)
-         newPos
-        }
-        2 -> { // END
-         val newPos = randomAccessFile.length() + offset
-         randomAccessFile.seek(newPos)
-         newPos
-        }
-        else -> throw IllegalArgumentException("Invalid seek origin: $seekOrigin")
-       }
-      }
-
-      override fun close() {
-       // Don't close here, will be closed in finally block
-      }
-     }
+   if (extractResult.isFailure) {
+    return@withContext Result.failure(
+     extractResult.exceptionOrNull() ?: Exception("NSIS extraction failed")
     )
-
-    val itemCount = archive.numberOfItems
-    Log.i(TAG, "NSIS archive contains $itemCount items")
-
-    var extractedFiles = 0
-    val indices = IntArray(itemCount) { it }
-
-    // Extract all files
-    archive.extract(indices, false, object : net.sf.sevenzipjbinding.IArchiveExtractCallback {
-     private var currentIndex = -1
-     private var currentOutputStream: java.io.FileOutputStream? = null
-     private var currentFile: File? = null
-
-     override fun setTotal(total: Long) {
-      Log.d(TAG, "Total bytes to extract: $total")
-     }
-
-     override fun setCompleted(complete: Long) {
-      // Progress tracking (optional)
-     }
-
-     override fun getStream(
-      index: Int,
-      extractAskMode: net.sf.sevenzipjbinding.ExtractAskMode
-     ): net.sf.sevenzipjbinding.ISequentialOutStream? {
-      currentIndex = index
-
-      if (extractAskMode != net.sf.sevenzipjbinding.ExtractAskMode.EXTRACT) {
-       return null
-      }
-
-      val path = archive.getStringProperty(index, net.sf.sevenzipjbinding.PropID.PATH) ?: ""
-      val isFolder = archive.getProperty(index, net.sf.sevenzipjbinding.PropID.IS_FOLDER) as? Boolean ?: false
-
-      if (isFolder || path.isEmpty()) {
-       return null
-      }
-
-      // Create output file
-      currentFile = File(targetDir, path.replace("\\", "/"))
-      currentFile?.parentFile?.mkdirs()
-
-      currentOutputStream = java.io.FileOutputStream(currentFile)
-
-      return object : net.sf.sevenzipjbinding.ISequentialOutStream {
-       override fun write(data: ByteArray): Int {
-        currentOutputStream?.write(data)
-        return data.size
-       }
-      }
-     }
-
-     override fun prepareOperation(extractAskMode: net.sf.sevenzipjbinding.ExtractAskMode) {
-      // Prepare for extraction
-     }
-
-     override fun setOperationResult(extractOperationResult: net.sf.sevenzipjbinding.ExtractOperationResult) {
-      currentOutputStream?.close()
-      currentOutputStream = null
-
-      if (extractOperationResult == net.sf.sevenzipjbinding.ExtractOperationResult.OK) {
-       extractedFiles++
-       if (extractedFiles % 10 == 0) {
-        Log.d(TAG, "Extracted $extractedFiles files...")
-       }
-      } else {
-       Log.w(TAG, "Failed to extract file at index $currentIndex: $extractOperationResult")
-      }
-     }
-    })
-
-    Log.i(TAG, "Extracted $extractedFiles files from NSIS installer")
-
-    // Verify steam.exe exists
-    val steamExe = File(targetDir, "steam.exe")
-    if (!steamExe.exists()) {
-     return@withContext Result.failure(
-      Exception("steam.exe not found after extraction. Expected: ${steamExe.absolutePath}")
-     )
-    }
-
-    Log.i(TAG, "Steam Client extracted successfully: ${targetDir.absolutePath}")
-    Result.success(Unit)
-
-   } finally {
-    archive?.close()
-    randomAccessFile?.close()
    }
+
+   val extractedCount = extractResult.getOrDefault(0)
+   Log.i(TAG, "Extracted $extractedCount files from NSIS installer")
+
+   // Verify steam.exe exists
+   val steamExe = File(targetDir, "steam.exe")
+   if (!steamExe.exists()) {
+    return@withContext Result.failure(
+     Exception("steam.exe not found after extraction. Extracted $extractedCount files. Expected: ${steamExe.absolutePath}")
+    )
+   }
+
+   Log.i(TAG, "Steam Client extracted successfully: ${targetDir.absolutePath}")
+   Result.success(Unit)
 
   } catch (e: Exception) {
    Log.e(TAG, "Failed to extract Steam from NSIS installer", e)

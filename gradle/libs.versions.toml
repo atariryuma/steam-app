@@ -19,7 +19,6 @@ zxing = "3.5.3"
 zstd-jni = "1.5.6-8"
 commons-compress = "1.28.0"
 xz = "1.10"
-sevenzipjbinding = "16.02-2.01"
 turbine = "1.1.0"
 mockk = "1.13.13"
 arch-core-testing = "2.2.0"
@@ -79,12 +78,10 @@ androidx-security-crypto = { group = "androidx.security", name = "security-crypt
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version = "1.2.0" }
 
-# Compression (for Wine/Box64 binaries)
+# Compression (for Wine/Box64 binaries & NSIS extraction)
 zstd-jni = { group = "com.github.luben", name = "zstd-jni", version.ref = "zstd-jni" }
 commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commons-compress" }
 xz = { group = "org.tukaani", name = "xz", version.ref = "xz" }
-sevenzipjbinding = { group = "net.sf.sevenzipjbinding", name = "sevenzipjbinding", version.ref = "sevenzipjbinding" }
-sevenzipjbinding-allplatforms = { group = "net.sf.sevenzipjbinding", name = "sevenzipjbinding-all-platforms", version.ref = "sevenzipjbinding" }
 
 # Core
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.15.0" }

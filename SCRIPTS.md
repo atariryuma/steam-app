@@ -79,7 +79,7 @@ view-logs.bat
 
 ### `check-environment.bat` - Environment Checker
 Checks for:
-- Java JDK 17
+- Java JDK 21
 - JAVA_HOME variable
 - Android SDK
 - ADB (Android Debug Bridge)
@@ -158,7 +158,7 @@ quick-build.bat        # Retry build
 ## 📝 Environment Variables
 
 All scripts automatically set:
-- `JAVA_HOME`: `C:\Program Files\Eclipse Adoptium\jdk-17.0.17.10-hotspot`
+- `JAVA_HOME`: `C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot`
 - `ADB`: `C:\Android\sdk\platform-tools\adb.exe`
 - `PACKAGE`: `com.steamdeck.mobile.debug`
 

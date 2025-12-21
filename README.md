@@ -56,7 +56,7 @@ Winlator（Wine + Box86/Box64）を統合し、Snapdragon搭載デバイスで�
 ### 必要なツール
 
 - Android Studio Ladybug 2024.2.1+
-- JDK 17+
+- JDK 21+
 - Git
 
 ### セットアップ手順

@@ -31,7 +31,7 @@ class DataResultCallAdapterFactory : CallAdapter.Factory() {
   annotations: Array<out Annotation>,
   retrofit: Retrofit
  ): CallAdapter<*, *>? {
-  // DataResult<T>type みsupport
+  // Only support DataResult<T> types
   if (getRawType(returnType) != Call::class.java) {
    return null
   }
@@ -90,7 +90,7 @@ class DataResultCallAdapterFactory : CallAdapter.Factory() {
     if (body != null) {
      DataResult.Success(body)
     } else {
-     // 204 No Contentetc、body null もsuccess扱い
+     // 204 No Content, etc. - null body is treated as success
      @Suppress("UNCHECKED_CAST")
      DataResult.Success(Unit as T)
     }

@@ -95,6 +95,12 @@
 # zstd-jni (JNI bindings)
 -keep class com.github.luben.zstd.** { *; }
 
+# sevenzipjbinding (for NSIS extraction)
+-dontwarn net.sf.sevenzipjbinding.**
+-keep class net.sf.sevenzipjbinding.** { *; }
+-keep interface net.sf.sevenzipjbinding.** { *; }
+-keepclassmembers class net.sf.sevenzipjbinding.** { *; }
+
 # Google Error Prone Annotations (used by Tink)
 -dontwarn com.google.errorprone.annotations.**
 

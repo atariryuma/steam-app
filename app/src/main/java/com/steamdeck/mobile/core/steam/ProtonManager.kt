@@ -9,9 +9,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Proton configurationマネージャー
+ * Proton Configuration Manager
  *
- * Steam Play (Proton) configurationmanagementdo
+ * Manages Steam Play (Proton) configuration
  */
 @Singleton
 class ProtonManager @Inject constructor(
@@ -23,12 +23,12 @@ class ProtonManager @Inject constructor(
  }
 
  /**
-  * Proton 有効かどうかcheck
+  * Check if Proton is enabled
   */
  suspend fun isProtonEnabled(containerId: Long): Boolean = withContext(Dispatchers.IO) {
   try {
-   // in the future config.vdf file読み取ってconfirmation
-   // 現時点 常 true 返す
+   // TODO: Read config.vdf file in the future
+   // Currently always returns true
    Log.d(TAG, "Checking Proton status for container: $containerId")
    true
 
@@ -39,14 +39,14 @@ class ProtonManager @Inject constructor(
  }
 
  /**
-  * Proton 有効化
+  * Enable Proton
   */
  suspend fun enableProton(containerId: Long): Result<Unit> = withContext(Dispatchers.IO) {
   try {
    Log.i(TAG, "Enabling Proton for container: $containerId")
 
-   // in the future config.vdf configuration書き込む
-   // 現時点 ログ み
+   // TODO: Write configuration to config.vdf in the future
+   // Currently just logging
    Log.i(TAG, "Proton enabled (placeholder)")
 
    Result.success(Unit)
@@ -58,14 +58,14 @@ class ProtonManager @Inject constructor(
  }
 
  /**
-  * Proton 無効化
+  * Disable Proton
   */
  suspend fun disableProton(containerId: Long): Result<Unit> = withContext(Dispatchers.IO) {
   try {
    Log.i(TAG, "Disabling Proton for container: $containerId")
 
-   // in the future config.vdf fromconfigurationdelete
-   // 現時点 ログ み
+   // TODO: Delete configuration from config.vdf in the future
+   // Currently just logging
    Log.i(TAG, "Proton disabled (placeholder)")
 
    Result.success(Unit)
@@ -77,7 +77,7 @@ class ProtonManager @Inject constructor(
  }
 
  /**
-  * 特定 game 対して Proton 有効化
+  * Enable Proton for a specific game
   */
  suspend fun enableProtonForGame(
   containerId: Long,
@@ -87,7 +87,7 @@ class ProtonManager @Inject constructor(
   try {
    Log.i(TAG, "Enabling Proton for game: appId=$appId, version=$protonVersion")
 
-   // in the future個別 gameconfiguration config.vdf 書き込む
+   // TODO: Write game-specific configuration to config.vdf in the future
    Log.i(TAG, "Game-specific Proton enabled (placeholder)")
 
    Result.success(Unit)

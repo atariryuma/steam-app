@@ -25,11 +25,11 @@ class SteamGameScanner @Inject constructor(
  }
 
  /**
-  * Steam App ID に対応するゲームの実行ファイルを検索
+  * Search for game executable file corresponding to Steam App ID
   *
-  * @param containerId Winlator コンテナ ID
+  * @param containerId Winlator container ID
   * @param steamAppId Steam App ID
-  * @return 見つかった実行ファイルのパス、見つからない場合は null
+  * @return Path to the found executable file, or null if not found
   */
  suspend fun findGameExecutable(
   containerId: String,
@@ -38,7 +38,7 @@ class SteamGameScanner @Inject constructor(
   try {
    Log.i(TAG, "Scanning for game: appId=$steamAppId, containerId=$containerId")
 
-   // 1. コンテナを取得
+   // 1. Get container
    val containersResult = winlatorEmulator.listContainers()
    if (containersResult.isFailure) {
     return@withContext Result.failure(
@@ -52,42 +52,42 @@ class SteamGameScanner @Inject constructor(
      Exception("Container not found: $containerId")
     )
 
-   // 2. steamapps フォルダをチェック
+   // 2. Check steamapps folder
    val steamAppsDir = File(container.rootPath, STEAM_APPS_PATH)
    if (!steamAppsDir.exists() || !steamAppsDir.isDirectory) {
     Log.w(TAG, "Steam apps directory not found: ${steamAppsDir.absolutePath}")
     return@withContext Result.success(null)
    }
 
-   // 3. appmanifest_<appId>.acf ファイルを確認
+   // 3. Check for appmanifest_<appId>.acf file
    val manifestFile = File(steamAppsDir, "appmanifest_$steamAppId.acf")
    if (!manifestFile.exists()) {
     Log.i(TAG, "Game not installed (no manifest): appId=$steamAppId")
     return@withContext Result.success(null)
    }
 
-   // 4. マニフェストファイルからインストールディレクトリ名を取得
+   // 4. Get install directory name from manifest file
    val installDir = parseInstallDirFromManifest(manifestFile)
    if (installDir == null) {
     Log.w(TAG, "Failed to parse install directory from manifest")
     return@withContext Result.success(null)
    }
 
-   // 5. common/<InstallDir> フォルダを確認
+   // 5. Check common/<InstallDir> folder
    val gameDir = File(steamAppsDir, "$COMMON_PATH/$installDir")
    if (!gameDir.exists() || !gameDir.isDirectory) {
     Log.w(TAG, "Game directory not found: ${gameDir.absolutePath}")
     return@withContext Result.success(null)
    }
 
-   // 6. .exe ファイルを検索（最も可能性の高いものを選択）
+   // 6. Search for .exe file (select the most likely candidate)
    val exeFile = findMainExecutable(gameDir)
    if (exeFile == null) {
     Log.w(TAG, "No executable found in: ${gameDir.absolutePath}")
     return@withContext Result.success(null)
    }
 
-   // 7. Windows パス形式に変換 (例: C:\Program Files (x86)\Steam\steamapps\common\Game\game.exe)
+   // 7. Convert to Windows path format (e.g., C:\Program Files (x86)\Steam\steamapps\common\Game\game.exe)
    // Bug fix: Handle cases where "drive_c/" might not be in the path
    val absolutePath = exeFile.absolutePath
    val relativePath = if (absolutePath.contains("drive_c/")) {
@@ -164,18 +164,18 @@ class SteamGameScanner @Inject constructor(
  }
 
  /**
-  * ゲームフォルダから最も可能性の高いメイン実行ファイルを検索
+  * Search for the most likely main executable file in game folder
   *
-  * 優先順位:
-  * 1. フォルダ名と同じ名前の .exe
-  * 2. 最初に見つかった .exe ファイル
+  * Priority:
+  * 1. .exe file with the same name as the folder
+  * 2. First .exe file found
   */
  private fun findMainExecutable(gameDir: File): File? {
   return try {
    // walkTopDown() returns a FileTreeWalk which is closeable
    // Use toList() within try-catch to handle potential errors during directory traversal
    val exeFiles = gameDir.walkTopDown()
-    .maxDepth(2) // サブフォルダも1階層まで検索
+    .maxDepth(2) // Search up to 1 level of subfolders
     .filter { it.isFile && it.extension.equals("exe", ignoreCase = true) }
     .toList()
 
@@ -183,7 +183,7 @@ class SteamGameScanner @Inject constructor(
     return null
    }
 
-   // フォルダ名と同じ名前の .exe を優先
+   // Prioritize .exe file with the same name as the folder
    val gameName = gameDir.name
    val mainExe = exeFiles.find {
     it.nameWithoutExtension.equals(gameName, ignoreCase = true)

@@ -10,7 +10,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Wine/Box64/DXVK performanceoptimizationマネージャー
+ * Wine/Box64/DXVK Performance Optimization Manager
  *
  * Research-based optimizations (2025):
  * - Box64 dynarec configuration
@@ -34,20 +34,20 @@ class PerformanceOptimizer @Inject constructor(
  }
 
  /**
-  * performanceプリセットapply
+  * Apply performance preset
   */
  suspend fun applyPreset(preset: Box64PerformancePreset, winePrefixPath: File): Result<Unit> {
   return withContext(Dispatchers.IO) {
    try {
     Log.i(TAG, "Applying performance preset: $preset")
 
-    // Box64environmentvariableconfiguration
+    // Configure Box64 environment variables
     applyBox64Settings(preset)
 
-    // DXVKconfigurationcopy
+    // Copy DXVK configuration
     applyDxvkConfig(winePrefixPath)
 
-    // Wine レジストリoptimizationapply
+    // Apply Wine registry optimizations
     applyWineRegistryOptimizations(winePrefixPath, preset)
 
     Log.i(TAG, "Performance preset applied successfully")
@@ -105,10 +105,10 @@ class PerformanceOptimizer @Inject constructor(
    )
   }
 
-  // environmentvariableconfiguration（Process BuilderorWinlatorEngine use）
+  // Environment variable configuration (used by Process Builder or WinlatorEngine)
   envVars.forEach { (key, value) ->
    Log.d(TAG, "Setting $key=$value")
-   // Note: 実際 apply WinlatorEmulator.kt launchExecutable 行う
+   // Note: Actual application is done in WinlatorEmulator.kt launchExecutable
   }
  }
 

@@ -14,9 +14,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Steam Client インストーラーservice
+ * Steam Client Installer Service
  *
- * Steamインストーラー download verificationmanagementdo
+ * Manages Steam installer download and verification
  */
 @Singleton
 class SteamInstallerService @Inject constructor(

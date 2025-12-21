@@ -11,12 +11,12 @@ import javax.inject.Singleton
 /**
  * Wine input mapping bridge
  *
- * Research findingsimplementation:
- * - strategy1: Native uinput injection (futureimplementation)
- * - strategy2: SDL event injection (experimental)
- * - strategy3: InputBridge app integration (current implementation) ✅
+ * Research findings implementation:
+ * - Strategy 1: Native uinput injection (future implementation)
+ * - Strategy 2: SDL event injection (experimental)
+ * - Strategy 3: InputBridge app integration (current implementation) ✅
  *
- * With InputBridge app integration, send Android input to Wine/Proton games in 
+ * With InputBridge app integration, send Android input to Wine/Proton games in
  * DirectInput/XInput format.
  *
  * Best Practices:
@@ -26,7 +26,7 @@ import javax.inject.Singleton
  */
 interface InputBridge {
  /**
-  * initializationprocessing
+  * Initialization processing
   */
  fun initialize(): Result<Unit>
 
@@ -203,7 +203,7 @@ class NativeUInputBridge @Inject constructor(
   }
  }
 
- // Native methods (未implementation)
+ // Native methods (not implemented)
  private external fun nativeInit(): Boolean
  private external fun nativeCreateVirtualController(
   name: String,

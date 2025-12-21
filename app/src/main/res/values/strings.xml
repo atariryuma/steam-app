@@ -108,6 +108,8 @@
     <!-- Steam Installation Errors (SteamSetup.exe method) -->
     <string name="error_steamcmd_download_failed">Steam installer download failed.\n\nPlease check your internet connection and try again.</string>
     <string name="error_steamcmd_extraction_failed">Steam installer extraction failed.\n\nError: %1$s\n\nPlease ensure you have sufficient storage space (at least 1GB available).</string>
+    <string name="error_nsis_extraction_failed">NSIS extraction failed.\n\nError: %1$s\n\nFalling back to Wine installer execution.\n\nNote: Wine method requires WoW64 support and may fail on some devices.</string>
+    <string name="error_nsis_archive_open_failed">Failed to open NSIS archive.\n\nThe SteamSetup.exe file may be corrupted.\n\nSolutions:\n• Clear app cache and retry\n• Check internet connection\n• Ensure sufficient storage space</string>
     <string name="error_steamcmd_timeout">Steam installation timed out after 10 minutes.\n\nPossible causes:\n• Slow network connection\n• Network interruption\n\nSolutions:\n• Connect to a faster Wi-Fi network\n• Retry the installation</string>
     <string name="error_steamcmd_execution_failed">Steam installation failed.\n\nError: %1$s\n\nPlease retry the installation.</string>
     <string name="error_steam_client_not_found">Steam client files not found after installation.\n\nInstallation completed, but steam.exe is missing.\n\nSolutions:\n• Retry the installation\n• Check available storage space (minimum 1GB required)\n• Clear app cache and try again</string>
@@ -139,9 +141,12 @@
     <!-- Steam Installation Steps -->
     <string name="progress_steam_step_1">Downloading Steam installer</string>
     <string name="progress_steam_step_2">Extracting installer</string>
+    <string name="progress_steam_step_2_nsis">Extracting Steam from NSIS installer</string>
     <string name="progress_steam_step_3">Creating Wine container</string>
     <string name="progress_steam_step_4">Initializing Wine prefix</string>
     <string name="progress_steam_step_5">Installing Steam client</string>
+    <string name="progress_steam_nsis_success">NSIS extraction completed successfully</string>
+    <string name="progress_steam_fallback_wine">Falling back to Wine installer execution</string>
 
     <!-- Wine Container Creation Steps -->
     <string name="progress_wine_step_1">Preparing container directory</string>

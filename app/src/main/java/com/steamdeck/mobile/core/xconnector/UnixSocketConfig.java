@@ -1,6 +1,6 @@
 package com.steamdeck.mobile.core.xconnector;
 
-import com.winlator.core.FileUtils;
+import com.steamdeck.mobile.core.util.FileUtils;
 
 import java.io.File;
 

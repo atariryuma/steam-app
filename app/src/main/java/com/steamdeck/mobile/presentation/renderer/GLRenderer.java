@@ -6,10 +6,10 @@ import android.graphics.BitmapFactory;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 
-import com.winlator.R;
-import com.winlator.XrActivity;
-import com.winlator.math.Mathf;
-import com.winlator.math.XForm;
+import com.steamdeck.mobile.R;
+import com.steamdeck.mobile.core.vr.XrActivity;
+import com.steamdeck.mobile.core.math.Mathf;
+import com.steamdeck.mobile.core.math.XForm;
 import com.steamdeck.mobile.presentation.renderer.material.CursorMaterial;
 import com.steamdeck.mobile.presentation.renderer.material.ShaderMaterial;
 import com.steamdeck.mobile.presentation.renderer.material.WindowMaterial;

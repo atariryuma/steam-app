@@ -4,7 +4,7 @@ import android.view.KeyEvent;
 
 import androidx.collection.ArraySet;
 
-import com.winlator.inputcontrols.ExternalController;
+import com.steamdeck.mobile.core.input.ExternalController;
 
 import java.util.ArrayList;
 

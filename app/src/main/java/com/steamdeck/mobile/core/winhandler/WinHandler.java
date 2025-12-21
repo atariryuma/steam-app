@@ -3,10 +3,10 @@ package com.steamdeck.mobile.core.winhandler;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 
-import com.steamdeck.mobile.XServerDisplayActivity;
-import com.steamdeck.mobile.core.StringUtils;
-import com.steamdeck.mobile.inputcontrols.ControlsProfile;
-import com.steamdeck.mobile.inputcontrols.ExternalController;
+import com.steamdeck.mobile.presentation.ui.steam.XServerDisplayActivity;
+import com.steamdeck.mobile.core.util.StringUtils;
+import com.steamdeck.mobile.core.input.ControlsProfile;
+import com.steamdeck.mobile.core.input.ExternalController;
 import com.steamdeck.mobile.xserver.XServer;
 
 import java.io.IOException;

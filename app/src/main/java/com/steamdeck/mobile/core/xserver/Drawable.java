@@ -2,8 +2,8 @@ package com.steamdeck.mobile.core.xserver;
 
 import android.graphics.Bitmap;
 
-import com.winlator.core.Callback;
-import com.winlator.math.Mathf;
+import com.steamdeck.mobile.core.util.Callback;
+import com.steamdeck.mobile.core.math.Mathf;
 import com.steamdeck.mobile.presentation.renderer.GPUImage;
 import com.steamdeck.mobile.presentation.renderer.Texture;
 

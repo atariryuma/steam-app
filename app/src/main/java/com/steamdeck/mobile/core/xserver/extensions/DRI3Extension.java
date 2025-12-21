@@ -2,8 +2,8 @@ package com.steamdeck.mobile.core.xserver.extensions;
 
 import static com.winlator.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
 
-import com.winlator.core.Callback;
-import com.winlator.sysvshm.SysVSharedMemory;
+import com.steamdeck.mobile.core.util.Callback;
+import com.steamdeck.mobile.core.sysvshm.SysVSharedMemory;
 import com.steamdeck.mobile.core.xconnector.XConnectorEpoll;
 import com.steamdeck.mobile.core.xconnector.XInputStream;
 import com.steamdeck.mobile.core.xconnector.XOutputStream;

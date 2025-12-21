@@ -2,8 +2,8 @@ package com.steamdeck.mobile.core.xserver;
 
 import androidx.annotation.NonNull;
 
-import com.winlator.core.ArrayUtils;
-import com.winlator.core.StringUtils;
+import com.steamdeck.mobile.core.util.ArrayUtils;
+import com.steamdeck.mobile.core.util.StringUtils;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

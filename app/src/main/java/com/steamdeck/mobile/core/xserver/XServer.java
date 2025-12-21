@@ -2,9 +2,9 @@ package com.steamdeck.mobile.core.xserver;
 
 import android.util.SparseArray;
 
-import com.winlator.core.CursorLocker;
+import com.steamdeck.mobile.core.util.CursorLocker;
 import com.steamdeck.mobile.presentation.renderer.GLRenderer;
-import com.winlator.winhandler.WinHandler;
+import com.steamdeck.mobile.core.winhandler.WinHandler;
 import com.steamdeck.mobile.core.xserver.extensions.BigReqExtension;
 import com.steamdeck.mobile.core.xserver.extensions.DRI3Extension;
 import com.steamdeck.mobile.core.xserver.extensions.Extension;

@@ -3,7 +3,7 @@ package com.steamdeck.mobile.presentation.renderer;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 
-import com.winlator.XrActivity;
+import com.steamdeck.mobile.core.vr.XrActivity;
 import com.steamdeck.mobile.core.xserver.Drawable;
 
 import java.nio.ByteBuffer;

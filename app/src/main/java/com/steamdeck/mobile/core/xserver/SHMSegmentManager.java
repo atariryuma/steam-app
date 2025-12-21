@@ -2,7 +2,7 @@ package com.steamdeck.mobile.core.xserver;
 
 import android.util.SparseArray;
 
-import com.winlator.sysvshm.SysVSharedMemory;
+import com.steamdeck.mobile.core.sysvshm.SysVSharedMemory;
 
 import java.nio.ByteBuffer;
 

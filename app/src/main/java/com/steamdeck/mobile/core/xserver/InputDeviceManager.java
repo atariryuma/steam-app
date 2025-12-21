@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.xserver;
 
-import com.winlator.winhandler.MouseEventFlags;
-import com.winlator.winhandler.WinHandler;
+import com.steamdeck.mobile.core.winhandler.MouseEventFlags;
+import com.steamdeck.mobile.core.winhandler.WinHandler;
 import com.steamdeck.mobile.core.xserver.events.ButtonPress;
 import com.steamdeck.mobile.core.xserver.events.ButtonRelease;
 import com.steamdeck.mobile.core.xserver.events.EnterNotify;

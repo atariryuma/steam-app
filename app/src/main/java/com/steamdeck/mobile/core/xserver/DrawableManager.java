@@ -2,7 +2,7 @@ package com.steamdeck.mobile.core.xserver;
 
 import android.util.SparseArray;
 
-import com.winlator.core.Callback;
+import com.steamdeck.mobile.core.util.Callback;
 import com.steamdeck.mobile.presentation.renderer.Texture;
 
 public class DrawableManager extends XResourceManager implements XResourceManager.OnResourceLifecycleListener {

@@ -1,6 +1,6 @@
 package com.steamdeck.mobile.core.xserver;
 
-import com.winlator.math.Mathf;
+import com.steamdeck.mobile.core.math.Mathf;
 
 import java.util.ArrayList;
 

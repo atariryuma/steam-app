@@ -2,7 +2,7 @@ package com.steamdeck.mobile.core.xserver.requests;
 
 import static com.winlator.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
 
-import com.winlator.core.CursorLocker;
+import com.steamdeck.mobile.core.util.CursorLocker;
 import com.steamdeck.mobile.core.xconnector.XInputStream;
 import com.steamdeck.mobile.core.xconnector.XOutputStream;
 import com.steamdeck.mobile.core.xconnector.XStreamLock;

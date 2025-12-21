@@ -1,6 +1,6 @@
 package com.steamdeck.mobile.core.winlator
 
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
@@ -78,7 +78,7 @@ class ZstdDecompressor @Inject constructor() {
    val tzstFileSize = tzstFile.length()
    var bytesProcessed = 0L
 
-   Log.i(TAG, "Extracting tzst archive: ${tzstFile.name} (${tzstFileSize / 1024}KB)")
+   AppLogger.i(TAG, "Extracting tzst archive: ${tzstFile.name} (${tzstFileSize / 1024}KB)")
    progressCallback?.invoke(0.0f, "Extracting ${tzstFile.name}...")
 
    BufferedInputStream(FileInputStream(tzstFile)).use { bufferedInput ->
@@ -91,7 +91,7 @@ class ZstdDecompressor @Inject constructor() {
 
        // Security: Prevent path traversal attacks
        if (!outputFile.canonicalPath.startsWith(targetDir.canonicalPath)) {
-        Log.w(TAG, "Skipping suspicious entry: ${entry.name}")
+        AppLogger.w(TAG, "Skipping suspicious entry: ${entry.name}")
         entry = tarInput.nextEntry as TarArchiveEntry?
         continue
        }
@@ -99,10 +99,10 @@ class ZstdDecompressor @Inject constructor() {
        if (entry.isDirectory) {
         // Create directory
         outputFile.mkdirs()
-        Log.d(TAG, "Created directory: ${entry.name}")
+        AppLogger.d(TAG, "Created directory: ${entry.name}")
        } else if (entry.isSymbolicLink) {
         // Skip symlinks (not supported on Android)
-        Log.d(TAG, "Skipping symlink: ${entry.name} -> ${entry.linkName}")
+        AppLogger.d(TAG, "Skipping symlink: ${entry.name} -> ${entry.linkName}")
        } else {
         // Extract file
         outputFile.parentFile?.mkdirs()
@@ -122,10 +122,10 @@ class ZstdDecompressor @Inject constructor() {
 
         if (isExecutable) {
          outputFile.setExecutable(true, false)
-         Log.d(TAG, "Set executable: ${entry.name} (mode: ${mode.toString(8)})")
+         AppLogger.d(TAG, "Set executable: ${entry.name} (mode: ${mode.toString(8)})")
         }
 
-        Log.d(TAG, "Extracted: ${entry.name} (${entry.size} bytes)")
+        AppLogger.d(TAG, "Extracted: ${entry.name} (${entry.size} bytes)")
        }
 
        // Report progress (estimate 10x compression ratio)
@@ -138,11 +138,11 @@ class ZstdDecompressor @Inject constructor() {
     }
    }
 
-   Log.i(TAG, "Tzst extraction complete: ${targetDir.absolutePath}")
+   AppLogger.i(TAG, "Tzst extraction complete: ${targetDir.absolutePath}")
    progressCallback?.invoke(1.0f, "Extraction complete")
    Result.success(targetDir)
   } catch (e: Exception) {
-   Log.e(TAG, "Tzst extraction failed", e)
+   AppLogger.e(TAG, "Tzst extraction failed", e)
    Result.failure(e)
   }
  }
@@ -169,7 +169,7 @@ class ZstdDecompressor @Inject constructor() {
    val tarFileSize = tarFile.length()
    var bytesProcessed = 0L
 
-   Log.i(TAG, "Extracting tar archive: ${tarFile.name} (${tarFileSize / 1024}KB)")
+   AppLogger.i(TAG, "Extracting tar archive: ${tarFile.name} (${tarFileSize / 1024}KB)")
 
    BufferedInputStream(FileInputStream(tarFile)).use { bufferedInput ->
     TarArchiveInputStream(bufferedInput).use { tarInput ->
@@ -180,7 +180,7 @@ class ZstdDecompressor @Inject constructor() {
 
       // Security: Prevent path traversal attacks
       if (!outputFile.canonicalPath.startsWith(targetDir.canonicalPath)) {
-       Log.w(TAG, "Skipping suspicious entry: ${entry.name}")
+       AppLogger.w(TAG, "Skipping suspicious entry: ${entry.name}")
        entry = tarInput.nextEntry as TarArchiveEntry?
        continue
       }
@@ -188,7 +188,7 @@ class ZstdDecompressor @Inject constructor() {
       if (entry.isDirectory) {
        // Create directory
        outputFile.mkdirs()
-       Log.d(TAG, "Created directory: ${entry.name}")
+       AppLogger.d(TAG, "Created directory: ${entry.name}")
       } else {
        // Extract file
        outputFile.parentFile?.mkdirs()
@@ -209,10 +209,10 @@ class ZstdDecompressor @Inject constructor() {
 
        if (isExecutable) {
         outputFile.setExecutable(true, false)
-        Log.d(TAG, "Set executable: ${entry.name} (mode: ${mode.toString(8)})")
+        AppLogger.d(TAG, "Set executable: ${entry.name} (mode: ${mode.toString(8)})")
        }
 
-       Log.d(TAG, "Extracted: ${entry.name} (${entry.size} bytes)")
+       AppLogger.d(TAG, "Extracted: ${entry.name} (${entry.size} bytes)")
       }
 
       // Report progress
@@ -224,11 +224,11 @@ class ZstdDecompressor @Inject constructor() {
     }
    }
 
-   Log.i(TAG, "Tar extraction complete: ${targetDir.absolutePath}")
+   AppLogger.i(TAG, "Tar extraction complete: ${targetDir.absolutePath}")
    progressCallback?.invoke(1.0f)
    Result.success(targetDir)
   } catch (e: Exception) {
-   Log.e(TAG, "Tar extraction failed", e)
+   AppLogger.e(TAG, "Tar extraction failed", e)
    Result.failure(e)
   }
  }
@@ -240,7 +240,7 @@ class ZstdDecompressor @Inject constructor() {
   * @return Estimated decompressed size in bytes, or null if cannot determine
   */
  fun getDecompressedSize(tzstFile: File): Long? {
-  Log.w(TAG, "Zstandard decompression is temporarily unavailable")
+  AppLogger.w(TAG, "Zstandard decompression is temporarily unavailable")
   return null
  }
 
@@ -271,7 +271,7 @@ class ZstdDecompressor @Inject constructor() {
    val txzFileSize = txzFile.length()
    var bytesProcessed = 0L
 
-   Log.i(TAG, "Extracting txz archive: ${txzFile.name} (${txzFileSize / 1024 / 1024}MB)")
+   AppLogger.i(TAG, "Extracting txz archive: ${txzFile.name} (${txzFileSize / 1024 / 1024}MB)")
    progressCallback?.invoke(0.0f, "Extracting ${txzFile.name}...")
 
    BufferedInputStream(FileInputStream(txzFile)).use { bufferedInput ->
@@ -284,7 +284,7 @@ class ZstdDecompressor @Inject constructor() {
 
        // Security: Prevent path traversal attacks
        if (!outputFile.canonicalPath.startsWith(targetDir.canonicalPath)) {
-        Log.w(TAG, "Skipping suspicious entry: ${entry.name}")
+        AppLogger.w(TAG, "Skipping suspicious entry: ${entry.name}")
         entry = tarInput.nextEntry as TarArchiveEntry?
         continue
        }
@@ -292,10 +292,10 @@ class ZstdDecompressor @Inject constructor() {
        if (entry.isDirectory) {
         // Create directory
         outputFile.mkdirs()
-        Log.d(TAG, "Created directory: ${entry.name}")
+        AppLogger.d(TAG, "Created directory: ${entry.name}")
        } else if (entry.isSymbolicLink) {
         // Skip symlinks on Windows (not supported)
-        Log.d(TAG, "Skipping symlink: ${entry.name} -> ${entry.linkName}")
+        AppLogger.d(TAG, "Skipping symlink: ${entry.name} -> ${entry.linkName}")
        } else {
         // Extract file
         outputFile.parentFile?.mkdirs()
@@ -315,10 +315,10 @@ class ZstdDecompressor @Inject constructor() {
 
         if (isExecutable) {
          outputFile.setExecutable(true, false)
-         Log.d(TAG, "Set executable: ${entry.name} (mode: ${mode.toString(8)})")
+         AppLogger.d(TAG, "Set executable: ${entry.name} (mode: ${mode.toString(8)})")
         }
 
-        Log.d(TAG, "Extracted: ${entry.name} (${entry.size} bytes)")
+        AppLogger.d(TAG, "Extracted: ${entry.name} (${entry.size} bytes)")
        }
 
        // Report progress
@@ -331,11 +331,11 @@ class ZstdDecompressor @Inject constructor() {
     }
    }
 
-   Log.i(TAG, "Txz extraction complete: ${targetDir.absolutePath}")
+   AppLogger.i(TAG, "Txz extraction complete: ${targetDir.absolutePath}")
    progressCallback?.invoke(1.0f, "Extraction complete")
    Result.success(targetDir)
   } catch (e: Exception) {
-   Log.e(TAG, "Txz extraction failed", e)
+   AppLogger.e(TAG, "Txz extraction failed", e)
    Result.failure(e)
   }
  }
@@ -347,7 +347,7 @@ class ZstdDecompressor @Inject constructor() {
   * @return true if valid zstd file
   */
  fun isValidZstd(file: File): Boolean {
-  Log.w(TAG, "Zstandard validation is temporarily unavailable")
+  AppLogger.w(TAG, "Zstandard validation is temporarily unavailable")
   return false
  }
 }

@@ -1,6 +1,6 @@
 package com.steamdeck.mobile.core.steam
 
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import java.io.File
 
 /**
@@ -63,7 +63,7 @@ object AppManifestParser {
                 return Result.failure(Exception("Cannot read manifest file: ${file.absolutePath}"))
             }
 
-            Log.d(TAG, "Parsing ACF manifest: ${file.name}")
+            AppLogger.d(TAG, "Parsing ACF manifest: ${file.name}")
 
             val content = file.readText()
 
@@ -98,12 +98,12 @@ object AppManifestParser {
                 lastUpdated = lastUpdated
             )
 
-            Log.d(TAG, "Parsed manifest: appId=$appId, name=$name, stateFlags=$stateFlags")
+            AppLogger.d(TAG, "Parsed manifest: appId=$appId, name=$name, stateFlags=$stateFlags")
 
             Result.success(manifest)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse ACF manifest: ${file.absolutePath}", e)
+            AppLogger.e(TAG, "Failed to parse ACF manifest: ${file.absolutePath}", e)
             Result.failure(e)
         }
     }

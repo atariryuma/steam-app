@@ -2,7 +2,7 @@ package com.steamdeck.mobile.core.winlator
 
 import android.content.Context
 import android.system.Os
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.util.ElfPatcher
 import com.steamdeck.mobile.core.wine.WineMonoInstaller
 import com.steamdeck.mobile.domain.emulator.*
@@ -113,10 +113,10 @@ class WinlatorEmulator @Inject constructor(
 
    val isAvailable = binariesExist && rootfsExtracted
 
-   Log.d(TAG, "Winlator availability: binaries=$binariesExist, rootfs=$rootfsExtracted")
+   AppLogger.d(TAG, "Winlator availability: binaries=$binariesExist, rootfs=$rootfsExtracted")
    Result.success(isAvailable)
   } catch (e: Exception) {
-   Log.e(TAG, "Error checking availability", e)
+   AppLogger.e(TAG, "Error checking availability", e)
    Result.failure(EmulatorException("Failed to check Winlator availability", e))
   }
  }
@@ -125,7 +125,7 @@ class WinlatorEmulator @Inject constructor(
   progressCallback: ((Float, String) -> Unit)?
  ): Result<Unit> = withContext(Dispatchers.IO) {
   try {
-   Log.i(TAG, "Initializing Winlator emulator...")
+   AppLogger.i(TAG, "Initializing Winlator emulator...")
    progressCallback?.invoke(0.0f, "Initializing Winlator...")
 
    // Create directories
@@ -156,7 +156,7 @@ class WinlatorEmulator @Inject constructor(
      }
 
      if (extractResult.isFailure) {
-      Log.e(TAG, "Failed to extract PRoot", extractResult.exceptionOrNull())
+      AppLogger.e(TAG, "Failed to extract PRoot", extractResult.exceptionOrNull())
       return@withContext Result.failure(
        EmulatorException("Failed to extract PRoot: ${extractResult.exceptionOrNull()?.message}")
       )
@@ -182,27 +182,27 @@ class WinlatorEmulator @Inject constructor(
 
      // Make sure it's executable
      prootBinary.setExecutable(true, false)
-     Log.i(TAG, "PRoot extracted and set executable: ${prootBinary.absolutePath}")
+     AppLogger.i(TAG, "PRoot extracted and set executable: ${prootBinary.absolutePath}")
 
      // EXPERIMENTAL: Disable PRoot PIE/TLS patches (testing if patches cause SIGSEGV)
      // // Patch PRoot to PIE format (ET_DYN) for Android 5.0+ compatibility
      // val patchResult = ElfPatcher.patchToPie(prootBinary)
      // if (patchResult.isFailure) {
-     //  Log.w(TAG, "Failed to patch PRoot to PIE: ${patchResult.exceptionOrNull()?.message}")
+     //  AppLogger.w(TAG, "Failed to patch PRoot to PIE: ${patchResult.exceptionOrNull()?.message}")
      //  // Continue anyway - binary might already be PIE
      // }
 
      // // Patch TLS alignment for Android 12+ (requires 64-byte alignment)
      // val tlsPatchResult = ElfPatcher.patchTlsAlignment(prootBinary, 64)
      // if (tlsPatchResult.isFailure) {
-     //  Log.w(TAG, "Failed to patch PRoot TLS alignment: ${tlsPatchResult.exceptionOrNull()?.message}")
+     //  AppLogger.w(TAG, "Failed to patch PRoot TLS alignment: ${tlsPatchResult.exceptionOrNull()?.message}")
      //  // Continue anyway - might already be aligned
      // }
-     Log.i(TAG, "PRoot extracted, skipping PIE/TLS patches to test original binary")
+     AppLogger.i(TAG, "PRoot extracted, skipping PIE/TLS patches to test original binary")
 
      progressCallback?.invoke(0.15f, "PRoot ready")
     } else {
-     Log.e(TAG, "PRoot .txz file not found: ${prootTxzFile.absolutePath}")
+     AppLogger.e(TAG, "PRoot .txz file not found: ${prootTxzFile.absolutePath}")
      return@withContext Result.failure(
       EmulatorException("PRoot asset file not found")
      )
@@ -215,21 +215,21 @@ class WinlatorEmulator @Inject constructor(
    // PRoot v5.3.0 is already statically linked and may not need PIE/TLS patches
    // TODO: Re-enable if proot works without patches, or try different proot version
    if (prootBinary.exists()) {
-    Log.i(TAG, "PRoot binary exists, skipping PIE/TLS patches (testing if patches cause SIGSEGV)")
+    AppLogger.i(TAG, "PRoot binary exists, skipping PIE/TLS patches (testing if patches cause SIGSEGV)")
     // // Verify and patch PIE if needed
     // val patchPieResult = ElfPatcher.patchToPie(prootBinary)
     // if (patchPieResult.isFailure) {
-    //  Log.w(TAG, "PRoot PIE patch check failed: ${patchPieResult.exceptionOrNull()?.message}")
+    //  AppLogger.w(TAG, "PRoot PIE patch check failed: ${patchPieResult.exceptionOrNull()?.message}")
     // } else {
-    //  Log.d(TAG, "PRoot PIE patch verified/applied")
+    //  AppLogger.d(TAG, "PRoot PIE patch verified/applied")
     // }
 
     // // Verify and patch TLS if needed
     // val patchTlsResult = ElfPatcher.patchTlsAlignment(prootBinary, 64)
     // if (patchTlsResult.isFailure) {
-    //  Log.w(TAG, "PRoot TLS patch check failed: ${patchTlsResult.exceptionOrNull()?.message}")
+    //  AppLogger.w(TAG, "PRoot TLS patch check failed: ${patchTlsResult.exceptionOrNull()?.message}")
     // } else {
-    //  Log.d(TAG, "PRoot TLS alignment verified/applied")
+    //  AppLogger.d(TAG, "PRoot TLS alignment verified/applied")
     // }
    }
 
@@ -254,7 +254,7 @@ class WinlatorEmulator @Inject constructor(
      }
 
      if (extractResult.isFailure) {
-      Log.e(TAG, "Failed to extract Box64", extractResult.exceptionOrNull())
+      AppLogger.e(TAG, "Failed to extract Box64", extractResult.exceptionOrNull())
       return@withContext Result.failure(
        Box64BinaryNotFoundException(
         "Failed to extract Box64: ${extractResult.exceptionOrNull()?.message}"
@@ -268,7 +268,7 @@ class WinlatorEmulator @Inject constructor(
       // Move binary to expected location
       extractedBox64.copyTo(box64Binary, overwrite = true)
       box64Binary.setExecutable(true, false)
-      Log.i(TAG, "Box64 binary moved from ${extractedBox64.absolutePath} to ${box64Binary.absolutePath}")
+      AppLogger.i(TAG, "Box64 binary moved from ${extractedBox64.absolutePath} to ${box64Binary.absolutePath}")
 
       // Clean up extracted directory structure
       File(box64Dir, "usr").deleteRecursively()
@@ -285,25 +285,25 @@ class WinlatorEmulator @Inject constructor(
 
      // Make sure it's executable
      box64Binary.setExecutable(true, false)
-     Log.i(TAG, "Box64 extracted and set executable: ${box64Binary.absolutePath}")
+     AppLogger.i(TAG, "Box64 extracted and set executable: ${box64Binary.absolutePath}")
 
      // Patch Box64 to PIE format (ET_DYN) for Android 5.0+ compatibility
      val patchResult = ElfPatcher.patchToPie(box64Binary)
      if (patchResult.isFailure) {
-      Log.w(TAG, "Failed to patch Box64 to PIE: ${patchResult.exceptionOrNull()?.message}")
+      AppLogger.w(TAG, "Failed to patch Box64 to PIE: ${patchResult.exceptionOrNull()?.message}")
       // Continue anyway - binary might already be PIE
      }
 
      // Patch TLS alignment for Android 12+ (requires 64-byte alignment)
      val tlsPatchResult = ElfPatcher.patchTlsAlignment(box64Binary, 64)
      if (tlsPatchResult.isFailure) {
-      Log.w(TAG, "Failed to patch Box64 TLS alignment: ${tlsPatchResult.exceptionOrNull()?.message}")
+      AppLogger.w(TAG, "Failed to patch Box64 TLS alignment: ${tlsPatchResult.exceptionOrNull()?.message}")
       // Continue anyway - might not have PT_TLS segment
      }
 
      progressCallback?.invoke(0.3f, "Box64 ready")
     } else {
-     Log.e(TAG, "Box64 .txz file not found: ${box64TxzFile.absolutePath}")
+     AppLogger.e(TAG, "Box64 .txz file not found: ${box64TxzFile.absolutePath}")
      return@withContext Result.failure(
       Box64BinaryNotFoundException("Box64 asset file not found")
      )
@@ -317,13 +317,13 @@ class WinlatorEmulator @Inject constructor(
     // Verify and patch PIE if needed
     val patchPieResult = ElfPatcher.patchToPie(box64Binary)
     if (patchPieResult.isFailure) {
-     Log.w(TAG, "Box64 PIE patch check failed: ${patchPieResult.exceptionOrNull()?.message}")
+     AppLogger.w(TAG, "Box64 PIE patch check failed: ${patchPieResult.exceptionOrNull()?.message}")
     }
 
     // Verify and patch TLS if needed
     val patchTlsResult = ElfPatcher.patchTlsAlignment(box64Binary, 64)
     if (patchTlsResult.isFailure) {
-     Log.w(TAG, "Box64 TLS patch check failed: ${patchTlsResult.exceptionOrNull()?.message}")
+     AppLogger.w(TAG, "Box64 TLS patch check failed: ${patchTlsResult.exceptionOrNull()?.message}")
     }
    }
 
@@ -363,12 +363,12 @@ class WinlatorEmulator @Inject constructor(
       // 0.4 to 1.0 = 60% of total progress
       progressCallback?.invoke(0.4f + extractProgress * 0.6f, status)
      }.onSuccess {
-      Log.i(TAG, "Rootfs extraction successful")
+      AppLogger.i(TAG, "Rootfs extraction successful")
 
       // Verify Wine binary exists
       if (wineBinary.exists()) {
        wineBinary.setExecutable(true, false)
-       Log.i(TAG, "Wine binary ready: ${wineBinary.absolutePath}")
+       AppLogger.i(TAG, "Wine binary ready: ${wineBinary.absolutePath}")
 
        // Set wineserver executable
        val wineserver = File(wineDir, "bin/wineserver")
@@ -376,18 +376,18 @@ class WinlatorEmulator @Inject constructor(
         wineserver.setExecutable(true, false)
        }
       } else {
-       Log.w(TAG, "Wine binary not found after extraction at: ${wineBinary.absolutePath}")
+       AppLogger.w(TAG, "Wine binary not found after extraction at: ${wineBinary.absolutePath}")
       }
 
       // Delete temporary .txz file to save space
       if (rootfsTxzFile.exists()) {
        rootfsTxzFile.delete()
-       Log.d(TAG, "Cleaned up temporary rootfs.txz file")
+       AppLogger.d(TAG, "Cleaned up temporary rootfs.txz file")
       }
 
       // Setup hardcoded linker path now that rootfs is extracted
       setupHardcodedLinkerPath()
-      Log.d(TAG, "setupHardcodedLinkerPath() completed")
+      AppLogger.d(TAG, "setupHardcodedLinkerPath() completed")
 
       // NOTE: Wine hardcoded path issue is now handled by proot virtualization
       // Wine binaries have compile-time hardcoded paths (/data/data/com.winlator/files/rootfs/tmp)
@@ -398,28 +398,28 @@ class WinlatorEmulator @Inject constructor(
       // CRITICAL FIX: Short Symlink Strategy for PT_INTERP size limit
       // Problem: actualLinker path is 89 chars, PT_INTERP limit is 63 bytes
       // Solution: Create short symlink (~43 chars) pointing to actual glibc linker
-      Log.d(TAG, "Starting Box64 interpreter path patch...")
+      AppLogger.d(TAG, "Starting Box64 interpreter path patch...")
       val actualLinker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
       val shortLinkerSymlink = File(context.filesDir, "l")
 
-      Log.d(TAG, "actualLinker: ${actualLinker.absolutePath} (${actualLinker.absolutePath.length} chars)")
-      Log.d(TAG, "shortSymlink: ${shortLinkerSymlink.absolutePath} (${shortLinkerSymlink.absolutePath.length} chars)")
+      AppLogger.d(TAG, "actualLinker: ${actualLinker.absolutePath} (${actualLinker.absolutePath.length} chars)")
+      AppLogger.d(TAG, "shortSymlink: ${shortLinkerSymlink.absolutePath} (${shortLinkerSymlink.absolutePath.length} chars)")
 
       if (actualLinker.exists() && box64Binary.exists()) {
        try {
         // Remove old symlink if exists
         if (shortLinkerSymlink.exists()) {
          shortLinkerSymlink.delete()
-         Log.d(TAG, "Removed existing symlink")
+         AppLogger.d(TAG, "Removed existing symlink")
         }
 
         // Create symlink using native Android API (no external commands)
         Os.symlink(actualLinker.absolutePath, shortLinkerSymlink.absolutePath)
-        Log.i(TAG, "Created symlink: ${shortLinkerSymlink.absolutePath} -> ${actualLinker.absolutePath}")
+        AppLogger.i(TAG, "Created symlink: ${shortLinkerSymlink.absolutePath} -> ${actualLinker.absolutePath}")
 
         // Verify symlink
         if (!shortLinkerSymlink.exists()) {
-         Log.e(TAG, "Symlink creation failed - file doesn't exist")
+         AppLogger.e(TAG, "Symlink creation failed - file doesn't exist")
          return@withContext Result.failure(
           EmulatorException("Failed to create linker symlink")
          )
@@ -432,41 +432,41 @@ class WinlatorEmulator @Inject constructor(
         )
 
         if (patchResult.isSuccess) {
-         Log.i(TAG, "Successfully patched Box64 interpreter to: ${shortLinkerSymlink.absolutePath}")
+         AppLogger.i(TAG, "Successfully patched Box64 interpreter to: ${shortLinkerSymlink.absolutePath}")
         } else {
-         Log.e(TAG, "Failed to patch Box64 interpreter", patchResult.exceptionOrNull())
+         AppLogger.e(TAG, "Failed to patch Box64 interpreter", patchResult.exceptionOrNull())
          return@withContext Result.failure(
           patchResult.exceptionOrNull() ?: EmulatorException("Box64 interpreter patch failed")
          )
         }
        } catch (e: Exception) {
-        Log.e(TAG, "Failed to setup linker symlink", e)
+        AppLogger.e(TAG, "Failed to setup linker symlink", e)
         return@withContext Result.failure(
          EmulatorException("Linker symlink setup failed: ${e.message}", e)
         )
        }
       } else {
-       Log.w(TAG, "Skipping Box64 patch: actualLinker=${actualLinker.exists()}, box64=${box64Binary.exists()}")
+       AppLogger.w(TAG, "Skipping Box64 patch: actualLinker=${actualLinker.exists()}, box64=${box64Binary.exists()}")
       }
 
       // EXPERIMENTAL: Skip proot PT_INTERP patch
       // PRoot is statically linked and has NO PT_INTERP header (logs show "No PT_INTERP header found")
       // Patching it is unnecessary and may cause issues
-      Log.d(TAG, "Skipping PRoot interpreter path patch (statically linked, no PT_INTERP)")
+      AppLogger.d(TAG, "Skipping PRoot interpreter path patch (statically linked, no PT_INTERP)")
 
       // CRITICAL FIX: Create libfreetype.so.6 symlink for Wine/Box64
       // Wine+Box64 needs libfreetype.so.6 for font rendering (Steam installer GUI)
       // Rootfs has libfreetype.so.6.20.2 but no .so.6 symlink → "cannot find FreeType library"
       setupLibrarySymlinks()
      }.onFailure { error ->
-      Log.e(TAG, "Rootfs extraction failed: ${error.message}", error)
+      AppLogger.e(TAG, "Rootfs extraction failed: ${error.message}", error)
       return@withContext Result.failure(
        EmulatorException("Failed to extract Wine rootfs: ${error.message}", error)
       )
      }
     }
    } else {
-    Log.i(TAG, "Wine already extracted, skipping")
+    AppLogger.i(TAG, "Wine already extracted, skipping")
     // Ensure linker is setup even if rootfs was already extracted
     setupHardcodedLinkerPath()
 
@@ -485,7 +485,7 @@ class WinlatorEmulator @Inject constructor(
 
       // Create symlink using native Android API
       Os.symlink(actualLinker.absolutePath, shortLinkerSymlink.absolutePath)
-      Log.i(TAG, "Created symlink: ${shortLinkerSymlink.absolutePath} -> ${actualLinker.absolutePath}")
+      AppLogger.i(TAG, "Created symlink: ${shortLinkerSymlink.absolutePath} -> ${actualLinker.absolutePath}")
 
       // Patch Box64 to use short symlink path
       val patchResult = ElfPatcher.patchInterpreterPath(
@@ -494,20 +494,20 @@ class WinlatorEmulator @Inject constructor(
       )
 
       if (patchResult.isSuccess) {
-       Log.i(TAG, "Successfully patched Box64 with short symlink")
+       AppLogger.i(TAG, "Successfully patched Box64 with short symlink")
       } else {
-       Log.e(TAG, "Box64 patch failed", patchResult.exceptionOrNull())
+       AppLogger.e(TAG, "Box64 patch failed", patchResult.exceptionOrNull())
       }
      } catch (e: Exception) {
-      Log.e(TAG, "Symlink setup failed", e)
+      AppLogger.e(TAG, "Symlink setup failed", e)
      }
     } else {
-     Log.w(TAG, "Skipping Box64 patch: linker=${actualLinker.exists()}, box64=${box64Binary.exists()}")
+     AppLogger.w(TAG, "Skipping Box64 patch: linker=${actualLinker.exists()}, box64=${box64Binary.exists()}")
     }
 
     // EXPERIMENTAL: Skip proot PT_INTERP patch (Wine already extracted case)
     // PRoot is statically linked and has NO PT_INTERP header
-    Log.d(TAG, "Skipping PRoot interpreter path patch (Wine already extracted, proot is statically linked)")
+    AppLogger.d(TAG, "Skipping PRoot interpreter path patch (Wine already extracted, proot is statically linked)")
 
     // CRITICAL FIX: Ensure library symlinks even if Wine already extracted
     setupLibrarySymlinks()
@@ -517,10 +517,10 @@ class WinlatorEmulator @Inject constructor(
 
    progressCallback?.invoke(1.0f, "Initialization complete")
 
-   Log.i(TAG, "Winlator initialization complete")
+   AppLogger.i(TAG, "Winlator initialization complete")
    Result.success(Unit)
   } catch (e: Exception) {
-   Log.e(TAG, "Initialization failed", e)
+   AppLogger.e(TAG, "Initialization failed", e)
    Result.failure(EmulatorException("Failed to initialize Winlator: ${e.message}", e))
   }
  }
@@ -540,7 +540,7 @@ class WinlatorEmulator @Inject constructor(
 
    // Check if container already exists (prevent duplicate creation)
    if (containerDir.exists()) {
-    Log.w(TAG, "Container already exists: $containerId, skipping creation")
+    AppLogger.w(TAG, "Container already exists: $containerId, skipping creation")
     // Return existing container info
     return@withContext Result.success(
      EmulatorContainer(
@@ -565,7 +565,7 @@ class WinlatorEmulator @Inject constructor(
    // Initialize Wine prefix with wineboot
    val initResult = initializeWinePrefix(containerDir)
    if (initResult.isFailure) {
-    Log.e(TAG, "Wine prefix initialization failed: ${initResult.exceptionOrNull()?.message}")
+    AppLogger.e(TAG, "Wine prefix initialization failed: ${initResult.exceptionOrNull()?.message}")
     containerDir.deleteRecursively()
     return@withContext Result.failure(
      initResult.exceptionOrNull()
@@ -575,10 +575,10 @@ class WinlatorEmulator @Inject constructor(
 
    // Run wineboot with -u to update the Wine prefix (loads services)
    // This is the "Normal (Load all services)" mode recommended for Steam
-   Log.i(TAG, "Running wineboot -u to load services...")
+   AppLogger.i(TAG, "Running wineboot -u to load services...")
    val updateResult = runWinebootUpdate(containerDir)
    if (updateResult.isFailure) {
-    Log.w(TAG, "wineboot -u failed (non-fatal): ${updateResult.exceptionOrNull()?.message}")
+    AppLogger.w(TAG, "wineboot -u failed (non-fatal): ${updateResult.exceptionOrNull()?.message}")
    }
 
    // CRITICAL FIX: Create C:\windows\system32\ directory manually
@@ -593,42 +593,74 @@ class WinlatorEmulator @Inject constructor(
      system32Dir.setReadable(true, false)
      system32Dir.setWritable(true, false)
      system32Dir.setExecutable(true, false)
-     Log.i(TAG, "Created C:\\windows\\system32\\ directory with correct permissions")
+     AppLogger.i(TAG, "Created C:\\windows\\system32\\ directory with correct permissions")
     }
    } catch (e: Exception) {
-    Log.w(TAG, "Failed to create system32 directory (non-fatal)", e)
+    AppLogger.w(TAG, "Failed to create system32 directory (non-fatal)", e)
+   }
+
+   // CRITICAL: Copy WoW64 DLLs to system32 for 32-bit app support
+   // Wine 9.2+ WoW64 mode requires these DLLs to run 32-bit Windows executables
+   try {
+    val system32Dir = File(containerDir, "drive_c/windows/system32")
+    val wineLibDir = File(wineDir, "lib/wine/x86_64-windows")
+    // WoW64 core DLLs + dependencies required for 32-bit app execution
+    val wow64Dlls = listOf(
+     "wow64.dll",       // WoW64 core
+     "wow64cpu.dll",    // WoW64 CPU emulation
+     "wow64win.dll",    // WoW64 Windows API bridge
+     "win32u.dll",      // Win32 user mode library (required by wow64win.dll)
+     "ntdll.dll",       // NT kernel interface (required by all WoW64 DLLs)
+     "kernelbase.dll",  // Kernel base library
+     "kernel32.dll"     // Win32 kernel API
+    )
+
+    wow64Dlls.forEach { dllName ->
+     val sourceDll = File(wineLibDir, dllName)
+     val targetDll = File(system32Dir, dllName)
+
+     if (sourceDll.exists()) {
+      sourceDll.copyTo(targetDll, overwrite = true)
+      AppLogger.i(TAG, "Copied WoW64 DLL: $dllName (${sourceDll.length()} bytes)")
+     } else {
+      AppLogger.w(TAG, "WoW64 DLL not found: ${sourceDll.absolutePath}")
+     }
+    }
+    AppLogger.i(TAG, "WoW64 DLLs installed successfully for 32-bit app support")
+   } catch (e: Exception) {
+    AppLogger.w(TAG, "Failed to copy WoW64 DLLs (non-fatal): ${e.message}", e)
    }
 
    // Set Windows version to Windows 10 (required for Steam)
    // Use direct registry edit (Winlator method) instead of wine regedit to avoid proot crashes
-   Log.i(TAG, "Configuring Wine to report as Windows 10...")
+   AppLogger.i(TAG, "Configuring Wine to report as Windows 10...")
    val directEditSuccess = setWindowsVersionDirect(containerDir)
    if (!directEditSuccess) {
-    Log.w(TAG, "Direct registry edit failed, trying fallback method...")
+    AppLogger.w(TAG, "Direct registry edit failed, trying fallback method...")
     // Fallback: try the old wine regedit method
     val versionResult = setWindowsVersion(containerDir)
     if (versionResult.isFailure) {
-     Log.e(TAG, "CRITICAL: Failed to set Windows version: ${versionResult.exceptionOrNull()?.message}")
-     Log.e(TAG, "Steam installation will likely fail without Windows 10 registry configuration")
+     AppLogger.e(TAG, "CRITICAL: Failed to set Windows version: ${versionResult.exceptionOrNull()?.message}")
+     AppLogger.e(TAG, "Steam installation will likely fail without Windows 10 registry configuration")
     } else {
-     Log.i(TAG, "Windows 10 registry configuration completed via fallback method")
+     AppLogger.i(TAG, "Windows 10 registry configuration completed via fallback method")
     }
    } else {
-    Log.i(TAG, "Windows 10 registry configuration completed successfully (direct edit)")
+    AppLogger.i(TAG, "Windows 10 registry configuration completed successfully (direct edit)")
    }
 
    // NEW: Install Wine Mono for .NET Framework compatibility
    // Required for 32-bit applications (e.g., SteamSetup.exe NSIS installer)
    try {
-    Log.i(TAG, "Installing Wine Mono for WoW64 support...")
+    AppLogger.i(TAG, "Installing Wine Mono for WoW64 support...")
     val monoInstallResult = installWineMonoIfNeeded(containerDir)
     if (monoInstallResult.isFailure) {
-     Log.w(TAG, "Wine Mono installation failed (non-fatal): ${monoInstallResult.exceptionOrNull()?.message}")
+     AppLogger.w(TAG, "Wine Mono installation failed (non-fatal): ${monoInstallResult.exceptionOrNull()?.message}")
     } else {
-     Log.i(TAG, "Wine Mono installation completed successfully")
+     AppLogger.i(TAG, "Wine Mono installation completed successfully")
     }
    } catch (e: Exception) {
-    Log.w(TAG, "Wine Mono installation error (non-fatal)", e)
+    AppLogger.w(TAG, "Wine Mono installation error (non-fatal)", e)
    }
 
    val container = EmulatorContainer(
@@ -641,10 +673,10 @@ class WinlatorEmulator @Inject constructor(
     sizeBytes = calculateDirectorySize(containerDir)
    )
 
-   Log.i(TAG, "Created container: ${container.name} (${container.id})")
+   AppLogger.i(TAG, "Created container: ${container.name} (${container.id})")
    Result.success(container)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to create container", e)
+   AppLogger.e(TAG, "Failed to create container", e)
    Result.failure(EmulatorException("Failed to create container: ${e.message}", e))
   }
  }
@@ -669,14 +701,14 @@ class WinlatorEmulator @Inject constructor(
       sizeBytes = calculateDirectorySize(dir)
      )
     } catch (e: Exception) {
-     Log.w(TAG, "Failed to load container ${dir.name}", e)
+     AppLogger.w(TAG, "Failed to load container ${dir.name}", e)
      null
     }
    } ?: emptyList()
 
    Result.success(containers)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to list containers", e)
+   AppLogger.e(TAG, "Failed to list containers", e)
    Result.failure(EmulatorException("Failed to list containers", e))
   }
  }
@@ -691,10 +723,10 @@ class WinlatorEmulator @Inject constructor(
    }
 
    containerDir.deleteRecursively()
-   Log.i(TAG, "Deleted container: $containerId")
+   AppLogger.i(TAG, "Deleted container: $containerId")
    Result.success(Unit)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to delete container", e)
+   AppLogger.e(TAG, "Failed to delete container", e)
    Result.failure(EmulatorException("Failed to delete container", e))
   }
  }
@@ -705,8 +737,8 @@ class WinlatorEmulator @Inject constructor(
   arguments: List<String>
  ): Result<EmulatorProcess> = withContext(Dispatchers.IO) {
   try {
-   Log.i(TAG, "Launching executable: ${executable.absolutePath}")
-   Log.d(TAG, "Container: ${container.name}, Arguments: $arguments")
+   AppLogger.i(TAG, "Launching executable: ${executable.absolutePath}")
+   AppLogger.d(TAG, "Container: ${container.name}, Arguments: $arguments")
 
    // 1. Verify executable exists
    if (!executable.exists()) {
@@ -756,8 +788,8 @@ class WinlatorEmulator @Inject constructor(
     addAll(arguments)
    }
 
-   Log.d(TAG, "Command: ${command.joinToString(" ")}")
-   Log.d(TAG, "Environment: $environmentVars")
+   AppLogger.d(TAG, "Command: ${command.joinToString(" ")}")
+   AppLogger.d(TAG, "Environment: $environmentVars")
 
    // 5. Start process
    val processBuilder = ProcessBuilder(command)
@@ -774,13 +806,13 @@ class WinlatorEmulator @Inject constructor(
    // Setting to executable's parent causes "could not open working directory" errors
    // because Wine tries to access it as a Windows path (C:\...) which doesn't exist
    processBuilder.directory(File("/"))
-   Log.d(TAG, "Working directory: /")
+   AppLogger.d(TAG, "Working directory: /")
 
    val process = processBuilder.start()
    val pid = getPid(process)
    val processId = "${System.currentTimeMillis()}_$pid"
 
-   Log.i(TAG, "Process launched: PID=$pid, ProcessId=$processId")
+   AppLogger.i(TAG, "Process launched: PID=$pid, ProcessId=$processId")
 
    // 6. CRITICAL FIX: Drain process output to prevent buffer overflow deadlock
    // Launch background coroutine to continuously read stdout
@@ -799,17 +831,17 @@ class WinlatorEmulator @Inject constructor(
            line.contains("warn", ignoreCase = true) ||
            line.contains("fail", ignoreCase = true) ||
            lineCount < 50) {
-        Log.d(TAG, "[Wine:$pid] $line")
+        AppLogger.d(TAG, "[Wine:$pid] $line")
        }
        lineCount++
       }
       if (lineCount >= 50) {
-       Log.d(TAG, "[Wine:$pid] ... ($lineCount total lines, showing errors only)")
+       AppLogger.d(TAG, "[Wine:$pid] ... ($lineCount total lines, showing errors only)")
       }
      }
     } catch (e: Exception) {
      // Stream closed or read interrupted - this is expected on process termination
-     Log.d(TAG, "[Wine:$pid] Output stream monitoring stopped: ${e.message}")
+     AppLogger.d(TAG, "[Wine:$pid] Output stream monitoring stopped: ${e.message}")
     }
    }
 
@@ -829,7 +861,7 @@ class WinlatorEmulator @Inject constructor(
 
    Result.success(emulatorProcess)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to launch executable", e)
+   AppLogger.e(TAG, "Failed to launch executable", e)
    Result.failure(ProcessLaunchException("Failed to launch executable: ${e.message}", e))
   }
  }
@@ -859,7 +891,7 @@ class WinlatorEmulator @Inject constructor(
     try {
      readProcessMetricsOnce(pid, processInfo.startTime)
     } catch (e: Exception) {
-     Log.w(TAG, "Failed to read process metrics", e)
+     AppLogger.w(TAG, "Failed to read process metrics", e)
      null
     }
    } else {
@@ -877,13 +909,13 @@ class WinlatorEmulator @Inject constructor(
 
    Result.success(status)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to get process status", e)
+   AppLogger.e(TAG, "Failed to get process status", e)
    Result.failure(EmulatorException("Failed to get process status: ${e.message}", e))
   }
  }
 
  override fun monitorProcess(processId: String, intervalMs: Long): Flow<EmulatorProcessStatus> = flow {
-  Log.i(TAG, "Starting process monitoring: $processId (interval: ${intervalMs}ms)")
+  AppLogger.i(TAG, "Starting process monitoring: $processId (interval: ${intervalMs}ms)")
 
   try {
    while (true) {
@@ -896,13 +928,13 @@ class WinlatorEmulator @Inject constructor(
 
       // If process has terminated, complete the flow
       if (!status.isRunning) {
-       Log.i(TAG, "Process terminated: $processId (exitCode: ${status.exitCode})")
+       AppLogger.i(TAG, "Process terminated: $processId (exitCode: ${status.exitCode})")
        break
       }
      }
      else -> {
       // Process not found or error - assume terminated
-      Log.w(TAG, "Process monitoring error: ${statusResult.exceptionOrNull()?.message}")
+      AppLogger.w(TAG, "Process monitoring error: ${statusResult.exceptionOrNull()?.message}")
       break
      }
     }
@@ -910,10 +942,10 @@ class WinlatorEmulator @Inject constructor(
     delay(intervalMs)
    }
   } catch (e: Exception) {
-   Log.e(TAG, "Process monitoring failed: $processId", e)
+   AppLogger.e(TAG, "Process monitoring failed: $processId", e)
    // Flow will complete naturally
   } finally {
-   Log.d(TAG, "Process monitoring stopped: $processId")
+   AppLogger.d(TAG, "Process monitoring stopped: $processId")
   }
  }.flowOn(Dispatchers.IO)
 
@@ -924,12 +956,12 @@ class WinlatorEmulator @Inject constructor(
      ProcessNotFoundException(processId)
     )
 
-   Log.i(TAG, "Killing process: $processId (force=$force)")
+   AppLogger.i(TAG, "Killing process: $processId (force=$force)")
 
    if (force) {
     // SIGKILL
     processInfo.process.destroyForcibly()
-    Log.d(TAG, "Process forcibly destroyed: $processId")
+    AppLogger.d(TAG, "Process forcibly destroyed: $processId")
    } else {
     // SIGTERM - graceful shutdown
     processInfo.process.destroy()
@@ -943,7 +975,7 @@ class WinlatorEmulator @Inject constructor(
     }
 
     if (exited == null) {
-     Log.w(TAG, "Process did not exit gracefully, force killing")
+     AppLogger.w(TAG, "Process did not exit gracefully, force killing")
      processInfo.process.destroyForcibly()
     }
    }
@@ -954,10 +986,10 @@ class WinlatorEmulator @Inject constructor(
    // Remove from active processes
    activeProcesses.remove(processId)
 
-   Log.i(TAG, "Process killed successfully: $processId")
+   AppLogger.i(TAG, "Process killed successfully: $processId")
    Result.success(Unit)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to kill process", e)
+   AppLogger.e(TAG, "Failed to kill process", e)
    Result.failure(EmulatorException("Failed to kill process: ${e.message}", e))
   }
  }
@@ -1003,10 +1035,10 @@ class WinlatorEmulator @Inject constructor(
     cacheDir.deleteRecursively()
    }
 
-   Log.i(TAG, "Cleanup freed ${bytesFreed / 1024 / 1024}MB")
+   AppLogger.i(TAG, "Cleanup freed ${bytesFreed / 1024 / 1024}MB")
    Result.success(bytesFreed)
   } catch (e: Exception) {
-   Log.e(TAG, "Cleanup failed", e)
+   AppLogger.e(TAG, "Cleanup failed", e)
    Result.failure(EmulatorException("Cleanup failed", e))
   }
  }
@@ -1047,7 +1079,7 @@ class WinlatorEmulator @Inject constructor(
     else -> put("WINEDEBUG", "+all") // MAXIMUM: All Wine debug channels
    }
 
-   put("WINEARCH", "win64")
+   put("WINEARCH", "win64") // 64-bit prefix with WoW64 for 32-bit app support (matches Winlator)
    put("WINELOADERNOEXEC", "1")
    // DO NOT set WINESERVER - let Wine find it via PATH
    // Setting WINESERVER causes Box64 nested posix_spawn to fail with ENOENT
@@ -1176,9 +1208,9 @@ class WinlatorEmulator @Inject constructor(
     if (file.exists()) {
      val deleted = file.delete()
      if (deleted) {
-      Log.d(TAG, "Cleaned up partial registry: $regFile")
+      AppLogger.d(TAG, "Cleaned up partial registry: $regFile")
      } else {
-      Log.w(TAG, "Failed to delete partial registry: $regFile")
+      AppLogger.w(TAG, "Failed to delete partial registry: $regFile")
      }
     }
    }
@@ -1188,12 +1220,12 @@ class WinlatorEmulator @Inject constructor(
     if (exists()) {
      val deleted = delete()
      if (deleted) {
-      Log.d(TAG, "Cleaned up .update-timestamp")
+      AppLogger.d(TAG, "Cleaned up .update-timestamp")
      }
     }
    }
   } catch (e: Exception) {
-   Log.w(TAG, "Failed to cleanup partial prefix", e)
+   AppLogger.w(TAG, "Failed to cleanup partial prefix", e)
    // Don't propagate - cleanup is best-effort
   }
  }
@@ -1230,7 +1262,7 @@ class WinlatorEmulator @Inject constructor(
    )
   }
   if (winebootBinary.exists() && !useWinebootBinary) {
-   Log.w(TAG, "wineboot is not an ELF binary, falling back to wineboot.exe")
+   AppLogger.w(TAG, "wineboot is not an ELF binary, falling back to wineboot.exe")
   }
 
   val linker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
@@ -1250,18 +1282,18 @@ class WinlatorEmulator @Inject constructor(
   )
   requiredLibDirs.forEach { dir ->
    if (!dir.exists()) {
-    Log.w(TAG, "Missing library directory: ${dir.absolutePath}")
-    Log.w(TAG, "Box64 may fail to load native libraries (glibc, etc.)")
+    AppLogger.w(TAG, "Missing library directory: ${dir.absolutePath}")
+    AppLogger.w(TAG, "Box64 may fail to load native libraries (glibc, etc.)")
    } else {
-    Log.d(TAG, "Verified library directory exists: ${dir.absolutePath}")
+    AppLogger.d(TAG, "Verified library directory exists: ${dir.absolutePath}")
    }
   }
 
-  Log.i(TAG, "Initializing Wine prefix: ${containerDir.absolutePath}")
-  Log.i(TAG, "Using linker: ${linker.absolutePath}")
-  Log.i(TAG, "Using box64: ${box64ToUse.absolutePath}")
-  Log.i(TAG, "Using wine: ${wineBinary.absolutePath}")
-  Log.i(
+  AppLogger.i(TAG, "Initializing Wine prefix: ${containerDir.absolutePath}")
+  AppLogger.i(TAG, "Using linker: ${linker.absolutePath}")
+  AppLogger.i(TAG, "Using box64: ${box64ToUse.absolutePath}")
+  AppLogger.i(TAG, "Using wine: ${wineBinary.absolutePath}")
+  AppLogger.i(
    TAG,
    "Using wineboot: ${if (useWinebootBinary) winebootBinary.absolutePath else winebootExe.absolutePath}"
   )
@@ -1307,7 +1339,7 @@ class WinlatorEmulator @Inject constructor(
   // - Spawned wineserver subprocess needs all env vars (BOX64_*, LD_LIBRARY_PATH)
   // - Must wait for wineserver socket to be created before launching wineboot
   try {
-   Log.i(TAG, "Pre-starting wineserver via Box64...")
+   AppLogger.i(TAG, "Pre-starting wineserver via Box64...")
    // CRITICAL: Wrap wineserver with proot for hardcoded path virtualization
    // CRITICAL: Do NOT pass linker as proot argument
    // Box64 binary already has PT_INTERP set to linker path - ELF loader handles it automatically
@@ -1342,12 +1374,12 @@ class WinlatorEmulator @Inject constructor(
       // Use while loop to continuously read until EOF (process termination)
       while (true) {
        val line = reader.readLine() ?: break  // EOF reached, process terminated
-       Log.d(TAG, "[wineserver] $line")
+       AppLogger.d(TAG, "[wineserver] $line")
       }
      }
     } catch (e: Exception) {
      // Stream closed or read interrupted - this is expected on process termination
-     Log.d(TAG, "[wineserver] Output reading stopped: ${e.message}")
+     AppLogger.d(TAG, "[wineserver] Output reading stopped: ${e.message}")
     }
    }
 
@@ -1363,7 +1395,7 @@ class WinlatorEmulator @Inject constructor(
        val socket = File(file, "socket")
        if (socket.exists()) {
         wineserverReady = true
-        Log.i(TAG, "Wineserver socket found: ${socket.absolutePath}")
+        AppLogger.i(TAG, "Wineserver socket found: ${socket.absolutePath}")
         return@forEach
        }
       }
@@ -1373,29 +1405,29 @@ class WinlatorEmulator @Inject constructor(
    }
 
    if (wineserverReady) {
-    Log.i(TAG, "Wineserver pre-started successfully")
+    AppLogger.i(TAG, "Wineserver pre-started successfully")
    } else {
-    Log.w(TAG, "Wineserver socket not found after 5s, continuing anyway...")
+    AppLogger.w(TAG, "Wineserver socket not found after 5s, continuing anyway...")
    }
   } catch (e: Exception) {
-   Log.w(TAG, "Failed to pre-start wineserver: ${e.message}")
+   AppLogger.w(TAG, "Failed to pre-start wineserver: ${e.message}")
    // Continue anyway - wineboot might still work
   }
 
   // Multi-tier retry loop with progressive timeout increase
   for (attemptNumber in 0 until MAX_RETRY_ATTEMPTS) {
    try {
-    Log.i(TAG, "=== Wine prefix initialization attempt ${attemptNumber + 1}/$MAX_RETRY_ATTEMPTS ===")
+    AppLogger.i(TAG, "=== Wine prefix initialization attempt ${attemptNumber + 1}/$MAX_RETRY_ATTEMPTS ===")
 
     // Build environment variables specific to this attempt
     val environmentVars = buildWinebootEnvironmentVariables(containerDir, attemptNumber)
 
     // Log key settings for this attempt
-    Log.d(TAG, "Attempt $attemptNumber settings:")
-    Log.d(TAG, " WINEDEBUG=${environmentVars["WINEDEBUG"]}")
-    Log.d(TAG, " BOX64_DYNAREC=${environmentVars["BOX64_DYNAREC"] ?: "enabled"}")
-    Log.d(TAG, " BOX64_DYNAREC_SAFEFLAGS=${environmentVars["BOX64_DYNAREC_SAFEFLAGS"] ?: "default"}")
-    Log.d(TAG, " BOX64_DYNAREC_STRONGMEM=${environmentVars["BOX64_DYNAREC_STRONGMEM"] ?: "default"}")
+    AppLogger.d(TAG, "Attempt $attemptNumber settings:")
+    AppLogger.d(TAG, " WINEDEBUG=${environmentVars["WINEDEBUG"]}")
+    AppLogger.d(TAG, " BOX64_DYNAREC=${environmentVars["BOX64_DYNAREC"] ?: "enabled"}")
+    AppLogger.d(TAG, " BOX64_DYNAREC_SAFEFLAGS=${environmentVars["BOX64_DYNAREC_SAFEFLAGS"] ?: "default"}")
+    AppLogger.d(TAG, " BOX64_DYNAREC_STRONGMEM=${environmentVars["BOX64_DYNAREC_STRONGMEM"] ?: "default"}")
 
     val processBuilder = ProcessBuilder(command)
     val env = processBuilder.environment()
@@ -1405,7 +1437,7 @@ class WinlatorEmulator @Inject constructor(
     env["LD_LIBRARY_PATH"] = rootfsLibraryPath
     processBuilder.redirectErrorStream(true)
 
-    Log.d(TAG, "Running: ${command.joinToString(" ")}")
+    AppLogger.d(TAG, "Running: ${command.joinToString(" ")}")
 
     val process = processBuilder.start()
 
@@ -1425,7 +1457,7 @@ class WinlatorEmulator @Inject constructor(
 
     if (exitCode == null) {
      // Timeout occurred (process already destroyed in finally block)
-     Log.w(TAG, "Attempt $attemptNumber: wineboot timed out after ${timeoutMs / 1000}s")
+     AppLogger.w(TAG, "Attempt $attemptNumber: wineboot timed out after ${timeoutMs / 1000}s")
 
      // If last attempt, fail
      if (attemptNumber == MAX_RETRY_ATTEMPTS - 1) {
@@ -1437,7 +1469,7 @@ class WinlatorEmulator @Inject constructor(
      // Cleanup and retry with exponential backoff
      cleanupPartialPrefix(containerDir)
      val backoffMs = (attemptNumber + 1) * RETRY_BACKOFF_MS
-     Log.i(TAG, "Waiting ${backoffMs / 1000}s before retry...")
+     AppLogger.i(TAG, "Waiting ${backoffMs / 1000}s before retry...")
      delay(backoffMs)
      continue
     }
@@ -1454,35 +1486,35 @@ class WinlatorEmulator @Inject constructor(
      val maxRegistryRetries = 10 // 10 x 500ms = 5 seconds
      while (registryCheckRetries < maxRegistryRetries) {
       if (systemReg.exists() && userReg.exists() && userdefReg.exists()) {
-       Log.i(TAG, "Wine prefix initialized successfully on attempt ${attemptNumber + 1}")
-       Log.d(TAG, "Verified: system.reg, user.reg, userdef.reg all present")
+       AppLogger.i(TAG, "Wine prefix initialized successfully on attempt ${attemptNumber + 1}")
+       AppLogger.d(TAG, "Verified: system.reg, user.reg, userdef.reg all present")
        return@withContext Result.success(Unit)
       }
 
       if (registryCheckRetries == 0) {
-       Log.i(TAG, "Registry files not yet created, waiting...")
+       AppLogger.i(TAG, "Registry files not yet created, waiting...")
       }
       delay(500)
       registryCheckRetries++
      }
 
      // Registry files not created despite exit code 0
-     Log.w(TAG, "wineboot returned 0 but registry files missing after ${maxRegistryRetries * 500 / 1000}s")
-     Log.w(TAG, "  system.reg exists: ${systemReg.exists()}")
-     Log.w(TAG, "  user.reg exists: ${userReg.exists()}")
-     Log.w(TAG, "  userdef.reg exists: ${userdefReg.exists()}")
+     AppLogger.w(TAG, "wineboot returned 0 but registry files missing after ${maxRegistryRetries * 500 / 1000}s")
+     AppLogger.w(TAG, "  system.reg exists: ${systemReg.exists()}")
+     AppLogger.w(TAG, "  user.reg exists: ${userReg.exists()}")
+     AppLogger.w(TAG, "  userdef.reg exists: ${userdefReg.exists()}")
 
      // Check output for c0000135 error (DLL not found)
      val hasC0000135 = output.toString().contains("c0000135", ignoreCase = true)
      if (hasC0000135) {
-      Log.e(TAG, "Detected c0000135 error (DLL not found) - Wine prefix initialization failed")
+      AppLogger.e(TAG, "Detected c0000135 error (DLL not found) - Wine prefix initialization failed")
      }
 
      // Treat as failure and retry
      if (attemptNumber < MAX_RETRY_ATTEMPTS - 1) {
       cleanupPartialPrefix(containerDir)
       val backoffMs = (attemptNumber + 1) * RETRY_BACKOFF_MS
-      Log.i(TAG, "Retrying after ${backoffMs / 1000}s...")
+      AppLogger.i(TAG, "Retrying after ${backoffMs / 1000}s...")
       delay(backoffMs)
       continue
      } else {
@@ -1494,12 +1526,12 @@ class WinlatorEmulator @Inject constructor(
 
     // Failed with non-zero exit code
     val outputTail = output.takeLast(500).toString()
-    Log.w(TAG, "Attempt $attemptNumber: wineboot exited with code $exitCode")
-    Log.d(TAG, "Output (last 500 chars): $outputTail")
+    AppLogger.w(TAG, "Attempt $attemptNumber: wineboot exited with code $exitCode")
+    AppLogger.d(TAG, "Output (last 500 chars): $outputTail")
 
     // Special handling for SIGSEGV (exit code 139)
     if (exitCode == 139) {
-     Log.e(TAG, "Attempt $attemptNumber: SIGSEGV detected (exit 139)")
+     AppLogger.e(TAG, "Attempt $attemptNumber: SIGSEGV detected (exit 139)")
     }
 
     // If last attempt, fail
@@ -1512,11 +1544,11 @@ class WinlatorEmulator @Inject constructor(
     // Cleanup and retry
     cleanupPartialPrefix(containerDir)
     val backoffMs = (attemptNumber + 1) * RETRY_BACKOFF_MS
-    Log.i(TAG, "Waiting ${backoffMs / 1000}s before retry...")
+    AppLogger.i(TAG, "Waiting ${backoffMs / 1000}s before retry...")
     delay(backoffMs)
 
    } catch (e: Exception) {
-    Log.e(TAG, "Attempt $attemptNumber: Exception during Wine prefix initialization", e)
+    AppLogger.e(TAG, "Attempt $attemptNumber: Exception during Wine prefix initialization", e)
 
     // If last attempt, fail
     if (attemptNumber == MAX_RETRY_ATTEMPTS - 1) {
@@ -1528,7 +1560,7 @@ class WinlatorEmulator @Inject constructor(
     // Cleanup and retry
     cleanupPartialPrefix(containerDir)
     val backoffMs = (attemptNumber + 1) * RETRY_BACKOFF_MS
-    Log.i(TAG, "Waiting ${backoffMs / 1000}s before retry...")
+    AppLogger.i(TAG, "Waiting ${backoffMs / 1000}s before retry...")
     delay(backoffMs)
    }
   }
@@ -1550,7 +1582,7 @@ class WinlatorEmulator @Inject constructor(
   */
  private suspend fun runWinebootUpdate(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
   try {
-   Log.i(TAG, "Running wineboot -u to load Windows services...")
+   AppLogger.i(TAG, "Running wineboot -u to load Windows services...")
 
    val command = buildList {
     add(prootBinary.absolutePath)
@@ -1573,11 +1605,11 @@ class WinlatorEmulator @Inject constructor(
    val output = StringBuilder()
    process.inputStream.bufferedReader().forEachLine { line ->
     output.appendLine(line)
-    Log.d(TAG, "[wineboot -u] $line")
+    AppLogger.d(TAG, "[wineboot -u] $line")
    }
 
    val exitCode = process.waitFor()
-   Log.i(TAG, "wineboot -u completed with exit code: $exitCode")
+   AppLogger.i(TAG, "wineboot -u completed with exit code: $exitCode")
 
    if (exitCode == 0) {
     Result.success(Unit)
@@ -1585,7 +1617,7 @@ class WinlatorEmulator @Inject constructor(
     Result.failure(EmulatorException("wineboot -u failed with exit code $exitCode"))
    }
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to run wineboot -u", e)
+   AppLogger.e(TAG, "Failed to run wineboot -u", e)
    Result.failure(e)
   }
  }
@@ -1601,7 +1633,7 @@ class WinlatorEmulator @Inject constructor(
   */
  private suspend fun setWindowsVersion(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
   try {
-   Log.i(TAG, "Setting Windows version to Windows 10")
+   AppLogger.i(TAG, "Setting Windows version to Windows 10")
 
    // Create .reg file with Windows 10 configuration
    val regFile = File(context.cacheDir, "set_windows_version.reg")
@@ -1625,7 +1657,7 @@ REGEDIT4
    // Build Wine environment
    val wineEnv = buildMap {
     put("WINEPREFIX", containerDir.absolutePath)
-    put("WINEARCH", "win64")
+    put("WINEARCH", "win64") // 64-bit prefix with WoW64 for 32-bit app support (matches Winlator)
     put("WINEDEBUG", "-all")
    }
 
@@ -1666,7 +1698,7 @@ REGEDIT4
     add(regFile.absolutePath)
    }
 
-   Log.d(TAG, "Executing regedit command: ${command.joinToString(" ")}")
+   AppLogger.d(TAG, "Executing regedit command: ${command.joinToString(" ")}")
 
    val processBuilder = ProcessBuilder(command)
 
@@ -1717,15 +1749,15 @@ REGEDIT4
    if (!completed) {
     process.destroy()
     regFile.delete()
-    Log.e(TAG, "regedit timeout after 30s. Output: $output")
+    AppLogger.e(TAG, "regedit timeout after 30s. Output: $output")
     return@withContext Result.failure(
      EmulatorException("regedit timeout after 30 seconds")
     )
    }
 
    val exitCode = process.exitValue()
-   Log.d(TAG, "regedit exit code: $exitCode")
-   Log.d(TAG, "regedit output: $output")
+   AppLogger.d(TAG, "regedit exit code: $exitCode")
+   AppLogger.d(TAG, "regedit output: $output")
 
    regFile.delete()
 
@@ -1735,11 +1767,11 @@ REGEDIT4
     )
    }
 
-   Log.i(TAG, "Successfully configured Wine to report as Windows 10")
+   AppLogger.i(TAG, "Successfully configured Wine to report as Windows 10")
    Result.success(Unit)
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to set Windows version", e)
+   AppLogger.e(TAG, "Failed to set Windows version", e)
    Result.failure(EmulatorException("Failed to set Windows version: ${e.message}", e))
   }
  }
@@ -1755,7 +1787,7 @@ REGEDIT4
   */
  private suspend fun setWindowsVersionDirect(containerDir: File): Boolean = withContext(Dispatchers.IO) {
   try {
-   Log.i(TAG, "Setting Windows version to Windows 10 (direct registry edit)")
+   AppLogger.i(TAG, "Setting Windows version to Windows 10 (direct registry edit)")
 
    val systemRegFile = File(containerDir, "system.reg")
 
@@ -1764,22 +1796,22 @@ REGEDIT4
    val maxRetries = 20  // 20 x 500ms = 10 seconds
    while (!systemRegFile.exists() && retries < maxRetries) {
     if (retries == 0) {
-     Log.i(TAG, "Waiting for system.reg to be created by wineserver...")
+     AppLogger.i(TAG, "Waiting for system.reg to be created by wineserver...")
     }
     delay(500)
     retries++
    }
 
    if (!systemRegFile.exists()) {
-    Log.e(TAG, "system.reg not found after ${maxRetries * 500 / 1000}s: ${systemRegFile.absolutePath}")
+    AppLogger.e(TAG, "system.reg not found after ${maxRetries * 500 / 1000}s: ${systemRegFile.absolutePath}")
     return@withContext false
    }
 
-   Log.i(TAG, "Found system.reg after ${retries * 500}ms")
+   AppLogger.i(TAG, "Found system.reg after ${retries * 500}ms")
 
    // Read system.reg
    val lines = systemRegFile.readLines().toMutableList()
-   Log.d(TAG, "Read ${lines.size} lines from system.reg")
+   AppLogger.d(TAG, "Read ${lines.size} lines from system.reg")
 
    // Find the CurrentVersion section (or a suitable insertion point)
    // Wine registry file uses single backslashes (escaped as \\ in Kotlin string)
@@ -1791,37 +1823,37 @@ REGEDIT4
 
     // Debug: Log lines that look like CurrentVersion sections
     if (line.contains("CurrentVersion", ignoreCase = true) && line.startsWith("[")) {
-     Log.d(TAG, "Line $i contains CurrentVersion: $line")
+     AppLogger.d(TAG, "Line $i contains CurrentVersion: $line")
     }
 
     // Check if the exact section already exists
     // Registry file format: [Software\\Microsoft\\...] with DOUBLE backslashes
     if (line.startsWith("[Software\\\\Microsoft\\\\Windows NT\\\\CurrentVersion]")) {
      currentVersionIndex = i
-     Log.d(TAG, "Found CurrentVersion section at line $i")
+     AppLogger.d(TAG, "Found CurrentVersion section at line $i")
      break
     }
     // Find a subsection like FontLink\SystemLink as insertion point
     if (insertionPoint == -1 && line.startsWith("[Software\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\")) {
      insertionPoint = i
-     Log.i(TAG, "Found CurrentVersion subsection at line $i: $line")
+     AppLogger.i(TAG, "Found CurrentVersion subsection at line $i: $line")
     }
    }
 
-   Log.d(TAG, "Search complete: currentVersionIndex=$currentVersionIndex, insertionPoint=$insertionPoint")
+   AppLogger.d(TAG, "Search complete: currentVersionIndex=$currentVersionIndex, insertionPoint=$insertionPoint")
 
    // If the section doesn't exist, create it before the first subsection
    if (currentVersionIndex == -1) {
     if (insertionPoint == -1) {
-     Log.e(TAG, "Cannot find suitable insertion point for CurrentVersion section")
-     Log.e(TAG, "First 50 lines of system.reg:")
+     AppLogger.e(TAG, "Cannot find suitable insertion point for CurrentVersion section")
+     AppLogger.e(TAG, "First 50 lines of system.reg:")
      lines.take(50).forEachIndexed { idx, line ->
-      Log.e(TAG, "  $idx: $line")
+      AppLogger.e(TAG, "  $idx: $line")
      }
      return@withContext false
     }
 
-    Log.i(TAG, "CurrentVersion section not found, creating new section at line $insertionPoint")
+    AppLogger.i(TAG, "CurrentVersion section not found, creating new section at line $insertionPoint")
     // Insert new section with timestamp
     // Use double backslashes to match Wine registry format
     val timestamp = System.currentTimeMillis()
@@ -1838,7 +1870,7 @@ REGEDIT4
    while (insertIndex < lines.size && !lines[insertIndex].startsWith("[")) {
     val line = lines[insertIndex]
     if (line.isNotBlank() && keysToRemove.any { key -> line.contains("\"$key\"") }) {
-     Log.d(TAG, "Removing existing registry entry: ${line.trim()}")
+     AppLogger.d(TAG, "Removing existing registry entry: ${line.trim()}")
      lines.removeAt(insertIndex)
     } else {
      insertIndex++
@@ -1857,17 +1889,17 @@ REGEDIT4
    insertIndex = currentVersionIndex + 1
    newSettings.forEach { setting ->
     lines.add(insertIndex++, setting)
-    Log.d(TAG, "Added registry entry: $setting")
+    AppLogger.d(TAG, "Added registry entry: $setting")
    }
 
    // Write back to file
    systemRegFile.writeText(lines.joinToString("\n"))
 
-   Log.i(TAG, "Successfully configured Wine to report as Windows 10 (direct edit)")
+   AppLogger.i(TAG, "Successfully configured Wine to report as Windows 10 (direct edit)")
    return@withContext true
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to set Windows version via direct edit", e)
+   AppLogger.e(TAG, "Failed to set Windows version via direct edit", e)
    return@withContext false
   }
  }
@@ -1909,7 +1941,7 @@ REGEDIT4
     uptimeMs = uptimeMs
    )
   } catch (e: Exception) {
-   Log.w(TAG, "Failed to read process metrics for PID $pid", e)
+   AppLogger.w(TAG, "Failed to read process metrics for PID $pid", e)
    return null
   }
  }
@@ -1937,7 +1969,7 @@ REGEDIT4
    // CRITICAL: Use minimal logging to prevent SIGSEGV crashes
    // Excessive logging (+all,+relay,+file) destabilizes Wine execution
    put("WINEDEBUG", "+err,+process,+loaddll") // DEBUG: Enable Wine error/process/dll logs
-   put("WINEARCH", "win64")
+   put("WINEARCH", "win64") // 64-bit prefix with WoW64 for 32-bit app support (matches Winlator)
    put("WINELOADERNOEXEC", "1")
    // DO NOT set WINESERVER - let Wine find it via PATH (same reason as wineboot)
    // put("WINESERVER", wineserverBinary.absolutePath)
@@ -2007,6 +2039,11 @@ REGEDIT4
    // Custom environment variables from config
    putAll(config.customEnvVars)
 
+   // CRITICAL: WINEARCH must be set AFTER customEnvVars to ensure it's never overridden
+   // Wine 9.2+ WoW64 mode requires win64 architecture (32-bit apps run via WoW64 layer)
+   // DO NOT allow customEnvVars to override this - it would break WoW64 mode
+   put("WINEARCH", "win64")
+
    // Add system paths
    val existingPath = System.getenv("PATH") ?: ""
    put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:$existingPath")
@@ -2046,7 +2083,7 @@ REGEDIT4
    pidField.isAccessible = true
    pidField.getInt(process)
   } catch (e: Exception) {
-   Log.w(TAG, "Failed to get PID via reflection, using fallback", e)
+   AppLogger.w(TAG, "Failed to get PID via reflection, using fallback", e)
    -1 // Fallback PID
   }
  }
@@ -2132,13 +2169,13 @@ REGEDIT4
        while (true) {
         val line = reader.readLine() ?: break  // EOF reached
         if (logPrefix.isNotEmpty()) {
-         Log.d(TAG, "$logPrefix $line")
+         AppLogger.d(TAG, "$logPrefix $line")
         }
         output.appendLine(line)
        }
       } catch (e: Exception) {
        // Stream closed or read interrupted - expected on cancellation
-       Log.d(TAG, "$logPrefix Output reading stopped: ${e.message}")
+       AppLogger.d(TAG, "$logPrefix Output reading stopped: ${e.message}")
       }
      }
     }
@@ -2150,14 +2187,14 @@ REGEDIT4
     try {
      process.inputStream.close()
     } catch (e: Exception) {
-     Log.d(TAG, "Failed to close input stream: ${e.message}")
+     AppLogger.d(TAG, "Failed to close input stream: ${e.message}")
     }
 
     // Wait for output reading to complete (with timeout)
     withTimeoutOrNull(OUTPUT_DRAIN_TIMEOUT_MS) {
      outputJob.await()
     } ?: run {
-     Log.w(TAG, "Output reading didn't complete within ${OUTPUT_DRAIN_TIMEOUT_MS / 1000}s, cancelling...")
+     AppLogger.w(TAG, "Output reading didn't complete within ${OUTPUT_DRAIN_TIMEOUT_MS / 1000}s, cancelling...")
      outputJob.cancel()
     }
 
@@ -2166,7 +2203,7 @@ REGEDIT4
   } finally {
    // Ensure process is cleaned up
    if (process.isAlive) {
-    Log.w(TAG, "Process still alive after timeout, destroying forcibly")
+    AppLogger.w(TAG, "Process still alive after timeout, destroying forcibly")
     process.destroyForcibly()
    }
   }
@@ -2186,7 +2223,7 @@ REGEDIT4
   val actualLinker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
 
   if (!actualLinker.exists()) {
-   Log.w(TAG, "Rootfs linker not found: ${actualLinker.absolutePath}")
+   AppLogger.w(TAG, "Rootfs linker not found: ${actualLinker.absolutePath}")
    return@withContext
   }
 
@@ -2194,7 +2231,7 @@ REGEDIT4
   val libDir = File(rootfsDir, "lib")
   if (!libDir.exists()) {
    libDir.mkdirs()
-   Log.d(TAG, "Created lib directory: ${libDir.absolutePath}")
+   AppLogger.d(TAG, "Created lib directory: ${libDir.absolutePath}")
   }
 
   // Create symlink at lib/ld-linux-aarch64.so.1 -> ../usr/lib/ld-linux-aarch64.so.1
@@ -2215,15 +2252,15 @@ REGEDIT4
     )
 
     when (val exitCode = result.exitCode) {
-     null -> Log.w(TAG, "Linker symlink creation timed out")
-     0 -> Log.i(TAG, "Created linker symlink: ${linkerSymlink.absolutePath} -> $symlinkTarget")
-     else -> Log.w(TAG, "Failed to create linker symlink (exit code $exitCode)")
+     null -> AppLogger.w(TAG, "Linker symlink creation timed out")
+     0 -> AppLogger.i(TAG, "Created linker symlink: ${linkerSymlink.absolutePath} -> $symlinkTarget")
+     else -> AppLogger.w(TAG, "Failed to create linker symlink (exit code $exitCode)")
     }
    } else {
-    Log.d(TAG, "Linker symlink already exists: ${linkerSymlink.absolutePath}")
+    AppLogger.d(TAG, "Linker symlink already exists: ${linkerSymlink.absolutePath}")
    }
   } catch (e: Exception) {
-   Log.w(TAG, "Could not create linker symlink: ${e.message}")
+   AppLogger.w(TAG, "Could not create linker symlink: ${e.message}")
   }
  }
 
@@ -2239,7 +2276,7 @@ REGEDIT4
  private fun setupLibrarySymlinks() {
   val libDir = File(rootfsDir, "usr/lib")
   if (!libDir.exists()) {
-   Log.w(TAG, "Library directory not found: ${libDir.absolutePath}")
+   AppLogger.w(TAG, "Library directory not found: ${libDir.absolutePath}")
    return
   }
 
@@ -2262,7 +2299,7 @@ REGEDIT4
    for ((actual, symlink1, symlink2) in libraries) {
     val actualFile = File(libDir, actual)
     if (!actualFile.exists()) {
-     Log.d(TAG, "$actual not found, skipping symlinks")
+     AppLogger.d(TAG, "$actual not found, skipping symlinks")
      continue
     }
 
@@ -2270,9 +2307,9 @@ REGEDIT4
     val symlink1File = File(libDir, symlink1)
     if (!symlink1File.exists()) {
      Os.symlink(actualFile.absolutePath, symlink1File.absolutePath)
-     Log.i(TAG, "Created $symlink1 -> $actual")
+     AppLogger.i(TAG, "Created $symlink1 -> $actual")
     } else {
-     Log.d(TAG, "$symlink1 already exists")
+     AppLogger.d(TAG, "$symlink1 already exists")
     }
 
     // Create second symlink if specified (e.g., libfreetype.so -> libfreetype.so.6.20.2)
@@ -2280,14 +2317,14 @@ REGEDIT4
      val symlink2File = File(libDir, symlink2)
      if (!symlink2File.exists()) {
       Os.symlink(actualFile.absolutePath, symlink2File.absolutePath)
-      Log.i(TAG, "Created $symlink2 -> $actual")
+      AppLogger.i(TAG, "Created $symlink2 -> $actual")
      } else {
-      Log.d(TAG, "$symlink2 already exists")
+      AppLogger.d(TAG, "$symlink2 already exists")
      }
     }
    }
   } catch (e: Exception) {
-   Log.w(TAG, "Failed to create library symlinks: ${e.message}", e)
+   AppLogger.w(TAG, "Failed to create library symlinks: ${e.message}", e)
   }
  }
 
@@ -2308,12 +2345,12 @@ REGEDIT4
    // Ensure actual tmp directory exists
    if (!actualTmpDir.exists()) {
     val created = actualTmpDir.mkdirs()
-    Log.d(TAG, "Created actual tmp directory: ${actualTmpDir.absolutePath}, success=$created")
+    AppLogger.d(TAG, "Created actual tmp directory: ${actualTmpDir.absolutePath}, success=$created")
    }
 
    // Verify actualTmpDir exists before creating symlink
    if (!actualTmpDir.exists()) {
-    Log.e(TAG, "Failed to create actual tmp directory: ${actualTmpDir.absolutePath}")
+    AppLogger.e(TAG, "Failed to create actual tmp directory: ${actualTmpDir.absolutePath}")
     return
    }
 
@@ -2321,12 +2358,12 @@ REGEDIT4
    val hardcodedParent = File("/data/data/com.winlator/files/rootfs")
    if (!hardcodedParent.exists()) {
     val created = hardcodedParent.mkdirs()
-    Log.d(TAG, "Created hardcoded parent directory: ${hardcodedParent.absolutePath}, success=$created")
+    AppLogger.d(TAG, "Created hardcoded parent directory: ${hardcodedParent.absolutePath}, success=$created")
    }
 
    // Verify hardcoded parent exists
    if (!hardcodedParent.exists()) {
-    Log.e(TAG, "Failed to create hardcoded parent directory: ${hardcodedParent.absolutePath}")
+    AppLogger.e(TAG, "Failed to create hardcoded parent directory: ${hardcodedParent.absolutePath}")
     return
    }
 
@@ -2334,17 +2371,17 @@ REGEDIT4
    // CRITICAL: Os.symlink(target, linkpath) - NOT (linkpath, target)
    if (!hardcodedTmpDir.exists()) {
     Os.symlink(actualTmpDir.absolutePath, hardcodedTmpDir.absolutePath)
-    Log.i(TAG, "Created Wine hardcoded tmp symlink: ${hardcodedTmpDir.absolutePath} -> ${actualTmpDir.absolutePath}")
+    AppLogger.i(TAG, "Created Wine hardcoded tmp symlink: ${hardcodedTmpDir.absolutePath} -> ${actualTmpDir.absolutePath}")
    } else if (!java.nio.file.Files.isSymbolicLink(hardcodedTmpDir.toPath())) {
     // If it exists but is not a symlink, delete and recreate
     hardcodedTmpDir.deleteRecursively()
     Os.symlink(actualTmpDir.absolutePath, hardcodedTmpDir.absolutePath)
-    Log.i(TAG, "Recreated Wine hardcoded tmp symlink: ${hardcodedTmpDir.absolutePath} -> ${actualTmpDir.absolutePath}")
+    AppLogger.i(TAG, "Recreated Wine hardcoded tmp symlink: ${hardcodedTmpDir.absolutePath} -> ${actualTmpDir.absolutePath}")
    } else {
-    Log.d(TAG, "Wine hardcoded tmp symlink already exists")
+    AppLogger.d(TAG, "Wine hardcoded tmp symlink already exists")
    }
   } catch (e: Exception) {
-   Log.w(TAG, "Could not create Wine hardcoded paths: ${e.message}")
+   AppLogger.w(TAG, "Could not create Wine hardcoded paths: ${e.message}")
    // This is not fatal - Wine may still work if it can create the directory itself
   }
 
@@ -2357,16 +2394,16 @@ REGEDIT4
    if (!rootfsBox64.exists() && box64Binary.exists()) {
     box64Binary.copyTo(rootfsBox64, overwrite = true)
     rootfsBox64.setExecutable(true, false)
-    Log.i(TAG, "Copied Box64 to rootfs: ${rootfsBox64.absolutePath}")
+    AppLogger.i(TAG, "Copied Box64 to rootfs: ${rootfsBox64.absolutePath}")
 
     // Note: Box64 interpreter path is hardcoded in the binary and too long to patch
     // We handle this by invoking ld-linux directly when running Box64
-    Log.d(TAG, "Box64 will be invoked via explicit ld-linux interpreter")
+    AppLogger.d(TAG, "Box64 will be invoked via explicit ld-linux interpreter")
    } else if (rootfsBox64.exists()) {
-    Log.d(TAG, "Box64 already exists in rootfs: ${rootfsBox64.absolutePath}")
+    AppLogger.d(TAG, "Box64 already exists in rootfs: ${rootfsBox64.absolutePath}")
    }
   } catch (e: Exception) {
-   Log.w(TAG, "Could not copy Box64 to rootfs: ${e.message}")
+   AppLogger.w(TAG, "Could not copy Box64 to rootfs: ${e.message}")
   }
  }
 
@@ -2377,7 +2414,7 @@ REGEDIT4
     input.copyTo(output)
    }
   }
-  Log.d(TAG, "Extracted asset: $assetPath -> ${destination.absolutePath}")
+  AppLogger.d(TAG, "Extracted asset: $assetPath -> ${destination.absolutePath}")
  }
 
  private fun calculateDirectorySize(directory: File): Long {
@@ -2404,7 +2441,7 @@ REGEDIT4
    // Check if Wine Mono is already installed
    val monoDir = File(containerDir, "drive_c/windows/mono")
    if (monoDir.exists() && monoDir.listFiles()?.isNotEmpty() == true) {
-    Log.i(TAG, "Wine Mono already installed, skipping")
+    AppLogger.i(TAG, "Wine Mono already installed, skipping")
     return@withContext Result.success(Unit)
    }
 
@@ -2428,7 +2465,7 @@ REGEDIT4
    installResult
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to install Wine Mono", e)
+   AppLogger.e(TAG, "Failed to install Wine Mono", e)
    Result.failure(e)
   }
  }
@@ -2469,17 +2506,17 @@ REGEDIT4
    val output = StringBuilder()
    process.inputStream.bufferedReader().forEachLine { line ->
     output.appendLine(line)
-    Log.d(TAG, "[$executable] $line")
+    AppLogger.d(TAG, "[$executable] $line")
    }
 
    val exitCode = process.waitFor()
-   Log.i(TAG, "$executable completed with exit code: $exitCode")
+   AppLogger.i(TAG, "$executable completed with exit code: $exitCode")
 
    if (exitCode == 0) Result.success(Unit)
    else Result.failure(Exception("$executable failed with exit code $exitCode"))
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to execute $executable", e)
+   AppLogger.e(TAG, "Failed to execute $executable", e)
    Result.failure(e)
   }
  }

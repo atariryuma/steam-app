@@ -170,7 +170,9 @@
       "Bash(do echo -n \"$resource: \")",
       "Bash(adb logcat:*)",
       "Bash(tasklist:*)",
-      "Bash(./adb.exe pull:*)"
+      "Bash(./adb.exe pull:*)",
+      "Bash(while true)",
+      "Bash(call gradlew.bat assembleDebug --console=plain)"
     ]
   }
 }

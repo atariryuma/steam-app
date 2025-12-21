@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.winlator
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,7 +39,7 @@ class PerformanceOptimizer @Inject constructor(
  suspend fun applyPreset(preset: Box64PerformancePreset, winePrefixPath: File): Result<Unit> {
   return withContext(Dispatchers.IO) {
    try {
-    Log.i(TAG, "Applying performance preset: $preset")
+    AppLogger.i(TAG, "Applying performance preset: $preset")
 
     // Configure Box64 environment variables
     applyBox64Settings(preset)
@@ -50,10 +50,10 @@ class PerformanceOptimizer @Inject constructor(
     // Apply Wine registry optimizations
     applyWineRegistryOptimizations(winePrefixPath, preset)
 
-    Log.i(TAG, "Performance preset applied successfully")
+    AppLogger.i(TAG, "Performance preset applied successfully")
     Result.success(Unit)
    } catch (e: Exception) {
-    Log.e(TAG, "Failed to apply performance preset", e)
+    AppLogger.e(TAG, "Failed to apply performance preset", e)
     Result.failure(e)
    }
   }
@@ -107,7 +107,7 @@ class PerformanceOptimizer @Inject constructor(
 
   // Environment variable configuration (used by Process Builder or WinlatorEngine)
   envVars.forEach { (key, value) ->
-   Log.d(TAG, "Setting $key=$value")
+   AppLogger.d(TAG, "Setting $key=$value")
    // Note: Actual application is done in WinlatorEmulator.kt launchExecutable
   }
  }
@@ -130,9 +130,9 @@ class PerformanceOptimizer @Inject constructor(
      dxvkConfigStream.copyTo(output)
     }
 
-    Log.d(TAG, "DXVK config copied to: ${targetFile.absolutePath}")
+    AppLogger.d(TAG, "DXVK config copied to: ${targetFile.absolutePath}")
    } catch (e: Exception) {
-    Log.w(TAG, "Failed to copy DXVK config", e)
+    AppLogger.w(TAG, "Failed to copy DXVK config", e)
    }
   }
  }
@@ -158,9 +158,9 @@ class PerformanceOptimizer @Inject constructor(
 
     // TODO: wine regedit performance.reg execution
     // WinlatorEmulatorviaapplydo必要 ある
-    Log.d(TAG, "Wine registry optimizations prepared: ${tempRegFile.absolutePath}")
+    AppLogger.d(TAG, "Wine registry optimizations prepared: ${tempRegFile.absolutePath}")
    } catch (e: Exception) {
-    Log.w(TAG, "Failed to prepare Wine registry optimizations", e)
+    AppLogger.w(TAG, "Failed to prepare Wine registry optimizations", e)
    }
   }
  }

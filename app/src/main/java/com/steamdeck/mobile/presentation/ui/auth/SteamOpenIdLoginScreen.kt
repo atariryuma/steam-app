@@ -1,5 +1,7 @@
 package com.steamdeck.mobile.presentation.ui.auth
 
+import com.steamdeck.mobile.core.logging.AppLogger
+
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -69,13 +71,13 @@ fun SteamOpenIdLoginScreen(
        request: WebResourceRequest?
       ): Boolean {
        val url = request?.url.toString()
-       android.util.Log.d("SteamOpenIdLogin", "URL redirect: $url")
+       AppLogger.d("SteamOpenIdLogin", "URL redirect: $url")
 
        // コールバックURL 検出 (localhost/127.0.0.1 callback interception)
        // Check both localhost and 127.0.0.1 for compatibility
        if (url.contains("127.0.0.1:8080/auth/callback") ||
            url.contains("localhost:8080/auth/callback")) {
-        android.util.Log.i("SteamOpenIdLogin", "✅ Callback detected: $url")
+        AppLogger.i("SteamOpenIdLogin", "✅ Callback detected: $url")
         onAuthCallback(url)
         return true // Prevent WebView from trying to load localhost
        }

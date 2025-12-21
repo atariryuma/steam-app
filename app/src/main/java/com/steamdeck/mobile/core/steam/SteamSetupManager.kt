@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.steam
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.R
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
@@ -63,28 +63,28 @@ class SteamSetupManager @Inject constructor(
   */
  suspend fun installSteam(
   containerId: String,
-  progressCallback: ((Float, String) -> Unit)? = null
+  progressCallback: ((Float, String, String?) -> Unit)? = null
  ): Result<SteamInstallResult> = withContext(Dispatchers.IO) {
   try {
-   Log.i(TAG, "Starting Steam installation for container: $containerId")
+   AppLogger.i(TAG, "Starting Steam installation for container: $containerId")
 
    // 0. Winlator emulator initialization (Box64/Wine extraction)
-   progressCallback?.invoke(0.0f, "Checking Winlator initialization...")
+   progressCallback?.invoke(0.0f, "Checking Winlator initialization...", null)
    val available = winlatorEmulator.isAvailable().getOrNull() ?: false
 
    if (!available) {
-    Log.w(TAG, "Winlator not initialized - starting initialization (this may take 2-3 minutes)...")
+    AppLogger.w(TAG, "Winlator not initialized - starting initialization (this may take 2-3 minutes)...")
 
     // Winlator initialization (Box64/Wine binary extraction)
-    // progress: 0.0 ~ 0.4 (40%)
+    // progress: 0.0 ~ 0.1 (10%) - Typically skipped on 2nd run
     val initResult = winlatorEmulator.initialize { progress, message ->
-     // Map 0.0-1.0 progress to 0.0-0.4 range
-     progressCallback?.invoke(progress * 0.4f, message)
+     // Map 0.0-1.0 progress to 0.0-0.1 range
+     progressCallback?.invoke(progress * 0.1f, message, null)
     }
 
     if (initResult.isFailure) {
      val error = initResult.exceptionOrNull()
-     Log.e(TAG, "Winlator initialization failed", error)
+     AppLogger.e(TAG, "Winlator initialization failed", error)
      return@withContext Result.success(
       SteamInstallResult.Error(
        "Failed to initialize Winlator environment.\n\n" +
@@ -97,13 +97,13 @@ class SteamSetupManager @Inject constructor(
      )
     }
 
-    Log.i(TAG, "Winlator initialization completed successfully")
+    AppLogger.i(TAG, "Winlator initialization completed successfully")
    } else {
-    Log.i(TAG, "Winlator already initialized, skipping initialization")
+    AppLogger.i(TAG, "Winlator already initialized, skipping initialization")
    }
 
-   // progress: 0.4 ~ 0.5 (10%)
-   progressCallback?.invoke(0.4f, "Downloading Steam installer...")
+   // progress: 0.0 ~ 0.1 (10%)
+   progressCallback?.invoke(0.0f, "Downloading Steam installer...", null)
 
    // 1. Download SteamSetup.exe (32-bit NSIS installer)
    val installerResult = steamInstallerService.downloadInstaller()
@@ -118,10 +118,10 @@ class SteamSetupManager @Inject constructor(
      SteamInstallResult.Error("Installer not available: ${it.message}")
     )
    }
-   Log.i(TAG, "Installer downloaded: ${installerFile.absolutePath}")
+   AppLogger.i(TAG, "Installer downloaded: ${installerFile.absolutePath}")
 
-   // progress: 0.5 ~ 0.6 (10%)
-   progressCallback?.invoke(0.5f, "Preparing container...")
+   // progress: 0.1 ~ 0.5 (40%) - Container creation takes 10-20 seconds
+   progressCallback?.invoke(0.1f, "Creating Wine container (this may take 10-20 seconds)...", null)
 
    // 2. Get or create container
    val containerResult = getOrCreateContainer(containerId)
@@ -136,37 +136,47 @@ class SteamSetupManager @Inject constructor(
      SteamInstallResult.Error("Container not available: ${it.message}")
     )
    }
-   Log.i(TAG, "Using container: ${container.name} (${container.id})")
+   AppLogger.i(TAG, "Using container: ${container.name} (${container.id})")
 
    // Verify Wine Mono installation
    val monoDir = File(container.rootPath, "drive_c/windows/mono")
    if (monoDir.exists()) {
-    Log.i(TAG, "Wine Mono installation confirmed: ${monoDir.absolutePath}")
+    AppLogger.i(TAG, "Wine Mono installation confirmed: ${monoDir.absolutePath}")
    } else {
-    Log.w(TAG, "Wine Mono not found - 32-bit apps may not work")
-    Log.w(TAG, "Expected location: ${monoDir.absolutePath}")
+    AppLogger.w(TAG, "Wine Mono not found - 32-bit apps may not work")
+    AppLogger.w(TAG, "Expected location: ${monoDir.absolutePath}")
    }
 
-   // progress: 0.6 ~ 0.95 (35%)
-   progressCallback?.invoke(0.6f, "Extracting Steam from NSIS installer...")
+   // progress: 0.5 ~ 0.55 (5%) - NSIS extraction is very fast (0.1 seconds for 40 files)
+   progressCallback?.invoke(0.5f, "Extracting Steam from NSIS installer...", null)
 
    // METHOD 1 (PRIORITY): Extract Steam Client directly from NSIS installer
    // This bypasses the WoW64 requirement by extracting files with 7-Zip
-   Log.i(TAG, "Attempting NSIS extraction (Method 1 - Recommended)...")
+   AppLogger.i(TAG, "Attempting NSIS extraction (Method 1 - Recommended)...")
 
    val steamDir = File(container.rootPath, "drive_c/Program Files (x86)/Steam")
-   val extractResult = steamInstallerService.extractSteamFromNSIS(installerFile, steamDir)
+   val extractResult = steamInstallerService.extractSteamFromNSIS(
+    installerFile,
+    steamDir,
+    onProgress = { filesExtracted, totalFiles ->
+     // Map file progress to overall progress (0.50 ~ 0.55 range - only 5% for fast NSIS extraction)
+     val fileProgress = filesExtracted.toFloat() / totalFiles.toFloat()
+     val overallProgress = 0.50f + (fileProgress * 0.05f)
+     val detail = "File $filesExtracted/$totalFiles"
+     progressCallback?.invoke(overallProgress, "Extracting Steam files", detail)
+    }
+   )
 
    if (extractResult.isSuccess) {
-    Log.i(TAG, "Steam Client installed successfully via NSIS extraction")
-    progressCallback?.invoke(0.95f, "NSIS extraction completed successfully")
+    AppLogger.i(TAG, "Steam Client installed successfully via NSIS extraction")
+    progressCallback?.invoke(0.55f, "NSIS extraction completed successfully", null)
    } else {
-    Log.w(TAG, "NSIS extraction failed: ${extractResult.exceptionOrNull()?.message}")
-    Log.i(TAG, "Falling back to Wine installer execution (Method 2 - Requires WoW64)...")
+    AppLogger.w(TAG, "NSIS extraction failed: ${extractResult.exceptionOrNull()?.message}")
+    AppLogger.i(TAG, "Falling back to Wine installer execution (Method 2 - Requires WoW64)...")
 
     // METHOD 2 (FALLBACK): Run SteamSetup.exe via Wine
     // WARNING: This requires WoW64 support and may fail on 64-bit only Wine builds
-    progressCallback?.invoke(0.6f, "Copying installer to container...")
+    progressCallback?.invoke(0.5f, "Copying installer to container...", null)
 
     // 3. Copy installer to container
     val copyResult = copyInstallerToContainer(container, installerFile)
@@ -181,19 +191,19 @@ class SteamSetupManager @Inject constructor(
       SteamInstallResult.Error("Container installer not available: ${it.message}")
      )
     }
-    Log.i(TAG, "Installer copied to container: ${containerInstaller.absolutePath}")
+    AppLogger.i(TAG, "Installer copied to container: ${containerInstaller.absolutePath}")
 
-    // progress: 0.7 ~ 0.95 (25%)
-    progressCallback?.invoke(0.7f, "Running Steam installer via Wine (WoW64 mode)...")
+    // progress: 0.5 ~ 0.55 (5%)
+    progressCallback?.invoke(0.5f, "Running Steam installer via Wine (WoW64 mode)...", null)
 
     // 4. Run installer via Wine with DEBUG logging enabled
     val installResult = runSteamInstaller(
      container = container,
      installerFile = containerInstaller,
      progressCallback = { progress ->
-      // Map installer progress (0.0-1.0) to overall progress (0.7-0.95)
-      val mappedProgress = 0.7f + (progress * 0.25f)
-      progressCallback?.invoke(mappedProgress, "Installing Steam...")
+      // Map installer progress (0.0-1.0) to overall progress (0.5-0.55)
+      val mappedProgress = 0.5f + (progress * 0.05f)
+      progressCallback?.invoke(mappedProgress, "Installing Steam...", null)
      }
     )
     if (installResult.isFailure) {
@@ -202,23 +212,23 @@ class SteamSetupManager @Inject constructor(
      )
     }
 
-    progressCallback?.invoke(0.95f, "Wine installer execution completed")
+    progressCallback?.invoke(0.55f, "Wine installer execution completed", null)
    }
 
-   // progress: 0.95 ~ 0.98 (3%)
-   progressCallback?.invoke(0.95f, "Initializing Steam client...")
+   // progress: 0.55 ~ 0.95 (40%) - Steam initialization takes 30 seconds (timeout waiting)
+   progressCallback?.invoke(0.55f, "Initializing Steam client (this may take 30 seconds)...", null)
 
    // 5. Initialize Steam client in background (creates steamapps/, config.vdf, etc.)
    val initResult = initializeSteamClient(container)
    if (initResult.isFailure) {
-    Log.w(TAG, "Steam initialization failed (non-fatal): ${initResult.exceptionOrNull()?.message}")
+    AppLogger.w(TAG, "Steam initialization failed (non-fatal): ${initResult.exceptionOrNull()?.message}")
     // Continue anyway - steamapps directory will be created manually if needed
    } else {
-    Log.i(TAG, "Steam client initialized successfully")
+    AppLogger.i(TAG, "Steam client initialized successfully")
    }
 
-   // progress: 0.98 ~ 1.0 (2%)
-   progressCallback?.invoke(0.98f, "Finalizing installation...")
+   // progress: 0.95 ~ 1.0 (5%)
+   progressCallback?.invoke(0.95f, "Finalizing installation...", null)
 
    // 6. Save installation information (container.id is already String type)
    steamInstallerService.saveInstallation(
@@ -227,8 +237,8 @@ class SteamSetupManager @Inject constructor(
     status = SteamInstallStatus.INSTALLED
    )
 
-   progressCallback?.invoke(1.0f, "Installation complete")
-   Log.i(TAG, "Steam installation completed successfully")
+   progressCallback?.invoke(1.0f, "Installation complete", null)
+   AppLogger.i(TAG, "Steam installation completed successfully")
 
    Result.success(SteamInstallResult.Success(
     installPath = DEFAULT_STEAM_PATH,
@@ -236,7 +246,7 @@ class SteamSetupManager @Inject constructor(
    ))
 
   } catch (e: Exception) {
-   Log.e(TAG, "Steam installation failed", e)
+   AppLogger.e(TAG, "Steam installation failed", e)
    Result.success(SteamInstallResult.Error(e.message ?: "Unknown error"))
   }
  }
@@ -262,7 +272,7 @@ class SteamSetupManager @Inject constructor(
 
      // If container doesn't exist, create new one in database
      if (containerEntity == null) {
-      Log.w(TAG, "Container $containerId not found in database, creating default container...")
+      AppLogger.w(TAG, "Container $containerId not found in database, creating default container...")
       val newEntity = WinlatorContainerEntity(
        id = containerIdLong ?: 0, // Save as Long type, 0 for auto-generate
        name = "Steam Client",
@@ -272,10 +282,10 @@ class SteamSetupManager @Inject constructor(
 
       try {
        val newId = database.winlatorContainerDao().insertContainer(newEntity)
-       Log.i(TAG, "Created default container entity with ID: $newId")
+       AppLogger.i(TAG, "Created default container entity with ID: $newId")
        containerEntity = newEntity.copy(id = newId)
       } catch (e: Exception) {
-       Log.e(TAG, "Failed to create default container entity", e)
+       AppLogger.e(TAG, "Failed to create default container entity", e)
        return@withLock Result.failure(Exception("Failed to create container in database: ${e.message}"))
       }
      }
@@ -306,7 +316,7 @@ class SteamSetupManager @Inject constructor(
      }
 
      // If container doesn't exist, create new one
-     Log.i(TAG, "Container not found, creating new container for ID: $containerId")
+     AppLogger.i(TAG, "Container not found, creating new container for ID: $containerId")
      val config = com.steamdeck.mobile.domain.emulator.EmulatorContainerConfig(
       name = containerEntity!!.name,
       performancePreset = when (containerEntity.box64Preset) {
@@ -331,17 +341,17 @@ class SteamSetupManager @Inject constructor(
      val createdContainer = created.getOrNull()
       ?: return@withLock Result.failure(Exception("Container creation failed"))
 
-     Log.d(TAG, "Created container - ID: ${createdContainer.id}, rootPath: ${createdContainer.rootPath}")
+     AppLogger.d(TAG, "Created container - ID: ${createdContainer.id}, rootPath: ${createdContainer.rootPath}")
 
      if (!isWinePrefixInitialized(createdContainer)) {
       val systemReg = File(createdContainer.rootPath, "system.reg")
       val userReg = File(createdContainer.rootPath, "user.reg")
-      Log.e(TAG, "Wine prefix check failed - system.reg exists: ${systemReg.exists()}, user.reg exists: ${userReg.exists()}")
-      Log.e(TAG, "  rootPath: ${createdContainer.rootPath}")
-      Log.e(TAG, "  rootPath.absolutePath: ${createdContainer.rootPath.absolutePath}")
-      Log.e(TAG, "  systemReg.absolutePath: ${systemReg.absolutePath}")
-      Log.e(TAG, "  systemReg.exists(): ${systemReg.exists()}")
-      Log.e(TAG, "  systemReg.canRead(): ${systemReg.canRead()}")
+      AppLogger.e(TAG, "Wine prefix check failed - system.reg exists: ${systemReg.exists()}, user.reg exists: ${userReg.exists()}")
+      AppLogger.e(TAG, "  rootPath: ${createdContainer.rootPath}")
+      AppLogger.e(TAG, "  rootPath.absolutePath: ${createdContainer.rootPath.absolutePath}")
+      AppLogger.e(TAG, "  systemReg.absolutePath: ${systemReg.absolutePath}")
+      AppLogger.e(TAG, "  systemReg.exists(): ${systemReg.exists()}")
+      AppLogger.e(TAG, "  systemReg.canRead(): ${systemReg.canRead()}")
       return@withLock Result.failure(
        Exception(
         "Wine prefix initialization failed (system.reg missing). " +
@@ -354,7 +364,7 @@ class SteamSetupManager @Inject constructor(
     }
 
    } catch (e: Exception) {
-    Log.e(TAG, "Failed to get or create container", e)
+    AppLogger.e(TAG, "Failed to get or create container", e)
     Result.failure(e)
    }
   }
@@ -376,18 +386,18 @@ class SteamSetupManager @Inject constructor(
   repeat(5) { attempt ->
    if (systemReg.exists() && userReg.exists()) {
     if (attempt > 0) {
-     Log.d(TAG, "Wine prefix files found after ${attempt} retries")
+     AppLogger.d(TAG, "Wine prefix files found after ${attempt} retries")
     }
     return@withContext true
    }
 
    if (attempt < 4) {
-    Log.d(TAG, "Wine prefix files not found (attempt ${attempt + 1}/5), waiting 200ms...")
+    AppLogger.d(TAG, "Wine prefix files not found (attempt ${attempt + 1}/5), waiting 200ms...")
     delay(200)
    }
   }
 
-  Log.e(TAG, "Wine prefix files still not found after 5 attempts (1 second total)")
+  AppLogger.e(TAG, "Wine prefix files still not found after 5 attempts (1 second total)")
   false
  }
 
@@ -411,11 +421,11 @@ class SteamSetupManager @Inject constructor(
    val containerInstaller = File(downloadsDir, "SteamSetup.exe")
    installerFile.copyTo(containerInstaller, overwrite = true)
 
-   Log.i(TAG, "Copied installer to: ${containerInstaller.absolutePath}")
+   AppLogger.i(TAG, "Copied installer to: ${containerInstaller.absolutePath}")
    Result.success(containerInstaller)
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to copy installer to container", e)
+   AppLogger.e(TAG, "Failed to copy installer to container", e)
    Result.failure(e)
   }
  }
@@ -457,7 +467,7 @@ class SteamSetupManager @Inject constructor(
     listOf("/D=C:\\Program Files (x86)\\Steam")
    }
 
-   Log.i(TAG, "Launching Steam installer with arguments: $arguments")
+   AppLogger.i(TAG, "Launching Steam installer with arguments: $arguments")
 
    val processResult = winlatorEmulator.launchExecutable(
     container = container,
@@ -476,7 +486,7 @@ class SteamSetupManager @Inject constructor(
      Exception("Failed to get process handle: ${it.message}")
     )
    }
-   Log.i(TAG, "Steam installer process started: PID ${process.pid}")
+   AppLogger.i(TAG, "Steam installer process started: PID ${process.pid}")
 
    // Wait for installer to complete (Timeout: 5 minutes)
    var waitTime = 0L
@@ -488,7 +498,7 @@ class SteamSetupManager @Inject constructor(
     val statusResult = winlatorEmulator.getProcessStatus(process.id)
     val isRunning = statusResult.getOrNull()?.isRunning ?: false
     if (!isRunning) {
-     Log.i(TAG, "Steam installer process completed after ${waitTime / 1000}s")
+     AppLogger.i(TAG, "Steam installer process completed after ${waitTime / 1000}s")
      processCompleted = true
      progressCallback?.invoke(0.9f)
      break
@@ -503,13 +513,13 @@ class SteamSetupManager @Inject constructor(
    }
 
    if (!processCompleted) {
-    Log.e(TAG, "Steam installer timeout after 5 minutes")
+    AppLogger.e(TAG, "Steam installer timeout after 5 minutes")
     // CRITICAL FIX: Kill the process before returning failure
     try {
      winlatorEmulator.killProcess(process.id)
-     Log.d(TAG, "Killed timed-out Steam installer process: ${process.id}")
+     AppLogger.d(TAG, "Killed timed-out Steam installer process: ${process.id}")
     } catch (e: Exception) {
-     Log.w(TAG, "Failed to kill timed-out process: ${e.message}")
+     AppLogger.w(TAG, "Failed to kill timed-out process: ${e.message}")
     }
     return@withContext Result.failure(
      Exception(
@@ -528,19 +538,19 @@ class SteamSetupManager @Inject constructor(
 
    while (retryCount < maxRetries) {
     if (steamExe.exists()) {
-     Log.i(TAG, "Steam installation verified: ${steamExe.absolutePath}")
+     AppLogger.i(TAG, "Steam installation verified: ${steamExe.absolutePath}")
      progressCallback?.invoke(1.0f)
      return@withContext Result.success(Unit)
     }
 
     retryCount++
-    Log.w(TAG, "Steam.exe not found, retry $retryCount/$maxRetries")
+    AppLogger.w(TAG, "Steam.exe not found, retry $retryCount/$maxRetries")
     progressCallback?.invoke(0.9f + (retryCount.toFloat() / maxRetries.toFloat()) * 0.1f)
     delay(retryDelay)
    }
 
    // Verification failed - provide detailed error message
-   Log.e(TAG, "Steam installation verification failed: Steam.exe not found at ${steamExe.absolutePath}")
+   AppLogger.e(TAG, "Steam installation verification failed: Steam.exe not found at ${steamExe.absolutePath}")
 
    // CRITICAL: Explain the WoW64 issue to the user
    val errorMessage = buildString {
@@ -560,7 +570,7 @@ class SteamSetupManager @Inject constructor(
    return@withContext Result.failure(Exception(errorMessage))
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to run Steam installer", e)
+   AppLogger.e(TAG, "Failed to run Steam installer", e)
    Result.failure(e)
   }
  }
@@ -584,7 +594,7 @@ class SteamSetupManager @Inject constructor(
   container: com.steamdeck.mobile.domain.emulator.EmulatorContainer
  ): Result<Unit> = withContext(Dispatchers.IO) {
   try {
-   Log.i(TAG, "Starting Steam client background initialization")
+   AppLogger.i(TAG, "Starting Steam client background initialization")
 
    // 1. Verify Steam.exe exists
    val steamExePath = "C:\\Program Files (x86)\\Steam\\Steam.exe"
@@ -594,19 +604,19 @@ class SteamSetupManager @Inject constructor(
    )
 
    if (!steamExeFile.exists()) {
-    Log.e(TAG, "Steam.exe not found at: ${steamExeFile.absolutePath}")
+    AppLogger.e(TAG, "Steam.exe not found at: ${steamExeFile.absolutePath}")
     return@withContext Result.failure(
      Exception("Steam.exe not found in container")
     )
    }
 
-   Log.d(TAG, "Steam.exe found: ${steamExeFile.absolutePath} (${steamExeFile.length()} bytes)")
+   AppLogger.d(TAG, "Steam.exe found: ${steamExeFile.absolutePath} (${steamExeFile.length()} bytes)")
 
    // 2. Launch Steam.exe with initialization flags
    // -silent: Run without UI
    // -noreactlogin: Disable React-based login UI (Wine compatibility)
    val arguments = listOf("-silent", "-noreactlogin")
-   Log.i(TAG, "Launching: $steamExePath ${arguments.joinToString(" ")}")
+   AppLogger.i(TAG, "Launching: $steamExePath ${arguments.joinToString(" ")}")
 
    val launchResult = winlatorEmulator.launchExecutable(
     container = container,
@@ -615,13 +625,13 @@ class SteamSetupManager @Inject constructor(
    )
 
    if (launchResult.isFailure) {
-    Log.e(TAG, "Failed to launch Steam for initialization: ${launchResult.exceptionOrNull()?.message}")
+    AppLogger.e(TAG, "Failed to launch Steam for initialization: ${launchResult.exceptionOrNull()?.message}")
     return@withContext Result.failure(
      launchResult.exceptionOrNull() ?: Exception("Failed to launch Steam")
     )
    }
 
-   Log.i(TAG, "Steam initialization launched successfully")
+   AppLogger.i(TAG, "Steam initialization launched successfully")
 
    // 3. Wait for initialization to complete (30 seconds timeout)
    // Steam creates directories within first few seconds
@@ -638,20 +648,20 @@ class SteamSetupManager @Inject constructor(
     )
 
     if (steamappsDir.exists()) {
-     Log.i(TAG, "Steamapps directory created successfully: ${steamappsDir.absolutePath}")
+     AppLogger.i(TAG, "Steamapps directory created successfully: ${steamappsDir.absolutePath}")
 
      // List directory contents for verification
      val contents = steamappsDir.listFiles()?.joinToString(", ") { it.name } ?: "empty"
-     Log.d(TAG, "Steamapps contents: $contents")
+     AppLogger.d(TAG, "Steamapps contents: $contents")
 
      return@withContext Result.success(Unit)
     }
 
-    Log.d(TAG, "Waiting for steamapps directory... (${(System.currentTimeMillis() - startTime) / 1000}s elapsed)")
+    AppLogger.d(TAG, "Waiting for steamapps directory... (${(System.currentTimeMillis() - startTime) / 1000}s elapsed)")
    }
 
    // 4. Timeout - manually create steamapps directory structure
-   Log.w(TAG, "Steam initialization timeout (30s) - creating steamapps directory manually")
+   AppLogger.w(TAG, "Steam initialization timeout (30s) - creating steamapps directory manually")
 
    // Create required Steam directory structure
    val steamappsDir = File(
@@ -662,32 +672,32 @@ class SteamSetupManager @Inject constructor(
 
    try {
     if (!steamappsDir.exists() && !steamappsDir.mkdirs()) {
-     Log.e(TAG, "Failed to create steamapps directory")
+     AppLogger.e(TAG, "Failed to create steamapps directory")
      return@withContext Result.failure(
       Exception("Failed to create steamapps directory")
      )
     }
 
     if (!commonDir.exists() && !commonDir.mkdirs()) {
-     Log.e(TAG, "Failed to create common directory")
+     AppLogger.e(TAG, "Failed to create common directory")
      return@withContext Result.failure(
       Exception("Failed to create common directory")
      )
     }
 
-    Log.i(TAG, "Successfully created Steam directory structure manually")
-    Log.d(TAG, "Created: ${steamappsDir.absolutePath}")
-    Log.d(TAG, "Created: ${commonDir.absolutePath}")
+    AppLogger.i(TAG, "Successfully created Steam directory structure manually")
+    AppLogger.d(TAG, "Created: ${steamappsDir.absolutePath}")
+    AppLogger.d(TAG, "Created: ${commonDir.absolutePath}")
 
     return@withContext Result.success(Unit)
 
    } catch (e: Exception) {
-    Log.e(TAG, "Failed to create Steam directories", e)
+    AppLogger.e(TAG, "Failed to create Steam directories", e)
     return@withContext Result.failure(e)
    }
 
   } catch (e: Exception) {
-   Log.e(TAG, "Steam initialization failed", e)
+   AppLogger.e(TAG, "Steam initialization failed", e)
    Result.failure(e)
   }
  }

@@ -1,5 +1,7 @@
 package com.steamdeck.mobile.presentation.ui.settings
 
+import com.steamdeck.mobile.core.logging.AppLogger
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -175,6 +177,7 @@ fun SettingsScreen(
      steamInstallState = steamInstallState,
      showWebView = showWebView,
      steamLoginViewModel = steamLoginViewModel,
+     settingsViewModel = viewModel,
      wineTestViewModel = wineTestViewModel,
      onShowWebView = { showWebView = true },
      onHideWebView = { showWebView = false },
@@ -214,6 +217,7 @@ private fun SettingsContent(
  steamInstallState: SteamInstallState,
  showWebView: Boolean,
  steamLoginViewModel: SteamLoginViewModel,
+ settingsViewModel: SettingsViewModel,
  wineTestViewModel: WineTestViewModel,
  onShowWebView: () -> Unit,
  onHideWebView: () -> Unit,
@@ -296,6 +300,7 @@ private fun SettingsContent(
        data = data,
        showWebView = showWebView,
        steamLoginViewModel = steamLoginViewModel,
+       settingsViewModel = settingsViewModel,
        onShowWebView = onShowWebView,
        onHideWebView = onHideWebView,
        onClear = onClearSettings,
@@ -365,6 +370,7 @@ private fun SteamAuthContent(
  data: com.steamdeck.mobile.presentation.viewmodel.SettingsData,
  showWebView: Boolean,
  steamLoginViewModel: SteamLoginViewModel,
+ settingsViewModel: SettingsViewModel,
  onShowWebView: () -> Unit,
  onHideWebView: () -> Unit,
  onClear: () -> Unit,
@@ -372,9 +378,17 @@ private fun SteamAuthContent(
 ) {
  val steamLoginState by steamLoginViewModel.uiState.collectAsState()
  
- // Close WebView on authentication success
+ // Close WebView on authentication success and trigger auto-sync
  LaunchedEffect(steamLoginState) {
   if (steamLoginState is SteamLoginUiState.Success) {
+   AppLogger.i(
+    "SettingsScreen",
+    "✅ Steam authentication success! Triggering auto-sync and closing WebView..."
+   )
+
+   // Trigger automatic library sync after successful login
+   settingsViewModel.syncAfterQrLogin()
+
    onHideWebView()
   }
  }
@@ -395,7 +409,7 @@ private fun SteamAuthContent(
      steamLoginViewModel.handleCallback(callbackUrl)
     },
     onError = { errorMessage ->
-     android.util.Log.e("SteamAuth", "OpenID error: $errorMessage")
+     AppLogger.e("SteamAuth", "OpenID error: $errorMessage")
     }
    )
   }
@@ -1566,6 +1580,14 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
     style = MaterialTheme.typography.bodyMedium,
     color = SteamColorPalette.LightText
    )
+   // Show detail message if available (e.g., "File 234/342")
+   state.detailMessage?.let { detail ->
+    Text(
+     text = detail,
+     style = MaterialTheme.typography.bodySmall,
+     color = SteamColorPalette.LightText.copy(alpha = 0.7f)
+    )
+   }
   }
 
   // Info box

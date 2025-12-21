@@ -1,6 +1,6 @@
 package com.steamdeck.mobile.core.steam
 
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -36,7 +36,7 @@ class SteamGameScanner @Inject constructor(
   steamAppId: Long
  ): Result<String?> = withContext(Dispatchers.IO) {
   try {
-   Log.i(TAG, "Scanning for game: appId=$steamAppId, containerId=$containerId")
+   AppLogger.i(TAG, "Scanning for game: appId=$steamAppId, containerId=$containerId")
 
    // 1. Get container
    val containersResult = winlatorEmulator.listContainers()
@@ -55,35 +55,35 @@ class SteamGameScanner @Inject constructor(
    // 2. Check steamapps folder
    val steamAppsDir = File(container.rootPath, STEAM_APPS_PATH)
    if (!steamAppsDir.exists() || !steamAppsDir.isDirectory) {
-    Log.w(TAG, "Steam apps directory not found: ${steamAppsDir.absolutePath}")
+    AppLogger.w(TAG, "Steam apps directory not found: ${steamAppsDir.absolutePath}")
     return@withContext Result.success(null)
    }
 
    // 3. Check for appmanifest_<appId>.acf file
    val manifestFile = File(steamAppsDir, "appmanifest_$steamAppId.acf")
    if (!manifestFile.exists()) {
-    Log.i(TAG, "Game not installed (no manifest): appId=$steamAppId")
+    AppLogger.i(TAG, "Game not installed (no manifest): appId=$steamAppId")
     return@withContext Result.success(null)
    }
 
    // 4. Get install directory name from manifest file
    val installDir = parseInstallDirFromManifest(manifestFile)
    if (installDir == null) {
-    Log.w(TAG, "Failed to parse install directory from manifest")
+    AppLogger.w(TAG, "Failed to parse install directory from manifest")
     return@withContext Result.success(null)
    }
 
    // 5. Check common/<InstallDir> folder
    val gameDir = File(steamAppsDir, "$COMMON_PATH/$installDir")
    if (!gameDir.exists() || !gameDir.isDirectory) {
-    Log.w(TAG, "Game directory not found: ${gameDir.absolutePath}")
+    AppLogger.w(TAG, "Game directory not found: ${gameDir.absolutePath}")
     return@withContext Result.success(null)
    }
 
    // 6. Search for .exe file (select the most likely candidate)
    val exeFile = findMainExecutable(gameDir)
    if (exeFile == null) {
-    Log.w(TAG, "No executable found in: ${gameDir.absolutePath}")
+    AppLogger.w(TAG, "No executable found in: ${gameDir.absolutePath}")
     return@withContext Result.success(null)
    }
 
@@ -95,17 +95,17 @@ class SteamGameScanner @Inject constructor(
    } else if (absolutePath.contains("drive_c\\")) {
     absolutePath.substringAfter("drive_c\\")
    } else {
-    Log.w(TAG, "Unexpected path format (no drive_c): $absolutePath")
+    AppLogger.w(TAG, "Unexpected path format (no drive_c): $absolutePath")
     return@withContext Result.success(null)
    }
 
    val windowsPath = "C:\\$relativePath".replace("/", "\\")
 
-   Log.i(TAG, "Found executable: $windowsPath")
+   AppLogger.i(TAG, "Found executable: $windowsPath")
    Result.success(windowsPath)
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to scan for game executable", e)
+   AppLogger.e(TAG, "Failed to scan for game executable", e)
    Result.failure(e)
   }
  }
@@ -132,33 +132,33 @@ class SteamGameScanner @Inject constructor(
    // Expected format: "\t\"installdir\"\t\t\"GameFolder\""
    val afterKey = line.substringAfter("\"installdir\"", "")
    if (afterKey.isEmpty()) {
-    Log.w(TAG, "Invalid manifest format: $line")
+    AppLogger.w(TAG, "Invalid manifest format: $line")
     return null
    }
 
    // Extract value between quotes
    val firstQuote = afterKey.indexOf('"')
    if (firstQuote == -1) {
-    Log.w(TAG, "No opening quote found: $afterKey")
+    AppLogger.w(TAG, "No opening quote found: $afterKey")
     return null
    }
 
    val secondQuote = afterKey.indexOf('"', firstQuote + 1)
    if (secondQuote == -1) {
-    Log.w(TAG, "No closing quote found: $afterKey")
+    AppLogger.w(TAG, "No closing quote found: $afterKey")
     return null
    }
 
    val installDir = afterKey.substring(firstQuote + 1, secondQuote).trim()
    if (installDir.isEmpty()) {
-    Log.w(TAG, "Empty install directory")
+    AppLogger.w(TAG, "Empty install directory")
     return null
    }
 
    installDir
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to parse manifest file", e)
+   AppLogger.e(TAG, "Failed to parse manifest file", e)
    null
   }
  }
@@ -191,7 +191,7 @@ class SteamGameScanner @Inject constructor(
 
    mainExe ?: exeFiles.firstOrNull()
   } catch (e: Exception) {
-   Log.w(TAG, "Error finding executable in ${gameDir.name}: ${e.message}")
+   AppLogger.w(TAG, "Error finding executable in ${gameDir.name}: ${e.message}")
    null
   }
  }

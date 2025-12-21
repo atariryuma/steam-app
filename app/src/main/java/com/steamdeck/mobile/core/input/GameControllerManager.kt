@@ -2,7 +2,7 @@ package com.steamdeck.mobile.core.input
 
 import android.content.Context
 import android.hardware.input.InputManager
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -51,7 +51,7 @@ class GameControllerManager @Inject constructor(
   // Start hot-plug monitor
   inputManager.registerInputDeviceListener(this, null)
 
-  Log.i(TAG, "GameControllerManager initialized with ${_connectedControllers.value.size} controllers")
+  AppLogger.i(TAG, "GameControllerManager initialized with ${_connectedControllers.value.size} controllers")
  }
 
  /**
@@ -71,7 +71,7 @@ class GameControllerManager @Inject constructor(
   }
 
   _connectedControllers.value = controllers
-  Log.d(TAG, "Discovered ${controllers.size} game controllers")
+  AppLogger.d(TAG, "Discovered ${controllers.size} game controllers")
  }
 
  /**
@@ -138,7 +138,7 @@ class GameControllerManager @Inject constructor(
   }
 
   _controllerState.value = _controllerState.value + (deviceId to updatedState)
-  Log.v(TAG, "Controller $deviceId: KeyEvent ${event.keyCode} action=${event.action}")
+  AppLogger.v(TAG, "Controller $deviceId: KeyEvent ${event.keyCode} action=${event.action}")
   return true
  }
 
@@ -178,7 +178,7 @@ class GameControllerManager @Inject constructor(
   )
 
   _controllerState.value = _controllerState.value + (deviceId to updatedState)
-  Log.v(TAG, "Controller $deviceId: Motion LS($leftX,$leftY) RS($rightX,$rightY) Triggers($triggerL,$triggerR)")
+  AppLogger.v(TAG, "Controller $deviceId: Motion LS($leftX,$leftY) RS($rightX,$rightY) Triggers($triggerL,$triggerR)")
   return true
  }
 
@@ -198,7 +198,7 @@ class GameControllerManager @Inject constructor(
    val controller = inputDevice?.let { createGameController(it) }
    if (controller != null) {
     _connectedControllers.value = _connectedControllers.value + controller
-    Log.i(TAG, "Controller connected: ${controller.name} (ID: $deviceId)")
+    AppLogger.i(TAG, "Controller connected: ${controller.name} (ID: $deviceId)")
    }
   }
  }
@@ -211,7 +211,7 @@ class GameControllerManager @Inject constructor(
   if (removedController != null) {
    _connectedControllers.value = _connectedControllers.value.filter { it.id != deviceId }
    _controllerState.value = _controllerState.value - deviceId
-   Log.i(TAG, "Controller disconnected: ${removedController.name} (ID: $deviceId)")
+   AppLogger.i(TAG, "Controller disconnected: ${removedController.name} (ID: $deviceId)")
   }
  }
 
@@ -226,7 +226,7 @@ class GameControllerManager @Inject constructor(
     _connectedControllers.value = _connectedControllers.value.map {
      if (it.id == deviceId) controller else it
     }
-    Log.d(TAG, "Controller changed: ${controller.name} (ID: $deviceId)")
+    AppLogger.d(TAG, "Controller changed: ${controller.name} (ID: $deviceId)")
    }
   }
  }
@@ -246,7 +246,7 @@ class GameControllerManager @Inject constructor(
   val vibrator = inputDevice?.vibrator
   if (vibrator?.hasVibrator() == true) {
    vibrator.vibrate(durationMs)
-   Log.d(TAG, "Controller $deviceId vibrating for ${durationMs}ms")
+   AppLogger.d(TAG, "Controller $deviceId vibrating for ${durationMs}ms")
   }
  }
 
@@ -255,7 +255,7 @@ class GameControllerManager @Inject constructor(
   */
  fun cleanup() {
   inputManager.unregisterInputDeviceListener(this)
-  Log.i(TAG, "GameControllerManager cleanup complete")
+  AppLogger.i(TAG, "GameControllerManager cleanup complete")
  }
 }
 

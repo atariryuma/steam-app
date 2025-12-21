@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.winlator
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.domain.model.Box64Preset
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.model.WinlatorContainer
@@ -41,7 +41,7 @@ class WinlatorEngineImpl @Inject constructor(
   * - Recommended to call when app exits or game terminates
   */
  fun cleanup() {
-  Log.d(TAG, "Cleaning up WinlatorEngine resources")
+  AppLogger.d(TAG, "Cleaning up WinlatorEngine resources")
   currentProcessId = null
   currentEmulatorProcess = null
   cachedDefaultContainer.set(null) // Clear container cache (thread-safe)
@@ -49,15 +49,15 @@ class WinlatorEngineImpl @Inject constructor(
 
  override suspend fun launchGame(game: Game, container: WinlatorContainer?): LaunchResult {
   return try {
-   Log.d(TAG, "Launching game: ${game.name}")
-   Log.d(TAG, "Executable: ${game.executablePath}")
-   Log.d(TAG, "Container: ${container?.name ?: "Default"}")
-   Log.d(TAG, "Source: ${game.source}, SteamAppId: ${game.steamAppId}")
+   AppLogger.d(TAG, "Launching game: ${game.name}")
+   AppLogger.d(TAG, "Executable: ${game.executablePath}")
+   AppLogger.d(TAG, "Container: ${container?.name ?: "Default"}")
+   AppLogger.d(TAG, "Source: ${game.source}, SteamAppId: ${game.steamAppId}")
 
    // For Steam games, download is required
    if (game.source == com.steamdeck.mobile.domain.model.GameSource.STEAM) {
     if (game.executablePath.isBlank()) {
-     Log.w(TAG, "Steam game not downloaded: ${game.name} (AppID: ${game.steamAppId})")
+     AppLogger.w(TAG, "Steam game not downloaded: ${game.name} (AppID: ${game.steamAppId})")
      return LaunchResult.Error(
       "This game has not been downloaded yet.\n\n" +
       "Steam game download functionality will be added in a future update."
@@ -68,13 +68,13 @@ class WinlatorEngineImpl @Inject constructor(
    // 1. Check Winlator initialization and auto-initialize if needed
    val available = winlatorEmulator.isAvailable().getOrNull() ?: false
    if (!available) {
-    Log.i(TAG, "Winlator not initialized, starting automatic initialization...")
+    AppLogger.i(TAG, "Winlator not initialized, starting automatic initialization...")
     val initResult = winlatorEmulator.initialize { progress, status ->
-     Log.d(TAG, "Initialization progress: ${(progress * 100).toInt()}% - $status")
+     AppLogger.d(TAG, "Initialization progress: ${(progress * 100).toInt()}% - $status")
     }
     if (initResult.isFailure) {
      val error = initResult.exceptionOrNull()
-     Log.e(TAG, "Winlator initialization failed", error)
+     AppLogger.e(TAG, "Winlator initialization failed", error)
      return LaunchResult.Error(
       "Failed to initialize Winlator environment.\n\n" +
       "Error: ${error?.message}\n\n" +
@@ -84,7 +84,7 @@ class WinlatorEngineImpl @Inject constructor(
       "• Restart your device"
      )
     }
-    Log.i(TAG, "Winlator initialization completed successfully")
+    AppLogger.i(TAG, "Winlator initialization completed successfully")
    }
 
    // 2. Check executable file exists
@@ -99,17 +99,17 @@ class WinlatorEngineImpl @Inject constructor(
 
    // 3. Detect game engine
    val engine = detectGameEngine(game.executablePath)
-   Log.d(TAG, "Detected engine: ${engine.displayName}")
+   AppLogger.d(TAG, "Detected engine: ${engine.displayName}")
 
    // 4. Apply optimization configuration
    val optimizedContainer = container ?: getOptimizedContainerSettings(engine)
-   Log.d(TAG, "Using container settings: Box64Preset=${optimizedContainer.box64Preset}, Wine=${optimizedContainer.wineVersion}")
+   AppLogger.d(TAG, "Using container settings: Box64Preset=${optimizedContainer.box64Preset}, Wine=${optimizedContainer.wineVersion}")
 
    // 5. Create or get EmulatorContainer
    val emulatorContainer = getOrCreateEmulatorContainer(game, optimizedContainer)
 
    // 6. Launch game
-   Log.i(TAG, "Launching executable via Winlator: ${execFile.absolutePath}")
+   AppLogger.i(TAG, "Launching executable via Winlator: ${execFile.absolutePath}")
    val launchResult = winlatorEmulator.launchExecutable(
     container = emulatorContainer,
     executable = execFile,
@@ -121,12 +121,12 @@ class WinlatorEngineImpl @Inject constructor(
      val emulatorProcess = launchResult.getOrThrow()
      currentProcessId = emulatorProcess.id
      currentEmulatorProcess = emulatorProcess
-     Log.i(TAG, "Game launched successfully: ProcessId=${emulatorProcess.id}, PID=${emulatorProcess.pid}")
+     AppLogger.i(TAG, "Game launched successfully: ProcessId=${emulatorProcess.id}, PID=${emulatorProcess.pid}")
      LaunchResult.Success(emulatorProcess.pid ?: -1)
     }
     launchResult.isFailure -> {
      val error = launchResult.exceptionOrNull()
-     Log.e(TAG, "Game launch failed", error)
+     AppLogger.e(TAG, "Game launch failed", error)
      LaunchResult.Error("Launch failed: ${error?.message}", error)
     }
     else -> {
@@ -134,7 +134,7 @@ class WinlatorEngineImpl @Inject constructor(
     }
    }
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to launch game", e)
+   AppLogger.e(TAG, "Failed to launch game", e)
    LaunchResult.Error("Game launch error: ${e.message}", e)
   }
  }
@@ -147,7 +147,7 @@ class WinlatorEngineImpl @Inject constructor(
    val statusResult = winlatorEmulator.getProcessStatus(processId)
    statusResult.getOrNull()?.isRunning ?: false
   } catch (e: Exception) {
-   Log.w(TAG, "Failed to check process status", e)
+   AppLogger.w(TAG, "Failed to check process status", e)
    false
   }
  }
@@ -159,44 +159,44 @@ class WinlatorEngineImpl @Inject constructor(
     return Result.failure(IllegalStateException("No game is currently running"))
    }
 
-   Log.d(TAG, "Stopping game process: $processId")
+   AppLogger.d(TAG, "Stopping game process: $processId")
 
    // Kill process via WinlatorEmulator
    val killResult = winlatorEmulator.killProcess(processId, force = false)
 
    if (killResult.isSuccess) {
-    Log.i(TAG, "Game stopped successfully")
+    AppLogger.i(TAG, "Game stopped successfully")
     cleanup() // Clean up resources to prevent memory leaks
     Result.success(Unit)
    } else {
     val error = killResult.exceptionOrNull()
-    Log.e(TAG, "Failed to stop game", error)
+    AppLogger.e(TAG, "Failed to stop game", error)
     Result.failure(error ?: Exception("Unknown error"))
    }
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to stop game", e)
+   AppLogger.e(TAG, "Failed to stop game", e)
    Result.failure(e)
   }
  }
 
  override suspend fun createContainer(container: WinlatorContainer): Result<WinlatorContainer> {
   return try {
-   Log.d(TAG, "Creating container: ${container.name}")
+   AppLogger.d(TAG, "Creating container: ${container.name}")
    // TODO: Create Winlator container
    Result.success(container)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to create container", e)
+   AppLogger.e(TAG, "Failed to create container", e)
    Result.failure(e)
   }
  }
 
  override suspend fun deleteContainer(containerId: Long): Result<Unit> {
   return try {
-   Log.d(TAG, "Deleting container: $containerId")
+   AppLogger.d(TAG, "Deleting container: $containerId")
    // TODO: Delete Winlator container
    Result.success(Unit)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to delete container", e)
+   AppLogger.e(TAG, "Failed to delete container", e)
    Result.failure(e)
   }
  }
@@ -223,7 +223,7 @@ class WinlatorEngineImpl @Inject constructor(
 
    GameEngine.UNKNOWN
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to detect game engine", e)
+   AppLogger.e(TAG, "Failed to detect game engine", e)
    GameEngine.UNKNOWN
   }
  }
@@ -257,17 +257,17 @@ class WinlatorEngineImpl @Inject constructor(
     it.id == "container_${game.winlatorContainerId}"
    }
    if (customContainer != null) {
-    Log.d(TAG, "Using custom container for ${game.name}: ${customContainer.name}")
+    AppLogger.d(TAG, "Using custom container for ${game.name}: ${customContainer.name}")
     return customContainer
    } else {
-    Log.w(TAG, "Custom container ${game.winlatorContainerId} not found, falling back to default")
+    AppLogger.w(TAG, "Custom container ${game.winlatorContainerId} not found, falling back to default")
    }
   }
 
   // PRIORITY 2: Use cached default container (OPTIMIZATION)
   // Most games use the default container, so cache it for instant lookup
   cachedDefaultContainer.get()?.let { cached ->
-   Log.d(TAG, "Using cached default container for: ${game.name}")
+   AppLogger.d(TAG, "Using cached default container for: ${game.name}")
    return cached
   }
 
@@ -278,15 +278,15 @@ class WinlatorEngineImpl @Inject constructor(
   val defaultContainer = existingContainers.firstOrNull { it.id == defaultContainerId }
 
   if (defaultContainer != null) {
-   Log.d(TAG, "Fetched and cached default container for: ${game.name}")
+   AppLogger.d(TAG, "Fetched and cached default container for: ${game.name}")
    cachedDefaultContainer.set(defaultContainer) // Cache for future lookups (thread-safe)
    return defaultContainer
   }
 
   // PRIORITY 4: Create default container on first game launch
   // This happens only once per app installation, all subsequent games reuse it
-  Log.i(TAG, "Creating shared default container (first-time setup)")
-  Log.i(TAG, "All games will share this container for optimal disk usage")
+  AppLogger.i(TAG, "Creating shared default container (first-time setup)")
+  AppLogger.i(TAG, "All games will share this container for optimal disk usage")
   val config = com.steamdeck.mobile.domain.emulator.EmulatorContainerConfig(
    name = "Default Container", // Shared by all games
    screenWidth = parseResolutionWidth(winlatorContainer.screenResolution),

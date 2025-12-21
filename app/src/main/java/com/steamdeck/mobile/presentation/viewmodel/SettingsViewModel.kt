@@ -327,9 +327,9 @@ class SettingsViewModel @Inject constructor(
 
     val result = steamSetupManager.installSteam(
      containerId = containerId,
-     progressCallback = { progress, message ->
-      _steamInstallState.value = SteamInstallState.Installing(progress, message)
-      AppLogger.d(TAG, "Install progress: $progress - $message")
+     progressCallback = { progress, message, detailMessage ->
+      _steamInstallState.value = SteamInstallState.Installing(progress, message, detailMessage)
+      AppLogger.d(TAG, "Install progress: $progress - $message${detailMessage?.let { " ($it)" } ?: ""}")
      }
     )
 
@@ -564,7 +564,8 @@ sealed class SteamInstallState {
  @Immutable
  data class Installing(
   val progress: Float,
-  val message: String
+  val message: String,
+  val detailMessage: String? = null  // Optional detail message (e.g., "File 234/342: Steam.exe")
  ) : SteamInstallState()
 
  /** Error */

@@ -1,6 +1,6 @@
 package com.steamdeck.mobile.core.winlator
 
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -32,7 +32,7 @@ class ProcessMonitor @Inject constructor() {
   * @return Flow of ProcessMetrics
   */
  fun startMonitoring(pid: Int, intervalMs: Long = UPDATE_INTERVAL_MS): Flow<ProcessMetrics> = flow {
-  Log.i(TAG, "Starting process monitoring for PID $pid")
+  AppLogger.i(TAG, "Starting process monitoring for PID $pid")
 
   val startTime = System.currentTimeMillis()
   var lastCpuTime = 0L
@@ -53,16 +53,16 @@ class ProcessMonitor @Inject constructor() {
      emit(metrics)
     } else {
      // Process no longer exists
-     Log.d(TAG, "Process $pid no longer exists, stopping monitoring")
+     AppLogger.d(TAG, "Process $pid no longer exists, stopping monitoring")
      break
     }
    } catch (e: Exception) {
     consecutiveErrors++
-    Log.e(TAG, "Error reading process metrics for PID $pid (attempt $consecutiveErrors/$maxConsecutiveErrors)", e)
+    AppLogger.e(TAG, "Error reading process metrics for PID $pid (attempt $consecutiveErrors/$maxConsecutiveErrors)", e)
 
     // CRITICAL FIX: Break infinite loop if process is unreadable (zombie/permission denied)
     if (consecutiveErrors >= maxConsecutiveErrors) {
-     Log.w(TAG, "Too many consecutive errors for PID $pid, assuming process is dead or zombie")
+     AppLogger.w(TAG, "Too many consecutive errors for PID $pid, assuming process is dead or zombie")
      break
     }
    }
@@ -70,7 +70,7 @@ class ProcessMonitor @Inject constructor() {
    delay(intervalMs)
   }
 
-  Log.i(TAG, "Stopped process monitoring for PID $pid")
+  AppLogger.i(TAG, "Stopped process monitoring for PID $pid")
  }
 
  /**
@@ -128,7 +128,7 @@ class ProcessMonitor @Inject constructor() {
     totalCpuTime = cpuStats.totalCpuTime
    )
   } catch (e: Exception) {
-   Log.w(TAG, "Failed to parse process metrics for PID $pid", e)
+   AppLogger.w(TAG, "Failed to parse process metrics for PID $pid", e)
    return null
   }
  }

@@ -1,6 +1,6 @@
 package com.steamdeck.mobile.core.util
 
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import java.io.File
 import java.io.RandomAccessFile
 
@@ -102,13 +102,13 @@ object ElfPatcher {
     val byte2 = raf.readByte().toInt() and 0xFF
     val eType = (byte1 or (byte2 shl 8)).toShort()
 
-    Log.d(TAG, "ELF binary ${binaryFile.name}: e_type = $eType (0x${eType.toString(16)})")
+    AppLogger.d(TAG, "ELF binary ${binaryFile.name}: e_type = $eType (0x${eType.toString(16)})")
 
     // 3. Check if patching is needed
     when (eType) {
      ET_EXEC -> {
       // Patch: ET_EXEC (2) → ET_DYN (3)
-      Log.i(TAG, "Patching ${binaryFile.name}: ET_EXEC → ET_DYN")
+      AppLogger.i(TAG, "Patching ${binaryFile.name}: ET_EXEC → ET_DYN")
 
       raf.seek(E_TYPE_OFFSET.toLong())
       // Write in little-endian format
@@ -122,7 +122,7 @@ object ElfPatcher {
       val newEType = (verifyByte1 or (verifyByte2 shl 8)).toShort()
 
       if (newEType == ET_DYN) {
-       Log.i(TAG, "Successfully patched ${binaryFile.name} to PIE (ET_DYN)")
+       AppLogger.i(TAG, "Successfully patched ${binaryFile.name} to PIE (ET_DYN)")
        Result.success(Unit)
       } else {
        Result.failure(IllegalStateException("Patch verification failed: e_type = $newEType"))
@@ -130,17 +130,17 @@ object ElfPatcher {
      }
      ET_DYN -> {
       // Already PIE, no patching needed
-      Log.d(TAG, "${binaryFile.name} is already PIE (ET_DYN)")
+      AppLogger.d(TAG, "${binaryFile.name} is already PIE (ET_DYN)")
       Result.success(Unit)
      }
      else -> {
-      Log.w(TAG, "${binaryFile.name} has unknown e_type: $eType")
+      AppLogger.w(TAG, "${binaryFile.name} has unknown e_type: $eType")
       Result.success(Unit) // Don't fail, just warn
      }
     }
    }
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to patch ${binaryFile.name}", e)
+   AppLogger.e(TAG, "Failed to patch ${binaryFile.name}", e)
    Result.failure(e)
   }
  }
@@ -172,7 +172,7 @@ object ElfPatcher {
     eType == ET_EXEC
    }
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to check ${binaryFile.name}", e)
+   AppLogger.e(TAG, "Failed to check ${binaryFile.name}", e)
    false
   }
  }
@@ -218,7 +218,7 @@ object ElfPatcher {
     raf.seek(0x36)
     val phnum = readShortLE(raf)
 
-    Log.d(TAG, "ELF ${binaryFile.name}: phoff=$phoff, phnum=$phnum")
+    AppLogger.d(TAG, "ELF ${binaryFile.name}: phoff=$phoff, phnum=$phnum")
 
     // 3. Search for PT_INTERP (type=3) program header
     for (i in 0 until phnum) {
@@ -233,7 +233,7 @@ object ElfPatcher {
       raf.seek(phOffset + 32) // Skip to p_filesz
       val interpSize = readLongLE(raf)
 
-      Log.d(TAG, "Found PT_INTERP at offset $interpOffset, size $interpSize")
+      AppLogger.d(TAG, "Found PT_INTERP at offset $interpOffset, size $interpSize")
 
       // Read current interpreter path
       raf.seek(interpOffset)
@@ -241,8 +241,8 @@ object ElfPatcher {
       raf.readFully(currentPath)
       val currentPathStr = String(currentPath).trim('\u0000')
 
-      Log.i(TAG, "Current interpreter: $currentPathStr")
-      Log.i(TAG, "New interpreter: $newInterpreterPath")
+      AppLogger.i(TAG, "Current interpreter: $currentPathStr")
+      AppLogger.i(TAG, "New interpreter: $newInterpreterPath")
 
       // Check if new path fits
       if (newInterpreterPath.length >= interpSize) {
@@ -269,7 +269,7 @@ object ElfPatcher {
       val verifyPathStr = String(verifyPath).trim('\u0000')
 
       if (verifyPathStr == newInterpreterPath) {
-       Log.i(TAG, "Successfully patched interpreter path in ${binaryFile.name}")
+       AppLogger.i(TAG, "Successfully patched interpreter path in ${binaryFile.name}")
        return Result.success(Unit)
       } else {
        return Result.failure(IllegalStateException("Verification failed: $verifyPathStr != $newInterpreterPath"))
@@ -280,7 +280,7 @@ object ElfPatcher {
     Result.failure(IllegalArgumentException("No PT_INTERP header found in ${binaryFile.name}"))
    }
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to patch interpreter path in ${binaryFile.name}", e)
+   AppLogger.e(TAG, "Failed to patch interpreter path in ${binaryFile.name}", e)
    Result.failure(e)
   }
  }
@@ -326,7 +326,7 @@ object ElfPatcher {
     raf.seek(0x36)
     val phnum = readShortLE(raf)
 
-    Log.d(TAG, "ELF ${binaryFile.name}: phoff=$phoff, phnum=$phnum")
+    AppLogger.d(TAG, "ELF ${binaryFile.name}: phoff=$phoff, phnum=$phnum")
 
     var patchedCount = 0
 
@@ -342,7 +342,7 @@ object ElfPatcher {
       raf.seek(phOffset + 48)
       val currentAlign = readLongLE(raf)
 
-      Log.d(TAG, "Found PT_TLS with alignment: $currentAlign (required: $requiredAlignment)")
+      AppLogger.d(TAG, "Found PT_TLS with alignment: $currentAlign (required: $requiredAlignment)")
 
       if (currentAlign < requiredAlignment) {
        // Patch alignment
@@ -362,25 +362,25 @@ object ElfPatcher {
        val newAlign = readLongLE(raf)
 
        if (newAlign == requiredAlignment) {
-        Log.i(TAG, "Successfully patched PT_TLS alignment: $currentAlign -> $newAlign")
+        AppLogger.i(TAG, "Successfully patched PT_TLS alignment: $currentAlign -> $newAlign")
         patchedCount++
        } else {
         return Result.failure(IllegalStateException("TLS alignment patch verification failed: got $newAlign, expected $requiredAlignment"))
        }
       } else {
-       Log.d(TAG, "PT_TLS alignment already sufficient: $currentAlign >= $requiredAlignment")
+       AppLogger.d(TAG, "PT_TLS alignment already sufficient: $currentAlign >= $requiredAlignment")
       }
      }
     }
 
     if (patchedCount > 0) {
-     Log.i(TAG, "Patched $patchedCount PT_TLS segment(s) in ${binaryFile.name}")
+     AppLogger.i(TAG, "Patched $patchedCount PT_TLS segment(s) in ${binaryFile.name}")
     }
 
     Result.success(Unit)
    }
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to patch TLS alignment in ${binaryFile.name}", e)
+   AppLogger.e(TAG, "Failed to patch TLS alignment in ${binaryFile.name}", e)
    Result.failure(e)
   }
  }

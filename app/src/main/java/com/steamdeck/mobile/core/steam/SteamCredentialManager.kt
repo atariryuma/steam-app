@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.steam
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.domain.repository.ISecurePreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -75,11 +75,11 @@ class SteamCredentialManager @Inject constructor(
         personaName: String? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            Log.i(TAG, "Writing Steam credentials for SteamID: $steamId, Container: $containerId")
+            AppLogger.i(TAG, "Writing Steam credentials for SteamID: $steamId, Container: $containerId")
 
             // Validate SteamID64 format (must be 17-digit number starting with 7656119)
             if (!isValidSteamId64(steamId)) {
-                Log.e(TAG, "Invalid SteamID64 format: $steamId")
+                AppLogger.e(TAG, "Invalid SteamID64 format: $steamId")
                 return@withContext Result.failure(
                     IllegalArgumentException("Invalid SteamID64 format: $steamId")
                 )
@@ -94,12 +94,12 @@ class SteamCredentialManager @Inject constructor(
             if (!steamConfigDir.exists()) {
                 val created = steamConfigDir.mkdirs()
                 if (!created) {
-                    Log.e(TAG, "Failed to create config directory: ${steamConfigDir.absolutePath}")
+                    AppLogger.e(TAG, "Failed to create config directory: ${steamConfigDir.absolutePath}")
                     return@withContext Result.failure(
                         Exception("Failed to create Steam config directory")
                     )
                 }
-                Log.d(TAG, "Created config directory: ${steamConfigDir.absolutePath}")
+                AppLogger.d(TAG, "Created config directory: ${steamConfigDir.absolutePath}")
             }
 
             val username = accountName ?: steamId
@@ -129,16 +129,16 @@ class SteamCredentialManager @Inject constructor(
                 return@withContext configResult
             }
 
-            Log.i(TAG, "✅ Steam credentials written successfully")
-            Log.d(TAG, "  SteamID: $steamId")
-            Log.d(TAG, "  Account: $username")
-            Log.d(TAG, "  Display: $displayName")
-            Log.d(TAG, "  Location: ${steamConfigDir.absolutePath}")
+            AppLogger.i(TAG, "✅ Steam credentials written successfully")
+            AppLogger.d(TAG, "  SteamID: $steamId")
+            AppLogger.d(TAG, "  Account: $username")
+            AppLogger.d(TAG, "  Display: $displayName")
+            AppLogger.d(TAG, "  Location: ${steamConfigDir.absolutePath}")
 
             Result.success(Unit)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to write Steam credentials", e)
+            AppLogger.e(TAG, "Failed to write Steam credentials", e)
             Result.failure(e)
         }
     }
@@ -213,13 +213,13 @@ class SteamCredentialManager @Inject constructor(
             }
             tempFile.renameTo(file)
 
-            Log.i(TAG, "✅ Written loginusers.vdf: ${file.absolutePath}")
-            Log.d(TAG, "File size: ${file.length()} bytes")
+            AppLogger.i(TAG, "✅ Written loginusers.vdf: ${file.absolutePath}")
+            AppLogger.d(TAG, "File size: ${file.length()} bytes")
 
             Result.success(Unit)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to write loginusers.vdf", e)
+            AppLogger.e(TAG, "Failed to write loginusers.vdf", e)
             Result.failure(e)
         }
     }
@@ -290,13 +290,13 @@ class SteamCredentialManager @Inject constructor(
             }
             tempFile.renameTo(file)
 
-            Log.i(TAG, "✅ Written config.vdf: ${file.absolutePath}")
-            Log.d(TAG, "File size: ${file.length()} bytes")
+            AppLogger.i(TAG, "✅ Written config.vdf: ${file.absolutePath}")
+            AppLogger.d(TAG, "File size: ${file.length()} bytes")
 
             Result.success(Unit)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to write config.vdf", e)
+            AppLogger.e(TAG, "Failed to write config.vdf", e)
             Result.failure(e)
         }
     }
@@ -352,17 +352,17 @@ class SteamCredentialManager @Inject constructor(
             val configured = loginUsersFile.exists() && configFile.exists()
 
             if (configured) {
-                Log.d(TAG, "Steam credentials configured for container: $containerId")
+                AppLogger.d(TAG, "Steam credentials configured for container: $containerId")
             } else {
-                Log.d(TAG, "Steam credentials NOT configured for container: $containerId")
-                Log.d(TAG, "  loginusers.vdf exists: ${loginUsersFile.exists()}")
-                Log.d(TAG, "  config.vdf exists: ${configFile.exists()}")
+                AppLogger.d(TAG, "Steam credentials NOT configured for container: $containerId")
+                AppLogger.d(TAG, "  loginusers.vdf exists: ${loginUsersFile.exists()}")
+                AppLogger.d(TAG, "  config.vdf exists: ${configFile.exists()}")
             }
 
             configured
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to check credentials configuration", e)
+            AppLogger.e(TAG, "Failed to check credentials configuration", e)
             false
         }
     }
@@ -378,7 +378,7 @@ class SteamCredentialManager @Inject constructor(
      */
     suspend fun clearCredentials(containerId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            Log.i(TAG, "Clearing Steam credentials for container: $containerId")
+            AppLogger.i(TAG, "Clearing Steam credentials for container: $containerId")
 
             val steamConfigDir = File(
                 context.filesDir,
@@ -398,11 +398,11 @@ class SteamCredentialManager @Inject constructor(
                 deleted++
             }
 
-            Log.i(TAG, "✅ Cleared $deleted credential file(s)")
+            AppLogger.i(TAG, "✅ Cleared $deleted credential file(s)")
             Result.success(Unit)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to clear credentials", e)
+            AppLogger.e(TAG, "Failed to clear credentials", e)
             Result.failure(e)
         }
     }

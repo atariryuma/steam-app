@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.controller
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.steamdeck.mobile.domain.model.*
@@ -75,7 +75,7 @@ class ControllerManager @Inject constructor(
   scope.launch {
    repository.getConnectedControllers().collect { controllers ->
     _connectedControllers.value = controllers
-    Log.i(TAG, "Detected ${controllers.size} controllers")
+    AppLogger.i(TAG, "Detected ${controllers.size} controllers")
 
     // Auto-select first controller if none active
     if (_activeController.value == null && controllers.isNotEmpty()) {
@@ -93,7 +93,7 @@ class ControllerManager @Inject constructor(
  fun setActiveController(controller: Controller) {
   scope.launch {
    _activeController.value = controller
-   Log.i(TAG, "Active controller set: ${controller.name}")
+   AppLogger.i(TAG, "Active controller set: ${controller.name}")
 
    // Load profile for this controller
    loadProfileForController(controller)
@@ -111,7 +111,7 @@ class ControllerManager @Inject constructor(
    if (profile != null) {
     _activeProfile.value = profile
     _activeButtonMapping.value = profile.buttonMapping
-    Log.i(TAG, "Loaded profile: ${profile.name}")
+    AppLogger.i(TAG, "Loaded profile: ${profile.name}")
    } else {
     // Use default mapping based on controller type
     _activeProfile.value = null
@@ -119,10 +119,10 @@ class ControllerManager @Inject constructor(
      ControllerType.PLAYSTATION -> ButtonMapping.PLAYSTATION_DEFAULT
      else -> ButtonMapping.XBOX_DEFAULT
     }
-    Log.i(TAG, "Using default ${controller.type} mapping")
+    AppLogger.i(TAG, "Using default ${controller.type} mapping")
    }
   }.onFailure { error ->
-   Log.w(TAG, "Failed to load profile, using default", error)
+   AppLogger.w(TAG, "Failed to load profile, using default", error)
    _activeProfile.value = null
    _activeButtonMapping.value = ButtonMapping.XBOX_DEFAULT
   }
@@ -151,7 +151,7 @@ class ControllerManager @Inject constructor(
    _buttonEvents.emit(buttonEvent)
   }
 
-  Log.d(TAG, "Button event: $gameAction ${if (buttonEvent.isPressed) "pressed" else "released"}")
+  AppLogger.d(TAG, "Button event: $gameAction ${if (buttonEvent.isPressed) "pressed" else "released"}")
   return true
  }
 

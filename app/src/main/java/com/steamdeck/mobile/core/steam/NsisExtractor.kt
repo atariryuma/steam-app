@@ -1,6 +1,6 @@
 package com.steamdeck.mobile.core.steam
 
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import net.sf.sevenzipjbinding.ArchiveFormat
 import net.sf.sevenzipjbinding.IArchiveExtractCallback
 import net.sf.sevenzipjbinding.IInArchive
@@ -32,16 +32,20 @@ class NsisExtractor(private val nsisFile: File) {
      * Extract Steam client files from NSIS installer
      *
      * @param targetDir Target directory for extracted files
+     * @param onProgress Optional progress callback (filesExtracted, totalFiles)
      * @return Result indicating success or failure with extracted file count
      */
-    suspend fun extractSteamFiles(targetDir: File): Result<Int> = withContext(Dispatchers.IO) {
+    suspend fun extractSteamFiles(
+        targetDir: File,
+        onProgress: ((filesExtracted: Int, totalFiles: Int) -> Unit)? = null
+    ): Result<Int> = withContext(Dispatchers.IO) {
         var archive: IInArchive? = null
         var randomAccessFile: RandomAccessFile? = null
 
         try {
-            Log.i(TAG, "Extracting NSIS using 7-Zip-JBinding library (ARM64 compatible)")
-            Log.i(TAG, "Source: ${nsisFile.absolutePath}")
-            Log.i(TAG, "Target: ${targetDir.absolutePath}")
+            AppLogger.i(TAG, "Extracting NSIS using 7-Zip-JBinding library (ARM64 compatible)")
+            AppLogger.i(TAG, "Source: ${nsisFile.absolutePath}")
+            AppLogger.i(TAG, "Target: ${targetDir.absolutePath}")
 
             // Ensure target directory exists
             targetDir.mkdirs()
@@ -54,18 +58,19 @@ class NsisExtractor(private val nsisFile: File) {
             archive = SevenZip.openInArchive(ArchiveFormat.NSIS, inStream)
 
             val itemCount = archive.numberOfItems
-            Log.i(TAG, "Found $itemCount items in NSIS archive")
+            AppLogger.i(TAG, "Found $itemCount items in NSIS archive")
 
             var extractedFiles = 0
 
             // Extract all files
             val callback = object : IArchiveExtractCallback {
                 override fun setTotal(total: Long) {
-                    Log.d(TAG, "Total bytes to extract: $total")
+                    AppLogger.d(TAG, "Total bytes to extract: $total")
                 }
 
                 override fun setCompleted(completeValue: Long) {
-                    // Progress callback (optional)
+                    // Note: completeValue is bytes processed, not file count
+                    // We use extractedFiles counter for accurate file progress
                 }
 
                 override fun getStream(index: Int, extractAskMode: net.sf.sevenzipjbinding.ExtractAskMode): ISequentialOutStream? {
@@ -73,7 +78,7 @@ class NsisExtractor(private val nsisFile: File) {
                     val isFolder = archive.getProperty(index, PropID.IS_FOLDER) as? Boolean ?: false
 
                     if (path == null) {
-                        Log.w(TAG, "Skipping item $index (no path)")
+                        AppLogger.w(TAG, "Skipping item $index (no path)")
                         return null
                     }
 
@@ -81,7 +86,7 @@ class NsisExtractor(private val nsisFile: File) {
 
                     if (isFolder) {
                         outputFile.mkdirs()
-                        Log.d(TAG, "Created directory: ${outputFile.name}")
+                        AppLogger.d(TAG, "Created directory: ${outputFile.name}")
                         return null
                     }
 
@@ -89,7 +94,11 @@ class NsisExtractor(private val nsisFile: File) {
                     outputFile.parentFile?.mkdirs()
 
                     extractedFiles++
-                    Log.d(TAG, "Extracting file $extractedFiles: ${outputFile.name}")
+
+                    // Report progress after incrementing counter
+                    onProgress?.invoke(extractedFiles, itemCount)
+
+                    AppLogger.d(TAG, "Extracting file $extractedFiles/$itemCount: ${outputFile.name}")
 
                     // Return output stream for file data
                     val fileOutputStream = FileOutputStream(outputFile)
@@ -108,7 +117,7 @@ class NsisExtractor(private val nsisFile: File) {
                 override fun setOperationResult(operationResultCode: net.sf.sevenzipjbinding.ExtractOperationResult) {
                     // Called after extraction completes
                     if (operationResultCode != net.sf.sevenzipjbinding.ExtractOperationResult.OK) {
-                        Log.w(TAG, "Extraction result: $operationResultCode")
+                        AppLogger.w(TAG, "Extraction result: $operationResultCode")
                     }
                 }
             }
@@ -119,30 +128,30 @@ class NsisExtractor(private val nsisFile: File) {
             // Verify Steam.exe exists (case-sensitive on Android)
             val steamExe = File(targetDir, "Steam.exe")
             if (!steamExe.exists()) {
-                Log.w(TAG, "Steam.exe not found after extraction. Extracted $extractedFiles files.")
-                Log.w(TAG, "Directory contents: ${targetDir.listFiles()?.joinToString { it.name }}")
+                AppLogger.w(TAG, "Steam.exe not found after extraction. Extracted $extractedFiles files.")
+                AppLogger.w(TAG, "Directory contents: ${targetDir.listFiles()?.joinToString { it.name }}")
             } else {
-                Log.i(TAG, "Successfully extracted Steam.exe (${steamExe.length()} bytes)")
+                AppLogger.i(TAG, "Successfully extracted Steam.exe (${steamExe.length()} bytes)")
             }
 
-            Log.i(TAG, "NSIS extraction complete: $extractedFiles files extracted")
+            AppLogger.i(TAG, "NSIS extraction complete: $extractedFiles files extracted")
             Result.success(extractedFiles)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to extract NSIS installer", e)
+            AppLogger.e(TAG, "Failed to extract NSIS installer", e)
             Result.failure(e)
         } finally {
             // Close archive and file handle
             try {
                 archive?.close()
             } catch (e: Exception) {
-                Log.w(TAG, "Error closing archive", e)
+                AppLogger.w(TAG, "Error closing archive", e)
             }
 
             try {
                 randomAccessFile?.close()
             } catch (e: Exception) {
-                Log.w(TAG, "Error closing file", e)
+                AppLogger.w(TAG, "Error closing file", e)
             }
         }
     }

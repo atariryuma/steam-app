@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.steam
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.download.DownloadManager
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
 import com.steamdeck.mobile.data.local.database.entity.SteamInstallEntity
@@ -66,7 +66,7 @@ class SteamInstallerService @Inject constructor(
     zipFile.delete()
    }
 
-   Log.i(TAG, "Downloading Steam Client from $STEAM_CLIENT_URL")
+   AppLogger.i(TAG, "Downloading Steam Client from $STEAM_CLIENT_URL")
 
    // Direct download with OkHttp
    val request = okhttp3.Request.Builder()
@@ -87,11 +87,11 @@ class SteamInstallerService @Inject constructor(
     }
    }
 
-   Log.i(TAG, "Steam Client downloaded: ${zipFile.absolutePath} (${zipFile.length() / 1024 / 1024}MB)")
+   AppLogger.i(TAG, "Steam Client downloaded: ${zipFile.absolutePath} (${zipFile.length() / 1024 / 1024}MB)")
    Result.success(zipFile)
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to download Steam Client", e)
+   AppLogger.e(TAG, "Failed to download Steam Client", e)
    Result.failure(e)
   }
  }
@@ -115,7 +115,7 @@ class SteamInstallerService @Inject constructor(
     targetDir.parentFile?.mkdirs()
    }
 
-   Log.i(TAG, "Extracting Steam Client to ${targetDir.absolutePath}")
+   AppLogger.i(TAG, "Extracting Steam Client to ${targetDir.absolutePath}")
 
    // Use Java's built-in ZipInputStream for extraction
    java.util.zip.ZipInputStream(zipFile.inputStream().buffered()).use { zipInput ->
@@ -145,11 +145,11 @@ class SteamInstallerService @Inject constructor(
     )
    }
 
-   Log.i(TAG, "Steam Client extracted successfully: ${targetDir.absolutePath}")
+   AppLogger.i(TAG, "Steam Client extracted successfully: ${targetDir.absolutePath}")
    Result.success(Unit)
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to extract Steam Client", e)
+   AppLogger.e(TAG, "Failed to extract Steam Client", e)
    Result.failure(e)
   }
  }
@@ -177,7 +177,7 @@ class SteamInstallerService @Inject constructor(
     installerFile.delete()
    }
 
-   Log.i(TAG, "Downloading Steam installer from $STEAM_INSTALLER_URL")
+   AppLogger.i(TAG, "Downloading Steam installer from $STEAM_INSTALLER_URL")
 
    // Direct download with OkHttp
    val request = okhttp3.Request.Builder()
@@ -198,11 +198,11 @@ class SteamInstallerService @Inject constructor(
     }
    }
 
-   Log.i(TAG, "Steam installer downloaded: ${installerFile.absolutePath}")
+   AppLogger.i(TAG, "Steam installer downloaded: ${installerFile.absolutePath}")
    Result.success(installerFile)
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to download Steam installer", e)
+   AppLogger.e(TAG, "Failed to download Steam installer", e)
    Result.failure(e)
   }
  }
@@ -218,9 +218,14 @@ class SteamInstallerService @Inject constructor(
   *
   * @param setupExe Downloaded SteamSetup.exe file
   * @param targetDir Target directory (e.g., container/drive_c/Program Files (x86)/Steam)
+  * @param onProgress Optional progress callback (filesExtracted, totalFiles)
   * @return Result indicating success or failure
   */
- suspend fun extractSteamFromNSIS(setupExe: File, targetDir: File): Result<Unit> = withContext(Dispatchers.IO) {
+ suspend fun extractSteamFromNSIS(
+  setupExe: File,
+  targetDir: File,
+  onProgress: ((filesExtracted: Int, totalFiles: Int) -> Unit)? = null
+ ): Result<Unit> = withContext(Dispatchers.IO) {
   try {
    if (!setupExe.exists()) {
     return@withContext Result.failure(
@@ -230,13 +235,13 @@ class SteamInstallerService @Inject constructor(
 
    targetDir.parentFile?.mkdirs()
 
-   Log.i(TAG, "Extracting Steam Client from NSIS installer using 7-Zip-JBinding library (ARM64 compatible)")
-   Log.i(TAG, "Source: ${setupExe.absolutePath}")
-   Log.i(TAG, "Target: ${targetDir.absolutePath}")
+   AppLogger.i(TAG, "Extracting Steam Client from NSIS installer using 7-Zip-JBinding library (ARM64 compatible)")
+   AppLogger.i(TAG, "Source: ${setupExe.absolutePath}")
+   AppLogger.i(TAG, "Target: ${targetDir.absolutePath}")
 
    // Use 7-Zip-JBinding library for NSIS extraction (supports LZMA, BZIP2, ZLIB/Deflate)
    val extractor = NsisExtractor(setupExe)
-   val extractResult = extractor.extractSteamFiles(targetDir)
+   val extractResult = extractor.extractSteamFiles(targetDir, onProgress)
 
    if (extractResult.isFailure) {
     return@withContext Result.failure(
@@ -245,7 +250,7 @@ class SteamInstallerService @Inject constructor(
    }
 
    val extractedCount = extractResult.getOrDefault(0)
-   Log.i(TAG, "Extracted $extractedCount files from NSIS installer")
+   AppLogger.i(TAG, "Extracted $extractedCount files from NSIS installer")
 
    // Verify Steam.exe exists (case-sensitive on Android)
    val steamExe = File(targetDir, "Steam.exe")
@@ -255,11 +260,11 @@ class SteamInstallerService @Inject constructor(
     )
    }
 
-   Log.i(TAG, "NSIS extraction successful: Steam.exe found (${steamExe.length()} bytes)")
+   AppLogger.i(TAG, "NSIS extraction successful: Steam.exe found (${steamExe.length()} bytes)")
    Result.success(Unit)
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to extract Steam from NSIS installer", e)
+   AppLogger.e(TAG, "Failed to extract Steam from NSIS installer", e)
    Result.failure(e)
   }
  }
@@ -286,7 +291,7 @@ class SteamInstallerService @Inject constructor(
      installedAt = System.currentTimeMillis()
     )
     database.steamInstallDao().update(updatedEntity)
-    Log.i(TAG, "Updated existing installation for container: $containerId")
+    AppLogger.i(TAG, "Updated existing installation for container: $containerId")
     Result.success(existing.id)
    } else {
     // Create new record
@@ -296,12 +301,12 @@ class SteamInstallerService @Inject constructor(
      status = status
     )
     val id = database.steamInstallDao().insert(entity)
-    Log.i(TAG, "Created new installation record for container: $containerId")
+    AppLogger.i(TAG, "Created new installation record for container: $containerId")
     Result.success(id)
    }
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to save installation", e)
+   AppLogger.e(TAG, "Failed to save installation", e)
    Result.failure(e)
   }
  }
@@ -315,7 +320,7 @@ class SteamInstallerService @Inject constructor(
     database.steamInstallDao().update(entity)
     Result.success(Unit)
    } catch (e: Exception) {
-    Log.e(TAG, "Failed to update installation", e)
+    AppLogger.e(TAG, "Failed to update installation", e)
     Result.failure(e)
    }
   }

@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.data.remote.steam
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.data.remote.steam.model.SteamGame
 import com.steamdeck.mobile.data.remote.steam.model.SteamPlayer
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -40,15 +40,15 @@ class SteamRepositoryImpl @Inject constructor(
 
     if (response.isSuccessful) {
      val games = response.body()?.response?.games ?: emptyList()
-     Log.d(TAG, "Successfully fetched ${games.size} games from Steam")
+     AppLogger.d(TAG, "Successfully fetched ${games.size} games from Steam")
      Result.success(games)
     } else {
      val errorMsg = "Steam API error: ${response.code()} ${response.message()}"
-     Log.e(TAG, errorMsg)
+     AppLogger.e(TAG, errorMsg)
      Result.failure(Exception(errorMsg))
     }
    } catch (e: Exception) {
-    Log.e(TAG, "Failed to fetch owned games", e)
+    AppLogger.e(TAG, "Failed to fetch owned games", e)
     Result.failure(e)
    }
   }
@@ -65,18 +65,18 @@ class SteamRepositoryImpl @Inject constructor(
     if (response.isSuccessful) {
      val player = response.body()?.response?.players?.firstOrNull()
      if (player != null) {
-      Log.d(TAG, "Successfully fetched player: ${player.personaName}")
+      AppLogger.d(TAG, "Successfully fetched player: ${player.personaName}")
       Result.success(player)
      } else {
       Result.failure(Exception("プレイヤーinformation not found"))
      }
     } else {
      val errorMsg = "Steam API error: ${response.code()} ${response.message()}"
-     Log.e(TAG, errorMsg)
+     AppLogger.e(TAG, errorMsg)
      Result.failure(Exception(errorMsg))
     }
    } catch (e: Exception) {
-    Log.e(TAG, "Failed to fetch player summary", e)
+    AppLogger.e(TAG, "Failed to fetch player summary", e)
     Result.failure(e)
    }
   }
@@ -103,11 +103,11 @@ class SteamRepositoryImpl @Inject constructor(
       }
      }
 
-     Log.d(TAG, "Successfully downloaded image to: $destinationPath")
+     AppLogger.d(TAG, "Successfully downloaded image to: $destinationPath")
      Result.success(Unit)
     }
    } catch (e: Exception) {
-    Log.e(TAG, "Failed to download image from $url", e)
+    AppLogger.e(TAG, "Failed to download image from $url", e)
     Result.failure(e)
    }
   }

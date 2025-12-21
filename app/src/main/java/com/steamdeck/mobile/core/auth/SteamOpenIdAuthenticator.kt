@@ -1,6 +1,7 @@
 package com.steamdeck.mobile.core.auth
 
 import android.net.Uri
+import com.steamdeck.mobile.core.logging.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
@@ -92,14 +93,14 @@ object SteamOpenIdAuthenticator {
   val returnedState = uri.getQueryParameter("state")
   if (returnedState != expectedState) {
    // Security: Never log CSRF tokens - they can be extracted from logcat
-   android.util.Log.w("SteamOpenIdAuth", "State mismatch detected - CSRF protection triggered")
+   AppLogger.w("SteamOpenIdAuth", "State mismatch detected - CSRF protection triggered")
    return null
   }
 
   // Step 2: OpenID mode verification
   val mode = uri.getQueryParameter("openid.mode")
   if (mode != "id_res") {
-   android.util.Log.w("SteamOpenIdAuth", "Invalid mode: $mode")
+   AppLogger.w("SteamOpenIdAuth", "Invalid mode: $mode")
    return null
   }
 
@@ -107,7 +108,7 @@ object SteamOpenIdAuthenticator {
   val params = extractOpenIdParams(uri)
   val isSignatureValid = verifyOpenIdSignature(params)
   if (!isSignatureValid) {
-   android.util.Log.e("SteamOpenIdAuth", "Signature verification failed - potential MITM attack")
+   AppLogger.e("SteamOpenIdAuth", "Signature verification failed - potential MITM attack")
    return null
   }
 
@@ -152,18 +153,18 @@ object SteamOpenIdAuthenticator {
 
    httpClient.newCall(request).execute().use { response ->
     if (!response.isSuccessful) {
-     android.util.Log.e("SteamOpenIdAuth", "Verification request failed: ${response.code}")
+     AppLogger.e("SteamOpenIdAuth", "Verification request failed: ${response.code}")
      return@withContext false
     }
 
     val responseBody = response.body?.string() ?: ""
-    android.util.Log.d("SteamOpenIdAuth", "Verification response: $responseBody")
+    AppLogger.d("SteamOpenIdAuth", "Verification response: $responseBody")
 
     // Steam returns "is_valid:true" if signature is valid
     return@withContext responseBody.contains("is_valid:true")
    }
   } catch (e: Exception) {
-   android.util.Log.e("SteamOpenIdAuth", "Signature verification failed", e)
+   AppLogger.e("SteamOpenIdAuth", "Signature verification failed", e)
    return@withContext false
   }
  }

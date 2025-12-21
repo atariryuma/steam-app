@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.wine
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -48,11 +48,11 @@ class WineMonoInstaller @Inject constructor(
 
             // Reuse existing file if it exists and size is valid
             if (msiFile.exists() && msiFile.length() > EXPECTED_SIZE_MB * 1024 * 1024 * 0.9) {
-                Log.i(TAG, "Using cached Wine Mono: ${msiFile.absolutePath}")
+                AppLogger.i(TAG, "Using cached Wine Mono: ${msiFile.absolutePath}")
                 return@withContext Result.success(msiFile)
             }
 
-            Log.i(TAG, "Downloading Wine Mono $WINE_MONO_VERSION from $WINE_MONO_URL")
+            AppLogger.i(TAG, "Downloading Wine Mono $WINE_MONO_VERSION from $WINE_MONO_URL")
 
             val request = okhttp3.Request.Builder()
                 .url(WINE_MONO_URL)
@@ -72,11 +72,11 @@ class WineMonoInstaller @Inject constructor(
                 }
             }
 
-            Log.i(TAG, "Wine Mono downloaded: ${msiFile.absolutePath} (${msiFile.length() / 1024 / 1024}MB)")
+            AppLogger.i(TAG, "Wine Mono downloaded: ${msiFile.absolutePath} (${msiFile.length() / 1024 / 1024}MB)")
             Result.success(msiFile)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to download Wine Mono", e)
+            AppLogger.e(TAG, "Failed to download Wine Mono", e)
             Result.failure(e)
         }
     }
@@ -95,7 +95,7 @@ class WineMonoInstaller @Inject constructor(
         executeCommand: suspend (executable: String, arguments: List<String>) -> Result<Unit>
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            Log.i(TAG, "Installing Wine Mono to ${containerDir.absolutePath}")
+            AppLogger.i(TAG, "Installing Wine Mono to ${containerDir.absolutePath}")
 
             // msiexec /i wine-mono.msi /qn (silent installation)
             val result = executeCommand(
@@ -108,15 +108,15 @@ class WineMonoInstaller @Inject constructor(
             )
 
             if (result.isSuccess) {
-                Log.i(TAG, "Wine Mono installed successfully")
+                AppLogger.i(TAG, "Wine Mono installed successfully")
                 Result.success(Unit)
             } else {
-                Log.e(TAG, "Wine Mono installation failed: ${result.exceptionOrNull()?.message}")
+                AppLogger.e(TAG, "Wine Mono installation failed: ${result.exceptionOrNull()?.message}")
                 result
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to install Wine Mono", e)
+            AppLogger.e(TAG, "Failed to install Wine Mono", e)
             Result.failure(e)
         }
     }

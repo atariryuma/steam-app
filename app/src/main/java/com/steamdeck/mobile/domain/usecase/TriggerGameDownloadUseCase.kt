@@ -1,13 +1,16 @@
 package com.steamdeck.mobile.domain.usecase
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.error.AppError
 import com.steamdeck.mobile.core.result.DataResult
 import com.steamdeck.mobile.core.steam.SteamInstallMonitorService
 import com.steamdeck.mobile.core.steam.SteamLauncher
+import com.steamdeck.mobile.domain.model.Download
+import com.steamdeck.mobile.domain.model.DownloadStatus
 import com.steamdeck.mobile.domain.model.InstallationStatus
 import com.steamdeck.mobile.domain.repository.GameRepository
+import com.steamdeck.mobile.domain.repository.DownloadRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -24,9 +27,10 @@ import javax.inject.Inject
  * 1. Validate game has Steam App ID
  * 2. Get Wine container for the game
  * 3. Verify Steam.exe exists in container
- * 4. Start SteamInstallMonitorService (FileObserver)
- * 5. Launch steam.exe -applaunch <appId> (auto-triggers download)
- * 6. Update game status to DOWNLOADING
+ * 4. Create DownloadEntity for DownloadScreen tracking
+ * 5. Start SteamInstallMonitorService (FileObserver)
+ * 6. Update GameEntity status to DOWNLOADING
+ * 7. Launch steam.exe -applaunch <appId> (auto-triggers download)
  *
  * Steam ToS Compliance:
  * - Uses official Steam client (no protocol emulation)
@@ -35,6 +39,7 @@ import javax.inject.Inject
 class TriggerGameDownloadUseCase @Inject constructor(
     @ApplicationContext private val context: Context,
     private val gameRepository: GameRepository,
+    private val downloadRepository: DownloadRepository,
     private val steamLauncher: SteamLauncher
 ) {
     companion object {
@@ -49,7 +54,7 @@ class TriggerGameDownloadUseCase @Inject constructor(
      */
     suspend operator fun invoke(gameId: Long): DataResult<Unit> = withContext(Dispatchers.IO) {
         try {
-            Log.i(TAG, "Triggering game download for gameId=$gameId")
+            AppLogger.i(TAG, "Triggering game download for gameId=$gameId")
 
             // 1. Get game from database
             val game = gameRepository.getGameById(gameId)
@@ -63,7 +68,7 @@ class TriggerGameDownloadUseCase @Inject constructor(
                     AppError.DatabaseError("Game does not have Steam App ID", null)
                 )
 
-            Log.d(TAG, "Game: ${game.name}, Steam App ID: $steamAppId")
+            AppLogger.d(TAG, "Game: ${game.name}, Steam App ID: $steamAppId")
 
             // 3. Validate Wine container ID
             val containerId = game.winlatorContainerId?.toString()
@@ -87,32 +92,55 @@ class TriggerGameDownloadUseCase @Inject constructor(
                 )
             }
 
-            Log.d(TAG, "Steam.exe found at: ${steamExePath.absolutePath}")
+            AppLogger.d(TAG, "Steam.exe found at: ${steamExePath.absolutePath}")
 
-            // 5. Start FileObserver monitoring service
+            // 5. Create DownloadEntity for tracking in DownloadScreen (start as DOWNLOADING)
+            val download = Download(
+                gameId = gameId,
+                fileName = "${game.name} (Steam)",
+                url = "steam://download/$steamAppId",
+                status = DownloadStatus.DOWNLOADING,  // Start as DOWNLOADING (no PENDING state)
+                installationStatus = InstallationStatus.NOT_INSTALLED,
+                progress = 0,
+                downloadedBytes = 0,
+                totalBytes = 0, // Steam doesn't provide total size upfront
+                destinationPath = steamExePath.parent ?: "",
+                startedTimestamp = System.currentTimeMillis()
+            )
+            val downloadId = downloadRepository.insertDownload(download)
+            AppLogger.d(TAG, "Created download entry: downloadId=$downloadId for ${game.name}")
+
+            // 6. Start FileObserver monitoring service
             try {
                 SteamInstallMonitorService.start(
                     context = context,
                     containerId = containerId,
                     steamAppId = steamAppId,
-                    gameId = gameId
+                    gameId = gameId,
+                    downloadId = downloadId
                 )
-                Log.i(TAG, "Started SteamInstallMonitorService for appId=$steamAppId")
+                AppLogger.i(TAG, "Started SteamInstallMonitorService for appId=$steamAppId, downloadId=$downloadId")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to start monitoring service", e)
+                AppLogger.e(TAG, "Failed to start monitoring service", e)
+                // Clean up download entry (ignore cleanup errors)
+                try {
+                    downloadRepository.deleteDownload(download.copy(id = downloadId))
+                } catch (deleteError: Exception) {
+                    AppLogger.w(TAG, "Failed to clean up download entry", deleteError)
+                }
                 return@withContext DataResult.Error(
                     AppError.Unknown(e)
                 )
             }
 
-            // 6. Update game status to DOWNLOADING (optimistic update)
+            // 7. Update game status to DOWNLOADING
             gameRepository.updateInstallationStatus(
                 gameId = gameId,
                 status = InstallationStatus.DOWNLOADING,
                 progress = 0
             )
 
-            // 7. Launch steam.exe -applaunch <appId>
+            // 8. Launch steam.exe -applaunch <appId>
             // This will auto-trigger download if game is not installed
             val launchResult = steamLauncher.launchGameViaSteam(
                 containerId = containerId,
@@ -120,11 +148,16 @@ class TriggerGameDownloadUseCase @Inject constructor(
             )
 
             if (launchResult.isFailure) {
-                // Rollback status update
+                // Rollback status updates
                 gameRepository.updateInstallationStatus(
                     gameId = gameId,
                     status = InstallationStatus.NOT_INSTALLED,
                     progress = 0
+                )
+                downloadRepository.markDownloadError(
+                    downloadId = downloadId,
+                    status = DownloadStatus.FAILED,
+                    errorMessage = "Failed to start Steam download: ${launchResult.exceptionOrNull()?.message}"
                 )
 
                 return@withContext DataResult.Error(
@@ -134,11 +167,11 @@ class TriggerGameDownloadUseCase @Inject constructor(
                 )
             }
 
-            Log.i(TAG, "Successfully triggered download for: ${game.name}")
+            AppLogger.i(TAG, "Successfully triggered download for: ${game.name}")
             DataResult.Success(Unit)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to trigger game download", e)
+            AppLogger.e(TAG, "Failed to trigger game download", e)
             DataResult.Error(AppError.from(e))
         }
     }

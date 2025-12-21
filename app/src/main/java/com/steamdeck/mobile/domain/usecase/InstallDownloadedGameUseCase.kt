@@ -1,8 +1,7 @@
 package com.steamdeck.mobile.domain.usecase
 
-import android.util.Log
-import com.steamdeck.mobile.core.error.AppError
 import com.steamdeck.mobile.core.logging.AppLogger
+import com.steamdeck.mobile.core.error.AppError
 import com.steamdeck.mobile.core.result.DataResult
 import com.steamdeck.mobile.domain.model.InstallationStatus
 import com.steamdeck.mobile.domain.repository.DownloadRepository

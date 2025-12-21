@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.download
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
@@ -259,42 +259,42 @@ class DownloadWorker @AssistedInject constructor(
 
    // Best Practice (2025): Automatic game installation after download completion
    // This provides seamless download-to-play workflow
-   Log.i(TAG, "Download completed successfully, starting automatic installation for download ID: $downloadId")
+   AppLogger.i(TAG, "Download completed successfully, starting automatic installation for download ID: $downloadId")
    try {
     when (val installResult = installDownloadedGameUseCase(downloadId)) {
      is com.steamdeck.mobile.core.result.DataResult.Success -> {
-      Log.i(TAG, "Game installation completed successfully for download ID: $downloadId")
+      AppLogger.i(TAG, "Game installation completed successfully for download ID: $downloadId")
      }
      is com.steamdeck.mobile.core.result.DataResult.Error -> {
-      Log.e(TAG, "Game installation failed for download ID: $downloadId - ${installResult.error}")
+      AppLogger.e(TAG, "Game installation failed for download ID: $downloadId - ${installResult.error}")
       // Installation failure is non-critical - download still succeeded
      }
      is com.steamdeck.mobile.core.result.DataResult.Loading -> {
       // Should not happen in UseCase invoke()
-      Log.w(TAG, "Unexpected Loading state from InstallDownloadedGameUseCase")
+      AppLogger.w(TAG, "Unexpected Loading state from InstallDownloadedGameUseCase")
      }
     }
    } catch (e: Exception) {
     // Installation error is non-critical - download completed
-    Log.e(TAG, "Exception during automatic installation for download ID: $downloadId", e)
+    AppLogger.e(TAG, "Exception during automatic installation for download ID: $downloadId", e)
    }
 
    Result.success()
   } catch (e: Exception) {
    // Detailed error logging
-   Log.e(TAG, "Download failed for ID: $downloadId", e)
-   Log.e(TAG, " URL: $url")
-   Log.e(TAG, " Destination: $destination/$fileName")
-   Log.e(TAG, " Error type: ${e.javaClass.simpleName}")
-   Log.e(TAG, " Error message: ${e.message}")
+   AppLogger.e(TAG, "Download failed for ID: $downloadId", e)
+   AppLogger.e(TAG, " URL: $url")
+   AppLogger.e(TAG, " Destination: $destination/$fileName")
+   AppLogger.e(TAG, " Error type: ${e.javaClass.simpleName}")
+   AppLogger.e(TAG, " Error message: ${e.message}")
 
    // Network error details
    if (e is java.net.UnknownHostException) {
-    Log.e(TAG, " Network error: Cannot resolve host")
+    AppLogger.e(TAG, " Network error: Cannot resolve host")
    } else if (e is java.net.SocketTimeoutException) {
-    Log.e(TAG, " Network error: Connection timeout")
+    AppLogger.e(TAG, " Network error: Connection timeout")
    } else if (e is java.io.IOException) {
-    Log.e(TAG, " I/O error: ${e.message}")
+    AppLogger.e(TAG, " I/O error: ${e.message}")
    }
 
    database.downloadDao().markDownloadError(

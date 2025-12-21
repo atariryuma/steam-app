@@ -6,7 +6,7 @@ import android.content.Intent
 import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.provider.DocumentsContract
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 // TODO: Re-enable when libaums v0.10.0 migration is complete
 // import com.github.mjdev.libaums.UsbMassStorageDevice
 // import com.github.mjdev.libaums.fs.UsbFile
@@ -60,14 +60,14 @@ class FileImportRepositoryImpl @Inject constructor(
 
  override suspend fun isUsbDeviceConnected(): Boolean = withContext(Dispatchers.IO) {
   // TODO: Re-implement when libaums v0.10.0 migration is complete
-  Log.w(TAG, "USB support temporarily disabled")
+  AppLogger.w(TAG, "USB support temporarily disabled")
   false
  }
 
  override suspend fun listUsbFiles(path: String): Result<List<ImportableFile>> =
   withContext(Dispatchers.IO) {
    // TODO: Re-implement when libaums v0.10.0 migration is complete
-   Log.w(TAG, "USB file listing temporarily disabled")
+   AppLogger.w(TAG, "USB file listing temporarily disabled")
    Result.failure(Exception("USB support is temporarily disabled during library migration"))
   }
 
@@ -100,7 +100,7 @@ class FileImportRepositoryImpl @Inject constructor(
     smbFile.exists() // Test connection
     Result.success(true)
    } catch (e: Exception) {
-    Log.e(TAG, "SMB connection test failed", e)
+    AppLogger.e(TAG, "SMB connection test failed", e)
     Result.failure(e)
    }
   }
@@ -135,7 +135,7 @@ class FileImportRepositoryImpl @Inject constructor(
 
    Result.success(files)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to list SMB files", e)
+   AppLogger.e(TAG, "Failed to list SMB files", e)
    Result.failure(e)
   }
  }
@@ -185,7 +185,7 @@ class FileImportRepositoryImpl @Inject constructor(
     ftpClient.disconnect()
     Result.success(success)
    } catch (e: Exception) {
-    Log.e(TAG, "FTP connection test failed", e)
+    AppLogger.e(TAG, "FTP connection test failed", e)
     Result.failure(e)
    }
   }
@@ -223,7 +223,7 @@ class FileImportRepositoryImpl @Inject constructor(
    ftpClient.logout()
    Result.success(files)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to list FTP files", e)
+   AppLogger.e(TAG, "Failed to list FTP files", e)
    Result.failure(e)
   } finally {
    ftpClient?.disconnect()
@@ -277,7 +277,7 @@ class FileImportRepositoryImpl @Inject constructor(
 
     Result.success(files)
    } catch (e: Exception) {
-    Log.e(TAG, "Failed to list local files", e)
+    AppLogger.e(TAG, "Failed to list local files", e)
     Result.failure(e)
    }
   }
@@ -348,7 +348,7 @@ class FileImportRepositoryImpl @Inject constructor(
 
    emit(ImportProgress.Success(destFile.absolutePath))
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to import file", e)
+   AppLogger.e(TAG, "Failed to import file", e)
    emit(ImportProgress.Error("Import failed: ${e.message}", e))
   }
  }.flowOn(Dispatchers.IO)

@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.domain.usecase
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.result.DataResult
 import com.steamdeck.mobile.core.steam.AppManifestParser
 import com.steamdeck.mobile.domain.repository.GameRepository
@@ -84,7 +84,7 @@ class ValidateGameInstallationUseCase @Inject constructor(
      */
     suspend operator fun invoke(gameId: Long): DataResult<ValidationResult> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "Validating game installation: gameId=$gameId")
+            AppLogger.d(TAG, "Validating game installation: gameId=$gameId")
 
             val errors = mutableListOf<ValidationError>()
 
@@ -100,7 +100,7 @@ class ValidateGameInstallationUseCase @Inject constructor(
             // Check 1: Executable file exists
             val executableFile = File(game.executablePath)
             if (!executableFile.exists()) {
-                Log.w(TAG, "Executable not found: ${game.executablePath}")
+                AppLogger.w(TAG, "Executable not found: ${game.executablePath}")
                 errors.add(ValidationError.ExecutableNotFound(game.executablePath))
             }
 
@@ -113,18 +113,18 @@ class ValidateGameInstallationUseCase @Inject constructor(
                 )
 
                 if (!manifestFile.exists()) {
-                    Log.w(TAG, "Manifest not found: ${manifestFile.absolutePath}")
+                    AppLogger.w(TAG, "Manifest not found: ${manifestFile.absolutePath}")
                     errors.add(ValidationError.ManifestNotFound)
                 } else {
                     val manifestResult = AppManifestParser.parse(manifestFile)
                     if (manifestResult.isSuccess) {
                         val manifest = manifestResult.getOrThrow()
                         if (manifest.stateFlags != 4) {
-                            Log.w(TAG, "Game not fully installed. StateFlags=${manifest.stateFlags}")
+                            AppLogger.w(TAG, "Game not fully installed. StateFlags=${manifest.stateFlags}")
                             errors.add(ValidationError.StateFlagsNotReady(manifest.stateFlags))
                         }
                     } else {
-                        Log.e(TAG, "Failed to parse manifest: ${manifestResult.exceptionOrNull()?.message}")
+                        AppLogger.e(TAG, "Failed to parse manifest: ${manifestResult.exceptionOrNull()?.message}")
                         errors.add(ValidationError.ManifestNotFound)
                     }
                 }
@@ -141,7 +141,7 @@ class ValidateGameInstallationUseCase @Inject constructor(
                 for (dllName in REQUIRED_DLLS) {
                     val dllFile = File(system32Dir, dllName)
                     if (!dllFile.exists()) {
-                        Log.w(TAG, "Missing DLL: $dllName at ${dllFile.absolutePath}")
+                        AppLogger.w(TAG, "Missing DLL: $dllName at ${dllFile.absolutePath}")
                         errors.add(ValidationError.MissingDLL(dllName))
                     }
                 }
@@ -153,15 +153,15 @@ class ValidateGameInstallationUseCase @Inject constructor(
             )
 
             if (result.isValid) {
-                Log.i(TAG, "Game validation successful: ${game.name}")
+                AppLogger.i(TAG, "Game validation successful: ${game.name}")
             } else {
-                Log.w(TAG, "Game validation failed with ${errors.size} errors")
+                AppLogger.w(TAG, "Game validation failed with ${errors.size} errors")
             }
 
             DataResult.Success(result)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to validate game installation", e)
+            AppLogger.e(TAG, "Failed to validate game installation", e)
             DataResult.Success(
                 ValidationResult(
                     isValid = false,

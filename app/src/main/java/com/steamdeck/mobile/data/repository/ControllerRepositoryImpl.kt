@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.data.repository
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import android.view.InputDevice
 import com.steamdeck.mobile.data.local.database.dao.ControllerProfileDao
 import com.steamdeck.mobile.data.mapper.toDomain
@@ -36,9 +36,9 @@ class ControllerRepositoryImpl @Inject constructor(
   try {
    val controllers = detectControllers()
    emit(controllers)
-   Log.d(TAG, "Detected ${controllers.size} controllers")
+   AppLogger.d(TAG, "Detected ${controllers.size} controllers")
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to detect controllers", e)
+   AppLogger.e(TAG, "Failed to detect controllers", e)
    emit(emptyList())
   }
  }
@@ -58,7 +58,7 @@ class ControllerRepositoryImpl @Inject constructor(
    val entity = controllerProfileDao.getLastUsedProfile(controllerId)
    Result.success(entity?.toDomain())
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to get last used profile", e)
+   AppLogger.e(TAG, "Failed to get last used profile", e)
    Result.failure(e)
   }
  }
@@ -67,10 +67,10 @@ class ControllerRepositoryImpl @Inject constructor(
   return try {
    val entity = profile.toEntity()
    val id = controllerProfileDao.insertProfile(entity)
-   Log.i(TAG, "Saved controller profile: ${profile.name} (ID: $id)")
+   AppLogger.i(TAG, "Saved controller profile: ${profile.name} (ID: $id)")
    Result.success(id)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to save profile", e)
+   AppLogger.e(TAG, "Failed to save profile", e)
    Result.failure(e)
   }
  }
@@ -79,10 +79,10 @@ class ControllerRepositoryImpl @Inject constructor(
   return try {
    val entity = profile.toEntity()
    controllerProfileDao.updateProfile(entity)
-   Log.i(TAG, "Updated controller profile: ${profile.name}")
+   AppLogger.i(TAG, "Updated controller profile: ${profile.name}")
    Result.success(Unit)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to update profile", e)
+   AppLogger.e(TAG, "Failed to update profile", e)
    Result.failure(e)
   }
  }
@@ -91,10 +91,10 @@ class ControllerRepositoryImpl @Inject constructor(
   return try {
    val entity = profile.toEntity()
    controllerProfileDao.deleteProfile(entity)
-   Log.i(TAG, "Deleted controller profile: ${profile.name}")
+   AppLogger.i(TAG, "Deleted controller profile: ${profile.name}")
    Result.success(Unit)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to delete profile", e)
+   AppLogger.e(TAG, "Failed to delete profile", e)
    Result.failure(e)
   }
  }
@@ -104,7 +104,7 @@ class ControllerRepositoryImpl @Inject constructor(
    controllerProfileDao.updateLastUsedAt(profileId)
    Result.success(Unit)
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to mark profile as used", e)
+   AppLogger.e(TAG, "Failed to mark profile as used", e)
    Result.failure(e)
   }
  }
@@ -131,7 +131,7 @@ class ControllerRepositoryImpl @Inject constructor(
      if (isGamepad || isJoystick) {
       // Validate device has required properties
       if (device.name.isNullOrBlank()) {
-       Log.w(TAG, "Skipping controller with empty name: deviceId=$deviceId")
+       AppLogger.w(TAG, "Skipping controller with empty name: deviceId=$deviceId")
        return@forEach
       }
 
@@ -146,14 +146,14 @@ class ControllerRepositoryImpl @Inject constructor(
       )
 
       controllers.add(controller)
-      Log.d(TAG, "Detected controller: ${controller.name} (${controller.type})")
+      AppLogger.d(TAG, "Detected controller: ${controller.name} (${controller.type})")
      }
     } catch (e: Exception) {
-     Log.w(TAG, "Error processing device $deviceId", e)
+     AppLogger.w(TAG, "Error processing device $deviceId", e)
     }
    }
   } catch (e: Exception) {
-   Log.e(TAG, "Error getting device IDs", e)
+   AppLogger.e(TAG, "Error getting device IDs", e)
   }
 
   return controllers

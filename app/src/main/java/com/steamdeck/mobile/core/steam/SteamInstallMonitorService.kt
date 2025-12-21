@@ -9,10 +9,12 @@ import android.content.Intent
 import android.os.Build
 import android.os.FileObserver
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.steamdeck.mobile.R
+import com.steamdeck.mobile.core.logging.AppLogger
+import com.steamdeck.mobile.domain.model.DownloadStatus
 import com.steamdeck.mobile.domain.model.InstallationStatus
+import com.steamdeck.mobile.domain.repository.DownloadRepository
 import com.steamdeck.mobile.domain.repository.GameRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -44,11 +46,11 @@ class SteamInstallMonitorService : Service() {
         private const val NOTIFICATION_CHANNEL_ID = "steam_install_monitor"
         private const val NOTIFICATION_ID = 1001
         private const val TIMEOUT_MILLIS = 2 * 60 * 60 * 1000L // 2 hours
-        private const val LOG_FILE_NAME = "steam-install-realtime.txt"
 
         const val EXTRA_CONTAINER_ID = "container_id"
         const val EXTRA_STEAM_APP_ID = "steam_app_id"
         const val EXTRA_GAME_ID = "game_id"
+        const val EXTRA_DOWNLOAD_ID = "download_id"
 
         /**
          * Start monitoring service
@@ -57,12 +59,14 @@ class SteamInstallMonitorService : Service() {
             context: Context,
             containerId: String,
             steamAppId: Long,
-            gameId: Long
+            gameId: Long,
+            downloadId: Long
         ) {
             val intent = Intent(context, SteamInstallMonitorService::class.java).apply {
                 putExtra(EXTRA_CONTAINER_ID, containerId)
                 putExtra(EXTRA_STEAM_APP_ID, steamAppId)
                 putExtra(EXTRA_GAME_ID, gameId)
+                putExtra(EXTRA_DOWNLOAD_ID, downloadId)
             }
             context.startForegroundService(intent)
         }
@@ -71,25 +75,23 @@ class SteamInstallMonitorService : Service() {
     @Inject
     lateinit var gameRepository: GameRepository
 
+    @Inject
+    lateinit var downloadRepository: DownloadRepository
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var fileObserver: RecursiveFileObserver? = null
     private var containerId: String? = null
     private var steamAppId: Long? = null
     private var gameId: Long? = null
-    private var logFile: File? = null
+    private var downloadId: Long? = null
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Service created")
+        AppLogger.d(TAG, "Service created")
         createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.i(TAG, "Service started")
-
-        // Initialize real-time log file
-        initializeLogFile()
-
         // Start foreground service immediately (Android 8+ requirement)
         startForeground(NOTIFICATION_ID, createNotification("Monitoring installation..."))
 
@@ -97,19 +99,18 @@ class SteamInstallMonitorService : Service() {
             containerId = it.getStringExtra(EXTRA_CONTAINER_ID)
             steamAppId = it.getLongExtra(EXTRA_STEAM_APP_ID, -1L)
             gameId = it.getLongExtra(EXTRA_GAME_ID, -1L)
+            downloadId = it.getLongExtra(EXTRA_DOWNLOAD_ID, -1L)
 
-            writeLog("Service started with params: containerId=$containerId, steamAppId=$steamAppId, gameId=$gameId")
+            AppLogger.i(TAG, "Service started: containerId=$containerId, steamAppId=$steamAppId, gameId=$gameId, downloadId=$downloadId")
 
-            if (containerId != null && steamAppId != null && steamAppId != -1L && gameId != null && gameId != -1L) {
-                startMonitoring(containerId!!, steamAppId!!, gameId!!)
+            if (containerId != null && steamAppId != null && steamAppId != -1L && gameId != null && gameId != -1L && downloadId != null && downloadId != -1L) {
+                startMonitoring(containerId!!, steamAppId!!, gameId!!, downloadId!!)
             } else {
-                writeLog("ERROR: Invalid parameters")
-                Log.e(TAG, "Invalid parameters: containerId=$containerId, steamAppId=$steamAppId, gameId=$gameId")
+                AppLogger.e(TAG, "Invalid parameters: containerId=$containerId, steamAppId=$steamAppId, gameId=$gameId, downloadId=$downloadId")
                 stopSelf()
             }
         } ?: run {
-            writeLog("ERROR: No intent provided")
-            Log.e(TAG, "No intent provided")
+            AppLogger.e(TAG, "No intent provided")
             stopSelf()
         }
 
@@ -120,7 +121,7 @@ class SteamInstallMonitorService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "Service destroyed")
+        AppLogger.d(TAG, "Service destroyed")
         fileObserver?.stopWatching()
         serviceScope.cancel()
     }
@@ -128,7 +129,7 @@ class SteamInstallMonitorService : Service() {
     /**
      * Start monitoring steamapps directory
      */
-    private fun startMonitoring(containerId: String, steamAppId: Long, gameId: Long) {
+    private fun startMonitoring(containerId: String, steamAppId: Long, gameId: Long, downloadId: Long) {
         serviceScope.launch {
             try {
                 // Build steamapps directory path
@@ -138,50 +139,76 @@ class SteamInstallMonitorService : Service() {
                     "winlator/containers/$containerId/drive_c/Program Files (x86)/Steam/steamapps"
                 )
 
-                writeLog("Steamapps directory path: ${steamappsDir.absolutePath}")
 
                 if (!steamappsDir.exists()) {
-                    writeLog("ERROR: Steamapps directory not found")
-                    Log.e(TAG, "Steamapps directory not found: ${steamappsDir.absolutePath}")
+                    AppLogger.e(TAG, "Steamapps directory not found: ${steamappsDir.absolutePath}")
+
+                    // Mark download as failed
+                    downloadRepository.markDownloadError(
+                        downloadId = downloadId,
+                        status = DownloadStatus.FAILED,
+                        errorMessage = "Steamapps directory not found"
+                    )
+
                     stopSelf()
                     return@launch
                 }
 
-                writeLog("SUCCESS: Steamapps directory exists")
-                writeLog("Starting FileObserver for Steam App ID: $steamAppId")
-                Log.i(TAG, "Starting FileObserver on: ${steamappsDir.absolutePath}")
-                Log.i(TAG, "Monitoring for Steam App ID: $steamAppId")
+                AppLogger.i(TAG, "Starting FileObserver on: ${steamappsDir.absolutePath}")
+                AppLogger.i(TAG, "Monitoring for Steam App ID: $steamAppId, downloadId: $downloadId")
 
                 // List existing files in steamapps directory
                 val existingFiles = steamappsDir.listFiles()?.map { it.name } ?: emptyList()
-                writeLog("Existing files in steamapps: ${existingFiles.joinToString(", ")}")
 
                 // Create and start FileObserver
                 fileObserver = RecursiveFileObserver(
                     path = steamappsDir.absolutePath,
                     steamAppId = steamAppId,
                     gameId = gameId,
+                    downloadId = downloadId,
                     onInstallComplete = { manifest ->
-                        handleInstallComplete(manifest, gameId)
+                        handleInstallComplete(manifest, gameId, downloadId)
                     },
                     onProgressUpdate = { progress ->
                         updateNotification("Installing game... $progress%")
+                        // Update download progress
+                        serviceScope.launch {
+                            downloadRepository.updateDownloadProgress(
+                                downloadId = downloadId,
+                                progress = progress,
+                                downloadedBytes = 0, // Steam doesn't provide byte progress
+                                status = DownloadStatus.DOWNLOADING
+                            )
+                        }
                     }
                 )
                 fileObserver?.startWatching()
-                writeLog("FileObserver started successfully")
 
                 // Set timeout to auto-stop service after 2 hours
                 launch {
                     delay(TIMEOUT_MILLIS)
-                    writeLog("TIMEOUT: 2 hours reached, stopping service")
-                    Log.w(TAG, "Timeout reached (2 hours), stopping service")
+                    AppLogger.w(TAG, "Timeout reached (2 hours), stopping service")
+
+                    // Mark download as failed due to timeout
+                    downloadRepository.markDownloadError(
+                        downloadId = downloadId,
+                        status = DownloadStatus.FAILED,
+                        errorMessage = "Installation timeout (2 hours)"
+                    )
+
                     stopSelf()
                 }
 
             } catch (e: Exception) {
-                writeLog("FATAL ERROR: Failed to start monitoring - ${e.message}")
-                Log.e(TAG, "Failed to start monitoring", e)
+                AppLogger.e(TAG, "Failed to start monitoring", e)
+
+                // Mark download as failed
+                downloadRepository.markDownloadError(
+                    downloadId = downloadId,
+                    status = DownloadStatus.FAILED,
+                    errorMessage = "Failed to start monitoring: ${e.message}"
+                )
+
                 stopSelf()
             }
         }
@@ -190,11 +217,10 @@ class SteamInstallMonitorService : Service() {
     /**
      * Handle installation complete event
      */
-    private fun handleInstallComplete(manifest: AppManifest, gameId: Long) {
+    private fun handleInstallComplete(manifest: AppManifest, gameId: Long, downloadId: Long) {
         serviceScope.launch {
             try {
-                writeLog("SUCCESS: Installation complete for ${manifest.name} (appId=${manifest.appId})")
-                Log.i(TAG, "Installation complete: ${manifest.name} (appId=${manifest.appId})")
+                AppLogger.i(TAG, "Installation complete: ${manifest.name} (appId=${manifest.appId})")
 
                 // Update game installation status
                 gameRepository.updateInstallationStatus(
@@ -202,20 +228,23 @@ class SteamInstallMonitorService : Service() {
                     status = InstallationStatus.INSTALLED,
                     progress = 100
                 )
-                writeLog("Database updated: status=INSTALLED, progress=100")
+
+                // Mark download as completed
+                downloadRepository.markDownloadCompleted(
+                    downloadId = downloadId,
+                    status = DownloadStatus.COMPLETED,
+                    completedTimestamp = System.currentTimeMillis()
+                )
 
                 // Show completion notification
                 updateNotification("${manifest.name} is ready to play!")
-                writeLog("Notification updated: Game ready to play")
 
                 // Stop service after 5 seconds (allow user to see notification)
                 delay(5000)
-                writeLog("Service stopping in 5 seconds")
                 stopSelf()
 
             } catch (e: Exception) {
-                writeLog("ERROR: Failed to handle install complete - ${e.message}")
-                Log.e(TAG, "Failed to handle install complete", e)
+                AppLogger.e(TAG, "Failed to handle install complete", e)
             }
         }
     }
@@ -261,49 +290,6 @@ class SteamInstallMonitorService : Service() {
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
-    /**
-     * Initialize real-time log file
-     */
-    private fun initializeLogFile() {
-        try {
-            logFile = File(getExternalFilesDir(null), LOG_FILE_NAME)
-
-            // Clear previous log or create new file
-            logFile?.writeText("")
-
-            val timestamp = System.currentTimeMillis()
-            val initialMessage = """
-                ===== Steam Install Monitor Service Started =====
-                Timestamp: $timestamp
-                Log file: ${logFile?.absolutePath}
-                =================================================
-
-            """.trimIndent()
-
-            logFile?.appendText(initialMessage)
-
-            Log.i(TAG, "Real-time log file initialized: ${logFile?.absolutePath}")
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize log file", e)
-        }
-    }
-
-    /**
-     * Write message to real-time log file
-     */
-    private fun writeLog(message: String) {
-        try {
-            val timestamp = System.currentTimeMillis()
-            val formattedMessage = "[$timestamp] $message\n"
-
-            logFile?.appendText(formattedMessage)
-
-        } catch (e: Exception) {
-            // Silent failure - don't crash service due to logging issues
-            Log.e(TAG, "Failed to write to log file: $message", e)
-        }
-    }
 
     /**
      * Recursive FileObserver for monitoring steamapps directory
@@ -314,6 +300,7 @@ class SteamInstallMonitorService : Service() {
         private val path: String,
         private val steamAppId: Long,
         private val gameId: Long,
+        private val downloadId: Long,
         private val onInstallComplete: (AppManifest) -> Unit,
         private val onProgressUpdate: (Int) -> Unit
     ) : FileObserver(path, FileObserver.CREATE or FileObserver.MODIFY) {
@@ -322,7 +309,6 @@ class SteamInstallMonitorService : Service() {
             if (path == null) return
 
             try {
-                writeLog("FileObserver event: $path (event=$event)")
 
                 // Check if this is an appmanifest file for our game
                 if (path.startsWith("appmanifest_") && path.endsWith(".acf")) {
@@ -334,19 +320,15 @@ class SteamInstallMonitorService : Service() {
                         .removeSuffix(".acf")
                         .toLongOrNull()
 
-                    writeLog("Detected appmanifest file: appId=$fileAppId (target=$steamAppId)")
 
                     if (fileAppId == steamAppId) {
-                        writeLog("MATCH: This is the target game's manifest file")
-                        Log.d(TAG, "Detected event on target manifest: $path (event=$event)")
+                        AppLogger.d(TAG, "Detected event on target manifest: $path (event=$event)")
                         handleManifestChange(manifestFile)
                     } else {
-                        writeLog("SKIP: Different game (appId=$fileAppId)")
                     }
                 }
             } catch (e: Exception) {
-                writeLog("ERROR: File event handler failed - ${e.message}")
-                Log.e(TAG, "Error handling file event: $path", e)
+                AppLogger.e(TAG, "Error handling file event: $path", e)
             }
         }
 
@@ -359,56 +341,48 @@ class SteamInstallMonitorService : Service() {
                     // Wait a bit to ensure file write is complete
                     delay(500)
 
-                    writeLog("Checking manifest file: ${manifestFile.absolutePath}")
 
                     if (!manifestFile.exists() || !manifestFile.canRead()) {
-                        writeLog("WARNING: Manifest file not readable")
-                        Log.w(TAG, "Manifest file not readable: ${manifestFile.absolutePath}")
+                        AppLogger.w(TAG, "Manifest file not readable: ${manifestFile.absolutePath}")
                         return@launch
                     }
 
-                    writeLog("Manifest file is readable, parsing...")
 
                     // Parse manifest
                     val result = AppManifestParser.parse(manifestFile)
                     if (result.isFailure) {
-                        writeLog("ERROR: Failed to parse manifest - ${result.exceptionOrNull()?.message}")
-                        Log.e(TAG, "Failed to parse manifest: ${result.exceptionOrNull()?.message}")
+                        AppLogger.e(TAG, "Failed to parse manifest: ${result.exceptionOrNull()?.message}")
                         return@launch
                     }
 
                     val manifest = result.getOrThrow()
-                    writeLog("Parsed manifest: appId=${manifest.appId}, name=${manifest.name}, stateFlags=${manifest.stateFlags}")
-                    Log.d(TAG, "Parsed manifest: appId=${manifest.appId}, name=${manifest.name}, stateFlags=${manifest.stateFlags}")
+                    AppLogger.d(TAG, "Parsed manifest: appId=${manifest.appId}, name=${manifest.name}, stateFlags=${manifest.stateFlags}")
 
                     when (manifest.stateFlags) {
                         2 -> {
                             // Downloading
-                            writeLog("STATUS: Game is DOWNLOADING (StateFlags=2)")
-                            Log.d(TAG, "Game is downloading: ${manifest.name}")
+                            AppLogger.d(TAG, "Game is downloading: ${manifest.name}")
                             gameRepository.updateInstallationStatus(
                                 gameId = gameId,
                                 status = InstallationStatus.DOWNLOADING,
                                 progress = 50 // Approximate progress
                             )
+                            // onProgressUpdate will update downloadRepository (avoid double update)
                             onProgressUpdate(50)
                         }
                         4 -> {
                             // Fully installed
-                            writeLog("STATUS: Game FULLY INSTALLED (StateFlags=4)")
-                            Log.i(TAG, "Game fully installed: ${manifest.name}")
+                            AppLogger.i(TAG, "Game fully installed: ${manifest.name}")
                             onInstallComplete(manifest)
                         }
                         else -> {
                             val stateDesc = AppManifestParser.getStateDescription(manifest.stateFlags)
-                            writeLog("STATUS: Game state=${stateDesc} (StateFlags=${manifest.stateFlags})")
-                            Log.d(TAG, "Game state: $stateDesc")
+                            AppLogger.d(TAG, "Game state: $stateDesc")
                         }
                     }
 
                 } catch (e: Exception) {
-                    writeLog("ERROR: Manifest change handler failed - ${e.message}")
-                    Log.e(TAG, "Error handling manifest change", e)
+                    AppLogger.e(TAG, "Error handling manifest change", e)
                 }
             }
         }

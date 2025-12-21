@@ -1,5 +1,7 @@
 package com.steamdeck.mobile.presentation.viewmodel
 
+import com.steamdeck.mobile.core.logging.AppLogger
+
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -96,11 +98,11 @@ class WinlatorInitViewModel @Inject constructor(
     val defaultExists = containers.any { it.id == "default_shared_container" }
 
     if (defaultExists) {
-     android.util.Log.d("WinlatorInitVM", "Default container already exists, skipping creation")
+     AppLogger.d("WinlatorInitVM", "Default container already exists, skipping creation")
      return@launch
     }
 
-    android.util.Log.i("WinlatorInitVM", "Pre-creating default container in background...")
+    AppLogger.i("WinlatorInitVM", "Pre-creating default container in background...")
 
     // Create default container with optimal settings
     val config = EmulatorContainerConfig(
@@ -115,14 +117,14 @@ class WinlatorInitViewModel @Inject constructor(
     val result = winlatorEmulator.createContainer(config)
 
     if (result.isSuccess) {
-     android.util.Log.i("WinlatorInitVM", "Default container created successfully in background")
+     AppLogger.i("WinlatorInitVM", "Default container created successfully in background")
     } else {
      // Silent failure - not critical, will be created on first game launch
-     android.util.Log.w("WinlatorInitVM", "Failed to pre-create default container: ${result.exceptionOrNull()?.message}")
+     AppLogger.w("WinlatorInitVM", "Failed to pre-create default container: ${result.exceptionOrNull()?.message}")
     }
    } catch (e: Exception) {
     // Silent failure - not critical
-    android.util.Log.w("WinlatorInitVM", "Exception during container pre-creation", e)
+    AppLogger.w("WinlatorInitVM", "Exception during container pre-creation", e)
    }
   }
  }

@@ -2,7 +2,7 @@ package com.steamdeck.mobile.core.input
 
 import android.content.Context
 import android.content.pm.PackageManager
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -76,14 +76,14 @@ class InputBridgeAppIntegration @Inject constructor(
   return try {
    installedPackage = detectInputBridgePackage()
    if (installedPackage != null) {
-    Log.i(TAG, "InputBridge detected: $installedPackage")
+    AppLogger.i(TAG, "InputBridge detected: $installedPackage")
     Result.success(Unit)
    } else {
-    Log.w(TAG, "InputBridge not installed")
+    AppLogger.w(TAG, "InputBridge not installed")
     Result.failure(InputBridgeNotInstalledException())
    }
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to initialize InputBridge", e)
+   AppLogger.e(TAG, "Failed to initialize InputBridge", e)
    Result.failure(e)
   }
  }
@@ -105,20 +105,20 @@ class InputBridgeAppIntegration @Inject constructor(
    if (intent != null) {
     intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
     context.startActivity(intent)
-    Log.i(TAG, "Launched InputBridge: $packageName")
+    AppLogger.i(TAG, "Launched InputBridge: $packageName")
     Result.success(Unit)
    } else {
     Result.failure(Exception("Failed to create launch intent for $packageName"))
    }
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to launch InputBridge", e)
+   AppLogger.e(TAG, "Failed to launch InputBridge", e)
    Result.failure(e)
   }
  }
 
  override fun cleanup() {
   // No cleanup needed for app integration
-  Log.d(TAG, "InputBridge cleanup (no-op)")
+  AppLogger.d(TAG, "InputBridge cleanup (no-op)")
  }
 
  /**
@@ -198,7 +198,7 @@ class NativeUInputBridge @Inject constructor(
    try {
     System.loadLibrary("uinput_bridge")
    } catch (e: UnsatisfiedLinkError) {
-    Log.w(TAG, "Native library not available: ${e.message}")
+    AppLogger.w(TAG, "Native library not available: ${e.message}")
    }
   }
  }

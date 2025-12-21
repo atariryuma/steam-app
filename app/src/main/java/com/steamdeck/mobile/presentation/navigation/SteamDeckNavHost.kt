@@ -17,6 +17,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.presentation.ui.download.DownloadScreen
 import com.steamdeck.mobile.presentation.ui.game.GameDetailScreen
 import com.steamdeck.mobile.presentation.ui.home.HomeScreen
@@ -334,14 +335,14 @@ fun SteamDeckNavHost(
     authUrl = authUrl,
     callbackUrl = "http://127.0.0.1:8080/auth/callback",
     onAuthCallback = { callbackUrl -> loginViewModel.handleCallback(callbackUrl) },
-    onError = { errorMessage -> android.util.Log.e("Navigation", "OpenID error: $errorMessage") }
+    onError = { errorMessage -> AppLogger.e("Navigation", "OpenID error: $errorMessage") }
    )
 
    // Handle authentication success
    val isSuccess = uiState is com.steamdeck.mobile.presentation.viewmodel.SteamLoginUiState.Success
    LaunchedEffect(isSuccess) {
     if (isSuccess) {
-     android.util.Log.i(
+     AppLogger.i(
       "SteamDeckNavHost",
       "✅ Steam authentication success! Triggering auto-sync and navigating back..."
      )

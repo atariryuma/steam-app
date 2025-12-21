@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.steam
 
 import android.content.Context
-import android.util.Log
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -29,11 +29,11 @@ class ProtonManager @Inject constructor(
   try {
    // TODO: Read config.vdf file in the future
    // Currently always returns true
-   Log.d(TAG, "Checking Proton status for container: $containerId")
+   AppLogger.d(TAG, "Checking Proton status for container: $containerId")
    true
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to check Proton status", e)
+   AppLogger.e(TAG, "Failed to check Proton status", e)
    false
   }
  }
@@ -43,16 +43,16 @@ class ProtonManager @Inject constructor(
   */
  suspend fun enableProton(containerId: Long): Result<Unit> = withContext(Dispatchers.IO) {
   try {
-   Log.i(TAG, "Enabling Proton for container: $containerId")
+   AppLogger.i(TAG, "Enabling Proton for container: $containerId")
 
    // TODO: Write configuration to config.vdf in the future
    // Currently just logging
-   Log.i(TAG, "Proton enabled (placeholder)")
+   AppLogger.i(TAG, "Proton enabled (placeholder)")
 
    Result.success(Unit)
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to enable Proton", e)
+   AppLogger.e(TAG, "Failed to enable Proton", e)
    Result.failure(e)
   }
  }
@@ -62,16 +62,16 @@ class ProtonManager @Inject constructor(
   */
  suspend fun disableProton(containerId: Long): Result<Unit> = withContext(Dispatchers.IO) {
   try {
-   Log.i(TAG, "Disabling Proton for container: $containerId")
+   AppLogger.i(TAG, "Disabling Proton for container: $containerId")
 
    // TODO: Delete configuration from config.vdf in the future
    // Currently just logging
-   Log.i(TAG, "Proton disabled (placeholder)")
+   AppLogger.i(TAG, "Proton disabled (placeholder)")
 
    Result.success(Unit)
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to disable Proton", e)
+   AppLogger.e(TAG, "Failed to disable Proton", e)
    Result.failure(e)
   }
  }
@@ -85,15 +85,15 @@ class ProtonManager @Inject constructor(
   protonVersion: String = "Proton Experimental"
  ): Result<Unit> = withContext(Dispatchers.IO) {
   try {
-   Log.i(TAG, "Enabling Proton for game: appId=$appId, version=$protonVersion")
+   AppLogger.i(TAG, "Enabling Proton for game: appId=$appId, version=$protonVersion")
 
    // TODO: Write game-specific configuration to config.vdf in the future
-   Log.i(TAG, "Game-specific Proton enabled (placeholder)")
+   AppLogger.i(TAG, "Game-specific Proton enabled (placeholder)")
 
    Result.success(Unit)
 
   } catch (e: Exception) {
-   Log.e(TAG, "Failed to enable Proton for game", e)
+   AppLogger.e(TAG, "Failed to enable Proton for game", e)
    Result.failure(e)
   }
  }

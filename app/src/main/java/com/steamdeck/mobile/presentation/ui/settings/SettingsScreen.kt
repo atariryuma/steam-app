@@ -19,7 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
@@ -117,7 +117,7 @@ fun SettingsScreen(
   }
  }
 
- // Error・Successメッセージ スナックバー表示
+ // Show snackbar for error and success messages
  LaunchedEffect(uiState) {
   when (val state = uiState) {
    is SettingsUiState.Error -> {
@@ -140,7 +140,7 @@ fun SettingsScreen(
   }
  }
 
- // SyncCompleteメッセージ スナックバー表示
+ // Show snackbar for sync completion messages
  LaunchedEffect(syncState) {
   when (val state = syncState) {
    is SyncState.Success -> {
@@ -193,7 +193,7 @@ fun SettingsScreen(
    }
   }
 
-  // Snackbar表示
+  // Snackbar host
   SnackbarHost(
    hostState = snackbarHostState,
    modifier = Modifier.align(Alignment.BottomCenter)
@@ -202,7 +202,7 @@ fun SettingsScreen(
 }
 
 /**
- * SettingsContent - 選択されたセクション 詳細表示
+ * * SettingsContent - Display details for selected section
  *
  * Best Practice: Max-width for large screens to avoid stretching
  */
@@ -241,16 +241,16 @@ private fun SettingsContent(
    ) {
     IconButton(onClick = onNavigateBack) {
      Icon(
-      imageVector = Icons.Default.ArrowBack,
+      imageVector = Icons.AutoMirrored.Filled.ArrowBack,
       contentDescription = stringResource(R.string.content_desc_back),
       tint = MaterialTheme.colorScheme.primary
      )
     }
     Text(
      text = when (selectedSection) {
-      0 -> "Steam Authentication"
-      1 -> "Steam Client"
-      2 -> "Library Sync"
+      0 -> "Step 1: Steam Client"
+      1 -> "Step 2: Steam Authentication"
+      2 -> "Step 3: Library Sync"
       3 -> "Controller Settings"
       4 -> "Wine Environment"
       5 -> "App Settings"
@@ -264,37 +264,68 @@ private fun SettingsContent(
    }
 
    // Content area
-   if (selectedSection == 0) {
-    SteamAuthContent(
-     data = data,
-     showWebView = showWebView,
-     steamLoginViewModel = steamLoginViewModel,
-     onShowWebView = onShowWebView,
-     onHideWebView = onHideWebView,
-     onClear = onClearSettings
-    )
-   } else {
-    Column(
-     modifier = Modifier
-      .fillMaxSize()
-      .verticalScroll(rememberScrollState())
-      .padding(24.dp),
-     verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-     // セクション別コンテンツ
+   Column(
+    modifier = Modifier
+     .fillMaxSize()
+     .verticalScroll(rememberScrollState())
+     .padding(24.dp),
+    verticalArrangement = Arrangement.spacedBy(24.dp)
+   ) {
+    // Section content with dependency checks
     when (selectedSection) {
-     1 -> SteamClientContent(
-      steamInstallState = steamInstallState,
-      defaultContainerId = "1",
-      onInstall = onInstallSteam,
-      onOpen = onOpenSteam,
-      onUninstall = onUninstallSteam
-     )
-     2 -> LibrarySyncContent(
-      data = data,
-      syncState = syncState,
-      onSync = onSyncLibrary
-     )
+     0 -> {
+      // Step 1: Steam Client Installation (no prerequisites)
+      SteamClientContent(
+       steamInstallState = steamInstallState,
+       defaultContainerId = "default_shared_container",
+       onInstall = onInstallSteam,
+       onOpen = onOpenSteam,
+       onUninstall = onUninstallSteam
+      )
+     }
+     1 -> {
+      // Step 2: Steam Authentication (requires Steam Client)
+      val isSteamInstalled = steamInstallState is SteamInstallState.Installed
+      if (!isSteamInstalled) {
+       PrerequisiteWarning(
+        message = "Please install Steam Client first (Step 1)",
+        requiredStep = "Step 1: Steam Client"
+       )
+      }
+      SteamAuthContent(
+       data = data,
+       showWebView = showWebView,
+       steamLoginViewModel = steamLoginViewModel,
+       onShowWebView = onShowWebView,
+       onHideWebView = onHideWebView,
+       onClear = onClearSettings,
+       enabled = isSteamInstalled
+      )
+     }
+     2 -> {
+      // Step 3: Library Sync (requires Steam Client + Authentication)
+      val isSteamInstalled = steamInstallState is SteamInstallState.Installed
+      val isSteamAuthenticated = data.steamId != null
+
+      if (!isSteamInstalled) {
+       PrerequisiteWarning(
+        message = "Please install Steam Client first (Step 1)",
+        requiredStep = "Step 1: Steam Client"
+       )
+      } else if (!isSteamAuthenticated) {
+       PrerequisiteWarning(
+        message = "Please authenticate with Steam first (Step 2)",
+        requiredStep = "Step 2: Steam Authentication"
+       )
+      }
+
+      LibrarySyncContent(
+       data = data,
+       syncState = syncState,
+       onSync = onSyncLibrary,
+       enabled = isSteamInstalled && isSteamAuthenticated
+      )
+     }
      3 -> ControllerContent(
       onNavigateToControllerSettings = onNavigateToControllerSettings
      )
@@ -306,7 +337,6 @@ private fun SettingsContent(
    }
   }
  }
-}
 }
 
 @Composable
@@ -327,7 +357,7 @@ private fun LoadingContent(modifier: Modifier = Modifier) {
 }
 
 // ========================================
-// セクション別コンテンツ（BackboneOne風カード）
+// Section-specific content (BackboneOne-style cards)
 // ========================================
 
 @Composable
@@ -337,11 +367,12 @@ private fun SteamAuthContent(
  steamLoginViewModel: SteamLoginViewModel,
  onShowWebView: () -> Unit,
  onHideWebView: () -> Unit,
- onClear: () -> Unit
+ onClear: () -> Unit,
+ enabled: Boolean = true
 ) {
  val steamLoginState by steamLoginViewModel.uiState.collectAsState()
  
- // authenticationSuccess時 WebViewClose
+ // Close WebView on authentication success
  LaunchedEffect(steamLoginState) {
   if (steamLoginState is SteamLoginUiState.Success) {
    onHideWebView()
@@ -349,7 +380,7 @@ private fun SteamAuthContent(
  }
  
  if (showWebView) {
-  // WebView表示（フルSize、サイドバー維持）
+  // Display WebView (full size, sidebar maintained)
   val (authUrl, _) = remember { steamLoginViewModel.startOpenIdLogin() }
   
   Box(
@@ -369,7 +400,7 @@ private fun SteamAuthContent(
    )
   }
  } else if (data.isSteamConfigured) {
-  // Login済み - Steamstyle design
+  // Already logged in - Steam style design
   SteamAuthLoggedInSection(
    username = data.steamUsername,
    steamId = data.steamId,
@@ -377,15 +408,16 @@ private fun SteamAuthContent(
    onLogout = onClear
   )
  } else {
-  // 未Login - OpenIDLoginボタン表示
+  // Not logged in - Display OpenID login button
   SteamOpenIdAuthSection(
-   onNavigateToLogin = onShowWebView
+   onNavigateToLogin = onShowWebView,
+   enabled = enabled
   )
  }
 }
 
 /**
- * Steamauthentication済みセクション（Steamstyle design）
+ * Steam authenticated section (Steam style design)
  */
 @Composable
 private fun SteamAuthLoggedInSection(
@@ -421,7 +453,7 @@ private fun SteamAuthLoggedInSection(
      .padding(horizontal = 26.dp, vertical = 18.dp),
     horizontalArrangement = Arrangement.spacedBy(26.dp)
    ) {
-    // 左カラム: ユーザー情報
+    // Left column: User information
     Column(
      modifier = Modifier
       .weight(0.5f)
@@ -452,7 +484,7 @@ private fun SteamAuthLoggedInSection(
       imageVector = Icons.Default.Check,
       contentDescription = null,
       modifier = Modifier.size(34.dp),
-      tint = SteamColorPalette.Green // Steam green
+      tint = SteamColorPalette.Green
      )
 
      Spacer(modifier = Modifier.height(8.dp))
@@ -482,7 +514,7 @@ private fun SteamAuthLoggedInSection(
      )
     }
 
-    // 右カラム: ボタン
+    // Right column: Buttons
     Column(
      modifier = Modifier
       .weight(0.5f)
@@ -526,7 +558,7 @@ private fun SteamAuthLoggedInSection(
 }
 
 /**
- * Steam OpenIDauthenticationセクション（Steam公式style design）
+ * Steam OpenID authentication section (Steam official style design)
  *
  * Steam公式カラーパレット:
  * - #171a21: ナビバー/ダーク背景
@@ -537,7 +569,8 @@ private fun SteamAuthLoggedInSection(
  */
 @Composable
 private fun SteamOpenIdAuthSection(
- onNavigateToLogin: () -> Unit
+ onNavigateToLogin: () -> Unit,
+ enabled: Boolean = true
 ) {
  Box(
   modifier = Modifier
@@ -549,7 +582,7 @@ private fun SteamOpenIdAuthSection(
    ),
   contentAlignment = Alignment.Center
  ) {
-  // メインカード
+  // Main card
   Card(
    modifier = Modifier
     .fillMaxWidth(0.85f)
@@ -574,7 +607,7 @@ private fun SteamOpenIdAuthSection(
      .padding(horizontal = 32.dp, vertical = 40.dp),
     horizontalAlignment = Alignment.CenterHorizontally
    ) {
-    // Steamロゴ
+    // Steam logo
     Text(
      text = "STEAM",
      style = MaterialTheme.typography.displaySmall.copy(
@@ -586,7 +619,7 @@ private fun SteamOpenIdAuthSection(
     
     Spacer(modifier = Modifier.height(4.dp))
     
-    // 区切り線
+    // Divider line
     Box(
      modifier = Modifier
       .width(60.dp)
@@ -604,7 +637,7 @@ private fun SteamOpenIdAuthSection(
     
     Spacer(modifier = Modifier.height(28.dp))
     
-    // タイトル
+    // Title
     Text(
      text = "Sign In",
      style = MaterialTheme.typography.titleLarge.copy(
@@ -615,14 +648,16 @@ private fun SteamOpenIdAuthSection(
     
     Spacer(modifier = Modifier.height(32.dp))
     
-    // Loginボタン（Steam風グラデーション）
+    // Login button (Steam-style gradient)
     Button(
      onClick = onNavigateToLogin,
+     enabled = enabled,
      modifier = Modifier
       .fillMaxWidth()
       .height(48.dp),
      colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-      containerColor = Color.Transparent
+      containerColor = Color.Transparent,
+      disabledContainerColor = Color.Transparent
      ),
      shape = RoundedCornerShape(2.dp),
      contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
@@ -632,10 +667,17 @@ private fun SteamOpenIdAuthSection(
        .fillMaxSize()
        .background(
         brush = Brush.linearGradient(
-         colors = listOf(
-          SteamColorPalette.BrightBlue,
-          SteamColorPalette.DeepBlue
-         )
+         colors = if (enabled) {
+          listOf(
+           SteamColorPalette.BrightBlue,
+           SteamColorPalette.DeepBlue
+          )
+         } else {
+          listOf(
+           SteamColorPalette.Gray.copy(alpha = 0.3f),
+           SteamColorPalette.Gray.copy(alpha = 0.5f)
+          )
+         }
         )
        ),
       contentAlignment = Alignment.Center
@@ -646,14 +688,14 @@ private fun SteamOpenIdAuthSection(
         fontWeight = FontWeight.Bold,
         letterSpacing = 0.5.sp
        ),
-       color = Color.White
+       color = if (enabled) Color.White else SteamColorPalette.Gray
       )
      }
     }
     
     Spacer(modifier = Modifier.height(24.dp))
     
-    // サブテキスト
+    // Subtext
     Text(
      text = "Official Steam Authentication (OpenID 2.0)",
      style = MaterialTheme.typography.bodySmall,
@@ -1105,7 +1147,8 @@ private fun SteamClientContent(
 private fun LibrarySyncContent(
  data: com.steamdeck.mobile.presentation.viewmodel.SettingsData,
  syncState: SyncState,
- onSync: () -> Unit
+ onSync: () -> Unit,
+ enabled: Boolean = true
 ) {
  Card(
   modifier = Modifier.fillMaxWidth(),
@@ -1127,7 +1170,7 @@ private fun LibrarySyncContent(
     color = MaterialTheme.colorScheme.onSurfaceVariant
    )
 
-   // Sync状態表示
+   // Sync state display
    when (val state = syncState) {
     is SyncState.Syncing -> {
      Column(
@@ -1146,10 +1189,10 @@ private fun LibrarySyncContent(
     else -> {}
    }
 
-   // Syncボタン
+   // Sync button
    FilledTonalButton(
     onClick = onSync,
-    enabled = data.isSteamConfigured && syncState !is SyncState.Syncing,
+    enabled = enabled && data.isSteamConfigured && syncState !is SyncState.Syncing,
     modifier = Modifier.fillMaxWidth()
    ) {
     Icon(
@@ -1162,9 +1205,9 @@ private fun LibrarySyncContent(
     )
    }
 
-   if (!data.isSteamConfigured) {
+   if (!enabled || !data.isSteamConfigured) {
     Text(
-     text = "※ Steam authentication required",
+     text = if (!enabled) "※ Please complete Step 1 and Step 2 first" else "※ Steam authentication required",
      style = MaterialTheme.typography.bodySmall,
      color = MaterialTheme.colorScheme.error
     )
@@ -1593,6 +1636,87 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
      ),
      color = MaterialTheme.colorScheme.error
     )
+   }
+  }
+ }
+}
+
+/**
+ * Prerequisite Warning Card
+ *
+ * Displays a warning when a section's prerequisites are not met
+ */
+@Composable
+private fun PrerequisiteWarning(
+ message: String,
+ requiredStep: String,
+ modifier: Modifier = Modifier
+) {
+ Card(
+  modifier = modifier.fillMaxWidth(),
+  colors = CardDefaults.cardColors(
+   containerColor = MaterialTheme.colorScheme.errorContainer
+  ),
+  shape = RoundedCornerShape(12.dp),
+  elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+ ) {
+  Column(
+   modifier = Modifier
+    .fillMaxWidth()
+    .padding(24.dp),
+   verticalArrangement = Arrangement.spacedBy(16.dp)
+  ) {
+   // Icon and title
+   Row(
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+    verticalAlignment = Alignment.CenterVertically
+   ) {
+    Icon(
+     imageVector = Icons.Default.Warning,
+     contentDescription = null,
+     tint = MaterialTheme.colorScheme.error,
+     modifier = Modifier.size(32.dp)
+    )
+    Text(
+     text = "Prerequisites Not Met",
+     style = MaterialTheme.typography.titleLarge,
+     fontWeight = FontWeight.Bold,
+     color = MaterialTheme.colorScheme.error
+    )
+   }
+
+   // Warning message
+   Text(
+    text = message,
+    style = MaterialTheme.typography.bodyLarge,
+    color = MaterialTheme.colorScheme.onErrorContainer
+   )
+
+   // Required step indicator
+   Surface(
+    shape = RoundedCornerShape(8.dp),
+    color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+   ) {
+    Row(
+     modifier = Modifier
+      .fillMaxWidth()
+      .padding(16.dp),
+     horizontalArrangement = Arrangement.spacedBy(8.dp),
+     verticalAlignment = Alignment.CenterVertically
+    ) {
+     Icon(
+      imageVector = Icons.Default.Info,
+      contentDescription = null,
+      tint = MaterialTheme.colorScheme.error,
+      modifier = Modifier.size(20.dp)
+     )
+     Text(
+      text = "Required: $requiredStep",
+      style = MaterialTheme.typography.bodyMedium,
+      fontWeight = FontWeight.Bold,
+      color = MaterialTheme.colorScheme.error
+     )
+    }
    }
   }
  }

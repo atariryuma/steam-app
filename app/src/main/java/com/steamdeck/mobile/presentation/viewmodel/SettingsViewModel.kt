@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.result.DataResult
+import com.steamdeck.mobile.core.steam.SteamCredentialManager
 import com.steamdeck.mobile.core.steam.SteamLauncher
 import com.steamdeck.mobile.core.steam.SteamSetupManager
 import com.steamdeck.mobile.domain.repository.ISecurePreferences
@@ -17,13 +18,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Settings画面 ViewModel
+ * Settings screen ViewModel
  *
- * Steamauthentication、library sync、アプリsettings管理
+ * Manages Steam authentication, library sync, and app settings
  *
  * Clean Architecture: Only depends on domain layer interfaces
  *
@@ -38,7 +40,8 @@ class SettingsViewModel @Inject constructor(
  private val securePreferences: ISecurePreferences,
  private val syncSteamLibraryUseCase: SyncSteamLibraryUseCase,
  private val steamLauncher: SteamLauncher,
- private val steamSetupManager: SteamSetupManager
+ private val steamSetupManager: SteamSetupManager,
+ private val steamCredentialManager: SteamCredentialManager
 ) : ViewModel() {
 
  companion object {
@@ -103,10 +106,10 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * settingsデータロード
+  * Load settings data
   *
-  * Note: ユーザー 自身 Steam Web API Key登録do必要 あります
-  * retrieve先: https://steamcommunity.com/dev/apikey
+  * Note: Users must register their own Steam Web API Key
+  * Obtain at: https://steamcommunity.com/dev/apikey
   */
  private fun loadSettings() {
   viewModelScope.launch {
@@ -133,29 +136,61 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * QRauthentication後 自動library sync
+  * Auto-sync library after QR authentication
   *
-  * QRauthenticationSuccess後、自動的 library sync
+  * Automatically syncs library after successful QR authentication
+  *
+  * Flow:
+  * 1. Write Steam credentials to VDF files (loginusers.vdf, config.vdf)
+  * 2. Sync Steam library via Web API
+  *
+  * This ensures Steam client can auto-login after QR authentication
   */
  fun syncAfterQrLogin() {
   viewModelScope.launch {
-   // 少し待機（QRauthenticationComplete確実 do）
+   // Wait briefly to ensure QR authentication is complete
    kotlinx.coroutines.delay(500)
+
+   // Get Steam ID and container ID
+   val steamIdFlow = securePreferences.getSteamId()
+   val steamId = steamIdFlow.first()
+   val containerId = getSteamContainerId()
+
+   // Write Steam credentials to VDF files (loginusers.vdf, config.vdf)
+   if (steamId != null && containerId != null) {
+    AppLogger.i(TAG, "Writing Steam credentials after QR login: steamId=$steamId, containerId=$containerId")
+
+    val credentialResult = steamCredentialManager.writeSteamCredentials(
+     containerId = containerId.toString(),
+     steamId = steamId
+    )
+
+    if (credentialResult.isSuccess) {
+     AppLogger.i(TAG, "✅ Steam credentials written successfully")
+    } else {
+     AppLogger.w(TAG, "Failed to write Steam credentials: ${credentialResult.exceptionOrNull()?.message}")
+     // Non-fatal error - continue with sync anyway
+    }
+   } else {
+    AppLogger.w(TAG, "Cannot write Steam credentials: steamId=$steamId, containerId=$containerId")
+   }
+
+   // Proceed with library sync
    syncSteamLibrary()
   }
  }
 
  /**
-  * Steamlibrary sync
+  * Sync Steam library
   *
-  * Best Practice: ユーザー提供 API Keyuse
-  * ユーザー 事前 API Key登録do必要 あります
+  * Best Practice: Uses user-provided API Key
+  * Users must register their API Key beforehand
   *
-  * 2025 Best Practice: DataResult<T> Errorハンドリング
+  * 2025 Best Practice: DataResult<T> error handling
   */
  fun syncSteamLibrary() {
   viewModelScope.launch {
-   // Steam IDretrieve
+   // Get Steam ID
    val currentData = (_uiState.value as? SettingsUiState.Success)?.data
    val steamId = currentData?.steamId
 
@@ -176,13 +211,13 @@ class SettingsViewModel @Inject constructor(
    _syncState.value = SyncState.Syncing(progress = 0f, message = "Starting sync...")
    AppLogger.i(TAG, "Starting library sync for Steam ID: $steamId, Container ID: $containerId")
 
-   // DataResult<Int>useした型安全なErrorハンドリング
+   // Type-safe error handling using DataResult<Int>
    when (val result = syncSteamLibraryUseCase(steamId, containerId)) {
     is DataResult.Success -> {
      val syncedCount = result.data
      securePreferences.setLastSyncTimestamp(System.currentTimeMillis())
      _syncState.value = SyncState.Success(syncedCount)
-     loadSettings() // 最終Syncdate and timeUpdate
+     loadSettings() // Update last sync date and time
      AppLogger.i(TAG, "Library sync completed: $syncedCount games")
     }
     is DataResult.Error -> {
@@ -191,7 +226,7 @@ class SettingsViewModel @Inject constructor(
      AppLogger.e(TAG, "Library sync failed: $errorMessage")
     }
     is DataResult.Loading -> {
-     // 進捗Update（将来的 ProgressBar 対応）
+     // Update progress (for future ProgressBar support)
      _syncState.value = SyncState.Syncing(
       progress = result.progress ?: 0f,
       message = "Syncing..."
@@ -202,31 +237,31 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * Steam API Keysave
+  * Save Steam API Key
   *
-  * @param apiKey Steam Web API Key（32文字 16進数文字列）
-  * retrieve先: https://steamcommunity.com/dev/apikey
+  * @param apiKey Steam Web API Key (32-character hexadecimal string)
+  * Obtain at: https://steamcommunity.com/dev/apikey
   */
  fun saveSteamApiKey(apiKey: String) {
   viewModelScope.launch {
    try {
-    // API Key バリデーション
+    // API Key validation
     if (apiKey.isBlank()) {
-     _uiState.value = SettingsUiState.Error("API Key入力please")
+     _uiState.value = SettingsUiState.Error("Please enter API Key")
      return@launch
     }
 
     if (apiKey.length != 32 || !apiKey.matches(Regex("^[0-9A-Fa-f]{32}$"))) {
-     _uiState.value = SettingsUiState.Error("DisabledなAPI Key す（32文字 16進数 ある必要 あります）")
+     _uiState.value = SettingsUiState.Error("Invalid API Key (must be 32 hexadecimal characters)")
      return@launch
     }
 
-    // API Keysave
+    // Save API Key
     securePreferences.saveSteamApiKey(apiKey)
     AppLogger.i(TAG, "Steam API Key saved successfully")
 
     _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
-     successMessage = "API Keysaveしました"
+     successMessage = "API Key saved successfully"
     ) ?: SettingsUiState.Loading
    } catch (e: Exception) {
     _uiState.value = SettingsUiState.Error("API Key save failed: ${e.message}")
@@ -235,7 +270,7 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * Steamsettingsクリア
+  * Clear Steam settings
   */
  fun clearSteamSettings() {
   viewModelScope.launch {
@@ -246,13 +281,13 @@ class SettingsViewModel @Inject constructor(
      successMessage = context.getString(com.steamdeck.mobile.R.string.success_steam_settings_cleared)
     ) ?: SettingsUiState.Loading
    } catch (e: Exception) {
-    _uiState.value = SettingsUiState.Error("クリア failed: ${e.message}")
+    _uiState.value = SettingsUiState.Error("Clear failed: ${e.message}")
    }
   }
  }
 
  /**
-  * Steaminstallation状態check
+  * Check Steam installation status
   */
  fun checkSteamInstallation() {
   viewModelScope.launch {
@@ -274,16 +309,16 @@ class SettingsViewModel @Inject constructor(
    } catch (e: Exception) {
     AppLogger.e(TAG, "Failed to check Steam installation", e)
     _steamInstallState.value = SteamInstallState.Error(
-     "installation状態 confirm failed: ${e.message}"
+     "Failed to check installation status: ${e.message}"
     )
    }
   }
  }
 
  /**
-  * Steam Clientinstallation
+  * Install Steam Client
   *
-  * @param containerId WinlatorContainer ID (String型)
+  * @param containerId WinlatorContainer ID (String type)
   */
  fun installSteamClient(containerId: String) {
   viewModelScope.launch {
@@ -321,14 +356,14 @@ class SettingsViewModel @Inject constructor(
      }
      .onFailure { error ->
       _steamInstallState.value = SteamInstallState.Error(
-       "installation failed: ${error.message}"
+       "Installation failed: ${error.message}"
       )
       AppLogger.e(TAG, "Failed to install Steam Client", error)
      }
 
    } catch (e: Exception) {
     _steamInstallState.value = SteamInstallState.Error(
-     "予期しないError 発生しました: ${e.message}"
+     "Unexpected error occurred: ${e.message}"
     )
     AppLogger.e(TAG, "Exception during Steam installation", e)
    }
@@ -336,7 +371,7 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * Steam Clientopen
+  * Open Steam Client
   *
   * @param containerId WinlatorContainer ID
   */
@@ -372,7 +407,7 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * Steam Clientアンinstallation
+  * Uninstall Steam Client
   *
   * @param containerId WinlatorContainer ID
   */
@@ -391,7 +426,7 @@ class SettingsViewModel @Inject constructor(
 
    } catch (e: Exception) {
     _steamInstallState.value = SteamInstallState.Error(
-     "アンinstallation failed: ${e.message}"
+     "Uninstallation failed: ${e.message}"
     )
     AppLogger.e(TAG, "Exception during Steam uninstallation", e)
    }
@@ -399,14 +434,14 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * Steam Install状態リセット
+  * Reset Steam install state
   */
  fun resetSteamInstallState() {
   _steamInstallState.value = SteamInstallState.Idle
  }
 
  /**
-  * Errorメッセージクリア
+  * Clear error message
   */
  fun clearError() {
   if (_uiState.value is SettingsUiState.Error) {
@@ -415,7 +450,7 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * Successメッセージクリア
+  * Clear success message
   */
  fun clearSuccessMessage() {
   val currentState = _uiState.value as? SettingsUiState.Success
@@ -425,7 +460,7 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
-  * Sync状態リセット
+  * Reset sync state
   */
  fun resetSyncState() {
   _syncState.value = SyncState.Idle
@@ -463,7 +498,7 @@ data class SettingsData(
  val isSteamConfigured: Boolean
 ) {
  /**
-  * 最終Syncdate and timeフォーマット
+  * Format last sync date and time
   */
  val lastSyncFormatted: String
   get() {
@@ -473,7 +508,7 @@ data class SettingsData(
 
    return when {
     diff < 60_000 -> "Less than 1 minute ago"
-    diff < 3600_000 -> "${diff / 60_000}minutes前"
+    diff < 3600_000 -> "${diff / 60_000} minutes ago"
     diff < 86400_000 -> "${diff / 3600_000} hours ago"
     else -> "${diff / 86400_000} days ago"
    }

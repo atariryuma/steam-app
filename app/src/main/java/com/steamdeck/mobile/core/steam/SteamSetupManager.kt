@@ -205,10 +205,22 @@ class SteamSetupManager @Inject constructor(
     progressCallback?.invoke(0.95f, "Wine installer execution completed")
    }
 
-   // progress: 0.95 ~ 1.0 (5%)
-   progressCallback?.invoke(0.95f, "Finalizing installation...")
+   // progress: 0.95 ~ 0.98 (3%)
+   progressCallback?.invoke(0.95f, "Initializing Steam client...")
 
-   // 5. Save installation information (container.id is already String type)
+   // 5. Initialize Steam client in background (creates steamapps/, config.vdf, etc.)
+   val initResult = initializeSteamClient(container)
+   if (initResult.isFailure) {
+    Log.w(TAG, "Steam initialization failed (non-fatal): ${initResult.exceptionOrNull()?.message}")
+    // Continue anyway - steamapps directory will be created manually if needed
+   } else {
+    Log.i(TAG, "Steam client initialized successfully")
+   }
+
+   // progress: 0.98 ~ 1.0 (2%)
+   progressCallback?.invoke(0.98f, "Finalizing installation...")
+
+   // 6. Save installation information (container.id is already String type)
    steamInstallerService.saveInstallation(
     containerId = container.id,
     installPath = DEFAULT_STEAM_PATH,
@@ -549,6 +561,133 @@ class SteamSetupManager @Inject constructor(
 
   } catch (e: Exception) {
    Log.e(TAG, "Failed to run Steam installer", e)
+   Result.failure(e)
+  }
+ }
+
+ /**
+  * Initialize Steam client in background
+  *
+  * Launches Steam.exe with -silent -noreactlogin flags to trigger first-run
+  * initialization, which creates steamapps/, config.vdf, loginusers.vdf, etc.
+  *
+  * Technical details:
+  * - Uses Wine container to execute Steam.exe
+  * - Command: Steam.exe -silent -noreactlogin
+  * - Timeout: 30 seconds (sufficient for directory creation)
+  * - Creates: steamapps/, config/, config.vdf, loginusers.vdf
+  *
+  * @param container Wine container where Steam is installed
+  * @return Result indicating success or failure (non-fatal)
+  */
+ private suspend fun initializeSteamClient(
+  container: com.steamdeck.mobile.domain.emulator.EmulatorContainer
+ ): Result<Unit> = withContext(Dispatchers.IO) {
+  try {
+   Log.i(TAG, "Starting Steam client background initialization")
+
+   // 1. Verify Steam.exe exists
+   val steamExePath = "C:\\Program Files (x86)\\Steam\\Steam.exe"
+   val steamExeFile = File(
+    context.filesDir,
+    "winlator/containers/${container.id}/drive_c/Program Files (x86)/Steam/Steam.exe"
+   )
+
+   if (!steamExeFile.exists()) {
+    Log.e(TAG, "Steam.exe not found at: ${steamExeFile.absolutePath}")
+    return@withContext Result.failure(
+     Exception("Steam.exe not found in container")
+    )
+   }
+
+   Log.d(TAG, "Steam.exe found: ${steamExeFile.absolutePath} (${steamExeFile.length()} bytes)")
+
+   // 2. Launch Steam.exe with initialization flags
+   // -silent: Run without UI
+   // -noreactlogin: Disable React-based login UI (Wine compatibility)
+   val arguments = listOf("-silent", "-noreactlogin")
+   Log.i(TAG, "Launching: $steamExePath ${arguments.joinToString(" ")}")
+
+   val launchResult = winlatorEmulator.launchExecutable(
+    container = container,
+    executable = steamExeFile,
+    arguments = arguments
+   )
+
+   if (launchResult.isFailure) {
+    Log.e(TAG, "Failed to launch Steam for initialization: ${launchResult.exceptionOrNull()?.message}")
+    return@withContext Result.failure(
+     launchResult.exceptionOrNull() ?: Exception("Failed to launch Steam")
+    )
+   }
+
+   Log.i(TAG, "Steam initialization launched successfully")
+
+   // 3. Wait for initialization to complete (30 seconds timeout)
+   // Steam creates directories within first few seconds
+   val initTimeout = 30_000L // 30 seconds
+   val startTime = System.currentTimeMillis()
+
+   while (System.currentTimeMillis() - startTime < initTimeout) {
+    delay(2000) // Check every 2 seconds
+
+    // Check if steamapps directory was created
+    val steamappsDir = File(
+     context.filesDir,
+     "winlator/containers/${container.id}/drive_c/Program Files (x86)/Steam/steamapps"
+    )
+
+    if (steamappsDir.exists()) {
+     Log.i(TAG, "Steamapps directory created successfully: ${steamappsDir.absolutePath}")
+
+     // List directory contents for verification
+     val contents = steamappsDir.listFiles()?.joinToString(", ") { it.name } ?: "empty"
+     Log.d(TAG, "Steamapps contents: $contents")
+
+     return@withContext Result.success(Unit)
+    }
+
+    Log.d(TAG, "Waiting for steamapps directory... (${(System.currentTimeMillis() - startTime) / 1000}s elapsed)")
+   }
+
+   // 4. Timeout - manually create steamapps directory structure
+   Log.w(TAG, "Steam initialization timeout (30s) - creating steamapps directory manually")
+
+   // Create required Steam directory structure
+   val steamappsDir = File(
+    context.filesDir,
+    "winlator/containers/${container.id}/drive_c/Program Files (x86)/Steam/steamapps"
+   )
+   val commonDir = File(steamappsDir, "common")
+
+   try {
+    if (!steamappsDir.exists() && !steamappsDir.mkdirs()) {
+     Log.e(TAG, "Failed to create steamapps directory")
+     return@withContext Result.failure(
+      Exception("Failed to create steamapps directory")
+     )
+    }
+
+    if (!commonDir.exists() && !commonDir.mkdirs()) {
+     Log.e(TAG, "Failed to create common directory")
+     return@withContext Result.failure(
+      Exception("Failed to create common directory")
+     )
+    }
+
+    Log.i(TAG, "Successfully created Steam directory structure manually")
+    Log.d(TAG, "Created: ${steamappsDir.absolutePath}")
+    Log.d(TAG, "Created: ${commonDir.absolutePath}")
+
+    return@withContext Result.success(Unit)
+
+   } catch (e: Exception) {
+    Log.e(TAG, "Failed to create Steam directories", e)
+    return@withContext Result.failure(e)
+   }
+
+  } catch (e: Exception) {
+   Log.e(TAG, "Steam initialization failed", e)
    Result.failure(e)
   }
  }

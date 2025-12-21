@@ -3,6 +3,7 @@ package com.steamdeck.mobile.di.module
 import android.content.Context
 import com.steamdeck.mobile.core.download.DownloadManager
 import com.steamdeck.mobile.core.steam.ProtonManager
+import com.steamdeck.mobile.core.steam.SteamCredentialManager
 import com.steamdeck.mobile.core.steam.SteamGameScanner
 import com.steamdeck.mobile.core.steam.SteamInstallerService
 import com.steamdeck.mobile.core.steam.SteamLauncher
@@ -18,7 +19,9 @@ import okhttp3.OkHttpClient
 import javax.inject.Singleton
 
 /**
- * Steammodule
+ * Steam Authentication Module
+ *
+ * Provides Steam-related dependencies (installer, launcher, credentials, etc.)
  *
  * Best Practice: Hilt dependency injection
  * Reference: https://developer.android.com/training/dependency-injection/hilt-android
@@ -30,7 +33,7 @@ object SteamAuthModule {
  /**
   * Steam Installer Service
   *
-  * Steamインストーラー download・verify管理します
+  * Manages Steam installer download and verification
   */
  @Provides
  @Singleton
@@ -51,7 +54,7 @@ object SteamAuthModule {
  /**
   * Steam Setup Manager
   *
-  * Winlatorコンテナ内 Steaminstallation管理します
+  * Manages Steam installation within Winlator containers
   */
  @Provides
  @Singleton
@@ -72,7 +75,7 @@ object SteamAuthModule {
  /**
   * Steam Launcher
   *
-  * Steam Clientvia gamelaunchします
+  * Launches games via Steam Client
   */
  @Provides
  @Singleton
@@ -89,7 +92,7 @@ object SteamAuthModule {
  /**
   * Proton Manager
   *
-  * Steam Play (Proton) settings管理します
+  * Manages Steam Play (Proton) settings
   */
  @Provides
  @Singleton
@@ -106,7 +109,7 @@ object SteamAuthModule {
  /**
   * Steam Game Scanner
   *
-  * インストール済みSteamゲームをスキャンします
+  * Scans for installed Steam games
   */
  @Provides
  @Singleton
@@ -117,4 +120,17 @@ object SteamAuthModule {
    winlatorEmulator = winlatorEmulator
   )
  }
+
+ /**
+  * Steam Credential Manager
+  *
+  * Generates Steam VDF files (loginusers.vdf, config.vdf)
+  * to enable auto-login functionality after QR authentication
+  *
+  * Note: Uses @Inject constructor, so Hilt automatically generates instance.
+  * No explicit @Provides needed.
+  */
+ // SteamCredentialManager uses @Inject constructor,
+ // so Hilt automatically generates the instance.
+ // No explicit @Provides is required.
 }

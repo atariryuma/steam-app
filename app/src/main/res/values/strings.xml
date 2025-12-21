@@ -252,9 +252,18 @@
     <string name="dialog_steam_launch_error_hint">To play Steam games, you need to either install Steam Client via Settings or set up a Winlator container.</string>
     <string name="button_delete">Delete</string>
     <string name="button_cancel">Cancel</string>
+    <string name="button_create">Create</string>
     <string name="button_open_settings">Open Settings</string>
     <string name="button_close">Close</string>
     <string name="games_synced_count">%1$d games synced</string>
+
+    <!-- Container Management -->
+    <string name="container_empty_title">No Containers</string>
+    <string name="container_empty_message">Create a container to run games</string>
+    <string name="container_create_button">Create Container</string>
+    <string name="container_create_dialog_title">Create New Container</string>
+    <string name="container_create_dialog_message">Enter container name</string>
+    <string name="container_name_label">Container Name</string>
 
     <!-- Controller Settings -->
     <string name="controller_section_connected">Connected Controllers</string>

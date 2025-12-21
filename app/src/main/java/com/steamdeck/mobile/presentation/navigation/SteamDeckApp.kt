@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
  * Architecture:
  * - Mini drawer persists across all screens (Home, Settings, Downloads, etc.)
  * - Drawer state managed at app level for consistency
- * - 280dp expanded, 24dp mini sidebar (Steam Big Picture style)
+ * - 280dp expanded, 80dp mini sidebar (Steam Big Picture style)
  *
  * Fullscreen mode for gaming/controller experience
  * No bottom navigation - maximizes screen space
@@ -44,8 +44,8 @@ fun SteamDeckApp() {
  val currentRoute = navBackStackEntry?.destination?.route ?: "home"
  val scope = rememberCoroutineScope()
 
- // Mini drawer width state (280.dp expanded, 24.dp mini sidebar)
- var drawerWidth by remember { mutableStateOf(24.dp) }
+ // Mini drawer width state (280.dp expanded, 80.dp mini sidebar)
+ var drawerWidth by remember { mutableStateOf(80.dp) }
  val isDrawerExpanded = drawerWidth == 280.dp
 
  // Drawer actions (Steam Big Picture style)
@@ -56,14 +56,14 @@ fun SteamDeckApp() {
  }
  val closeDrawer: () -> Unit = {
   scope.launch {
-   drawerWidth = 24.dp // Collapse to mini sidebar
+   drawerWidth = 80.dp // Collapse to mini sidebar
   }
  }
 
  // Auto-collapse drawer after navigation
  LaunchedEffect(currentRoute) {
   if (drawerWidth == 280.dp) {
-   drawerWidth = 24.dp // Collapse to mini sidebar after navigation
+   drawerWidth = 80.dp // Collapse to mini sidebar after navigation
   }
  }
 
@@ -96,7 +96,7 @@ fun SteamDeckApp() {
       },
       onNavigateToSteamLogin = {
        closeDrawer()
-       navController.navigate(Screen.SteamLogin.route)
+       navController.navigate(Screen.Settings.createRoute(section = 1))
       },
       onNavigateToSyncLibrary = {
        closeDrawer()
@@ -104,7 +104,7 @@ fun SteamDeckApp() {
       },
       onNavigateToSteamClient = {
        closeDrawer()
-       navController.navigate(Screen.Settings.createRoute(section = 1))
+       navController.navigate(Screen.Settings.createRoute(section = 0))
       },
       onNavigateToController = {
        closeDrawer()
@@ -135,7 +135,6 @@ fun SteamDeckApp() {
       onCloseDrawer = closeDrawer
      )
     }
-   }
 
    // Main navigation content
    SteamDeckNavHost(

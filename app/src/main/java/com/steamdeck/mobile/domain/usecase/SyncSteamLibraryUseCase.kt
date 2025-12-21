@@ -17,11 +17,11 @@ import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject
 
 /**
- * SteamlibraryローカルDB 同期doUseCase
+ * Sync Steam library to local database use case
  *
  * Best Practice: User-provided API Key
- * ユーザー 自身 Steam Web API Key登録do必要 あります
- * retrieve先: https://steamcommunity.com/dev/apikey
+ * Users must register their own Steam Web API Key
+ * Obtain at: https://steamcommunity.com/dev/apikey
  *
  * Clean Architecture: Only depends on domain layer interfaces
  *
@@ -39,15 +39,15 @@ class SyncSteamLibraryUseCase @Inject constructor(
  private val securePreferences: ISecurePreferences
 ) {
  /**
-  * Steamlibrary sync
+  * Sync Steam library
   *
   * @param steamId Steam ID (from QR authentication)
   * @param steamContainerId Steam container ID (where Steam client is installed)
-  * @return 同期result（successしたcase 同期されたgame数）
+  * @return Sync result (number of games synced on success)
   */
  suspend operator fun invoke(steamId: String, steamContainerId: Long): DataResult<Int> {
   return try {
-   // API Keyretrieve（必須: ユーザー自身 API Key）
+   // Get API Key (required: user must provide their own API Key)
    val apiKey = securePreferences.getSteamApiKey()
 
    if (apiKey.isNullOrBlank()) {
@@ -57,7 +57,7 @@ class SyncSteamLibraryUseCase @Inject constructor(
 
    AppLogger.d(TAG, "Using user-provided API Key for Steam ID: $steamId")
 
-   // Steam APIfromgamelistretrieve (use direct repository to get SteamGame objects)
+   // Fetch game list from Steam API (use direct repository to get SteamGame objects)
    val steamGamesResult = steamRepositoryImpl.getOwnedGames(apiKey, steamId)
    if (steamGamesResult.isFailure) {
     val error = steamGamesResult.exceptionOrNull()
@@ -76,7 +76,7 @@ class SyncSteamLibraryUseCase @Inject constructor(
     return DataResult.Success(0)
    }
 
-   // 並列processing game同期（高速化）
+   // Process game sync in parallel (performance optimization)
    val syncedCount = coroutineScope {
     val syncJobs = steamGames.mapIndexed { index, steamGame ->
      async {
@@ -94,7 +94,7 @@ class SyncSteamLibraryUseCase @Inject constructor(
         winlatorContainerId = steamContainerId
        )
 
-       // gameDB add
+       // Add game to database
        gameRepository.insertGame(game)
        AppLogger.d(TAG, "Synced [${index + 1}/${steamGames.size}]: ${game.name}")
        true
@@ -105,7 +105,7 @@ class SyncSteamLibraryUseCase @Inject constructor(
      }
     }
 
-    // all 同期ジョブ待機
+    // Wait for all sync jobs to complete
     val results = syncJobs.awaitAll()
     results.count { it }
    }

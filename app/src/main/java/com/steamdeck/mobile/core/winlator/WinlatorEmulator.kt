@@ -1936,7 +1936,7 @@ REGEDIT4
    put("LC_ALL", "C")
    // CRITICAL: Use minimal logging to prevent SIGSEGV crashes
    // Excessive logging (+all,+relay,+file) destabilizes Wine execution
-   put("WINEDEBUG", "-all") // Silent - most stable for game execution
+   put("WINEDEBUG", "+err,+process,+loaddll") // DEBUG: Enable Wine error/process/dll logs
    put("WINEARCH", "win64")
    put("WINELOADERNOEXEC", "1")
    // DO NOT set WINESERVER - let Wine find it via PATH (same reason as wineboot)
@@ -1983,8 +1983,8 @@ REGEDIT4
    }
 
    // Box64 log configuration
-   put("BOX64_LOG", "0") // Disable verbose logging
-   put("BOX64_NOBANNER", "1") // Disable startup banner
+   put("BOX64_LOG", "2") // DEBUG: Enable Box64 logging (0=none, 1=info, 2=debug, 3=verbose)
+   put("BOX64_NOBANNER", "0") // DEBUG: Show Box64 banner
 
    // Display configuration
    put("DISPLAY", ":0")

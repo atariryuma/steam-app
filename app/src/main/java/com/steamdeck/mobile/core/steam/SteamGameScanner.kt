@@ -9,10 +9,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Steam インストール済みゲームスキャナー
+ * Steam installed game scanner
  *
- * Winlator コンテナ内の Steam フォルダをスキャンして、
- * インストール済みゲームの情報を取得する
+ * Scans Steam folders in Winlator containers to detect
+ * installed games and retrieve their information
  */
 @Singleton
 class SteamGameScanner @Inject constructor(

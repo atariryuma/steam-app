@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,7 +24,7 @@ import com.steamdeck.mobile.presentation.viewmodel.ContainerUiState
 import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
 
 /**
- * WinlatorContainer Management画面 - Material3 design
+ * Winlator Container Management Screen - Material3 design
  *
  * Best Practices:
  * - Material3 TopAppBar for consistency
@@ -31,11 +32,11 @@ import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
  * - Material3 Card styling: elevation 2dp, padding 20dp, shapes.large
  * - LazyColumn with 24dp contentPadding, 16dp item spacing
  *
- * 機能:
- * - Containerlist表示
- * - 新規Containercreate
- * - ContainerEdit
- * - Containerdelete
+ * Features:
+ * - Display container list
+ * - Create new container
+ * - Edit container
+ * - Delete container
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,7 +67,7 @@ fun ContainerScreen(
     navigationIcon = {
      IconButton(onClick = onNavigateBack) {
       Icon(
-       imageVector = Icons.Default.ArrowBack,
+       imageVector = Icons.AutoMirrored.Filled.ArrowBack,
        contentDescription = stringResource(R.string.content_desc_back)
       )
      }
@@ -258,20 +259,20 @@ private fun EmptyContainersPlaceholder(
     tint = MaterialTheme.colorScheme.outline
    )
    Text(
-    text = "Container ありません",
+    text = stringResource(R.string.container_empty_title),
     style = MaterialTheme.typography.titleLarge,
     fontWeight = FontWeight.Bold,
     color = MaterialTheme.colorScheme.outline
    )
    Text(
-    text = "Containercreateしてgame実行 きます",
+    text = stringResource(R.string.container_empty_message),
     style = MaterialTheme.typography.bodyMedium,
     color = MaterialTheme.colorScheme.onSurfaceVariant
    )
    Button(onClick = onCreateClick) {
-    Icon(Icons.Default.Add, "create")
+    Icon(Icons.Default.Add, stringResource(R.string.content_desc_create))
     Spacer(modifier = Modifier.width(8.dp))
-    Text("Containercreate")
+    Text(stringResource(R.string.container_create_button))
    }
   }
  }
@@ -354,18 +355,18 @@ private fun CreateContainerDialog(
 
  AlertDialog(
   onDismissRequest = onDismiss,
-  icon = { Icon(Icons.Default.Add, "新規create") },
-  title = { Text("新しいContainercreate") },
+  icon = { Icon(Icons.Default.Add, stringResource(R.string.content_desc_create)) },
+  title = { Text(stringResource(R.string.container_create_dialog_title)) },
   text = {
    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Text(
-     text = "Container名入力please",
+     text = stringResource(R.string.container_create_dialog_message),
      style = MaterialTheme.typography.bodyMedium
     )
     OutlinedTextField(
      value = containerName,
      onValueChange = { containerName = it },
-     label = { Text("Container Name") },
+     label = { Text(stringResource(R.string.container_name_label)) },
      singleLine = true,
      modifier = Modifier.fillMaxWidth()
     )
@@ -376,12 +377,12 @@ private fun CreateContainerDialog(
     onClick = { onConfirm(containerName) },
     enabled = containerName.isNotBlank()
    ) {
-    Text("create")
+    Text(stringResource(R.string.button_create))
    }
   },
   dismissButton = {
    TextButton(onClick = onDismiss) {
-    Text("Cancel")
+    Text(stringResource(R.string.button_cancel))
    }
   }
  )

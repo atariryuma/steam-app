@@ -632,6 +632,7 @@ suspend fun launchGame(gameId: Long): DataResult<Unit> = withContext(Dispatchers
 - [core/auth/SteamOpenIdAuthenticator.kt](app/src/main/java/com/steamdeck/mobile/core/auth/SteamOpenIdAuthenticator.kt) - OpenID 2.0 auth
 - [core/steam/SteamSetupManager.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamSetupManager.kt) - Steam installation orchestration
 - [core/steam/SteamInstallerService.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamInstallerService.kt) - SteamCMD download & extraction
+- [core/steam/SteamCredentialManager.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamCredentialManager.kt) - VDF credential file generator
 - [core/download/DownloadManager.kt](app/src/main/java/com/steamdeck/mobile/core/download/DownloadManager.kt) - WorkManager downloads
 - [core/error/AppError.kt](app/src/main/java/com/steamdeck/mobile/core/error/AppError.kt) - Error hierarchy
 
@@ -674,8 +675,59 @@ android {
 - [okyes/app-data-file-exec](https://github.com/okyes/app-data-file-exec)
 - Winlator 10.1 uses same approach
 
+### 2025-12-21: Steam Credential Management (VDF File Generation)
+
+- **Added**: Automatic Steam client credential configuration after QR authentication
+- **Why**: Steam client needs VDF config files to recognize authenticated users
+- **Problem**: QR auth saved SteamID to app preferences only, Steam client had no login info
+- **Solution**: Generate `loginusers.vdf` and `config.vdf` files in Wine container
+
+**Implementation:**
+
+- `SteamCredentialManager.kt` - Write-only VDF file generator
+  - No external dependencies (uses Kotlin string templates)
+  - Generates `loginusers.vdf` with user account info (RememberPassword, AllowAutoLogin)
+  - Generates `config.vdf` with AutoLoginUser setting
+  - Tab-indented format (Steam convention)
+  - Atomic file writes (temp → rename)
+  - SteamID64 validation (17 digits, starts with 7656119)
+- `SettingsViewModel.syncAfterQrLogin()` - Integrated VDF writing
+  - Flow: QR auth → Write VDF files → Sync library
+  - Non-fatal error handling (continues sync on VDF write failure)
+- VDF files location: `<container>/drive_c/Program Files (x86)/Steam/config/`
+
+**VDF Format (Valve KeyValue):**
+
+```vdf
+"users"
+{
+    "76561198245791652"
+    {
+        "AccountName"           "username"
+        "PersonaName"           "DisplayName"
+        "RememberPassword"      "1"
+        "MostRecent"            "1"
+        "AllowAutoLogin"        "1"
+        "Timestamp"             "1734779654"
+    }
+}
+```
+
+**Security:**
+
+- Only stores public information (SteamID64, account name)
+- No passwords/tokens in VDF files
+- Actual authentication handled by Steam client
+
+**References:**
+
+- [SteamCredentialManager.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamCredentialManager.kt) - VDF generator
+- [SettingsViewModel.kt:148-180](app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/SettingsViewModel.kt#L148-L180) - Integration
+- [VDF Format - Valve Developer Community](https://developer.valvesoftware.com/wiki/VDF)
+- [KeyValues Specification](https://developer.valvesoftware.com/wiki/KeyValues)
+
 ---
 
 **Document purpose:** Guide AI assistants to write high-quality Kotlin/Compose code following project architecture.
 
-**Last updated:** 2025-12-20
+**Last updated:** 2025-12-21

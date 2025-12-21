@@ -15,11 +15,11 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Steam OpenIDログインViewModel（規約準拠版）
+ * Steam OpenID Login ViewModel (ToS Compliant)
  *
- * ⚠️ 変更内容:
- * - QRコードログインdelete（Steam規約違反リスク ため）
- * - Steam OpenID 2.0authentication 移行（Valve公式推奨）
+ * ⚠️ Important Changes:
+ * - QR code login removed (Steam ToS compliance risk)
+ * - Migrated to Steam OpenID 2.0 authentication (Valve official recommendation)
  *
  * Best Practices:
  * - StateFlow for UI state
@@ -29,7 +29,7 @@ import javax.inject.Inject
  *
  * Clean Architecture: Only depends on domain layer interfaces
  *
- * 公式ドキュメント:
+ * Official Documentation:
  * - https://partner.steamgames.com/doc/features/auth
  * - https://steamcommunity.com/dev
  */
@@ -52,9 +52,9 @@ class SteamLoginViewModel @Inject constructor(
  private var currentState: String? = null
 
  /**
-  * Steam OpenIDauthenticationstart
+  * Start Steam OpenID authentication
   *
-  * @return Pair(authenticationURL, ステート値)
+  * @return Pair(authentication URL, state value)
   */
  fun startOpenIdLogin(): Pair<String, String> {
   _uiState.update { SteamLoginUiState.Loading }
@@ -78,9 +78,9 @@ class SteamLoginViewModel @Inject constructor(
  }
 
  /**
-  * コールバックURL処理してSteamID64extract
+  * Handle callback URL and extract SteamID64
   *
-  * @param callbackUrl Steamauthentication後 コールバックURL
+  * @param callbackUrl Callback URL after Steam authentication
   */
  fun handleCallback(callbackUrl: String) {
   viewModelScope.launch {
@@ -100,7 +100,7 @@ class SteamLoginViewModel @Inject constructor(
    )
 
    if (steamId != null && SteamOpenIdAuthenticator.isValidSteamId64(steamId)) {
-    // SteamID64save
+    // Save SteamID64
     securePreferences.saveSteamId(steamId)
 
     AppLogger.i(TAG, "OpenID authentication successful. SteamID64: $steamId")
@@ -117,14 +117,14 @@ class SteamLoginViewModel @Inject constructor(
  }
 
  /**
-  * エラー状態クリア
+  * Clear error state
   */
  fun clearError() {
   _uiState.update { SteamLoginUiState.Initial }
  }
 
  /**
-  * retry
+  * Retry authentication
   */
  fun retry() {
   startOpenIdLogin()

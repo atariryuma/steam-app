@@ -24,6 +24,7 @@ import com.steamdeck.mobile.presentation.ui.container.ContainerScreen
 import com.steamdeck.mobile.presentation.ui.settings.ControllerSettingsScreen
 import com.steamdeck.mobile.presentation.ui.settings.SettingsScreen
 import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
+import com.steamdeck.mobile.presentation.viewmodel.SettingsViewModel
 import com.steamdeck.mobile.presentation.viewmodel.SteamLoginViewModel
 
 /**
@@ -85,7 +86,6 @@ fun SteamDeckNavHost(
     onGameClick = { gameId ->
      navController.navigate(Screen.GameDetail.createRoute(gameId))
     },
-    onOpenDrawer = onOpenDrawer,
     showAddGameDialogInitially = showAddGameFromNav
    )
   }
@@ -323,6 +323,9 @@ fun SteamDeckNavHost(
    val loginViewModel: SteamLoginViewModel = hiltViewModel()
    val uiState by loginViewModel.uiState.collectAsState()
 
+   // Get SettingsViewModel to trigger auto-sync after login
+   val settingsViewModel: SettingsViewModel = hiltViewModel()
+
    // Generate authentication URL
    val (authUrl, _) = remember { loginViewModel.startOpenIdLogin() }
 
@@ -340,8 +343,13 @@ fun SteamDeckNavHost(
     if (isSuccess) {
      android.util.Log.i(
       "SteamDeckNavHost",
-      "✅ Steam authentication success! Navigating back to settings..."
+      "✅ Steam authentication success! Triggering auto-sync and navigating back..."
      )
+
+     // Trigger automatic library sync after successful login
+     settingsViewModel.syncAfterQrLogin()
+
+     // Navigate back to settings
      navController.popBackStack()
     }
    }

@@ -31,8 +31,49 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Gamepad
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -68,32 +109,39 @@ private object HomeScreenDefaults {
 }
 
 /**
- * BackboneOne-style Home Screen
+ * Home Screen - Game Library
  *
- * Best Practices (2025):
- * - Material Design 3 adaptive navigation with navigation drawer
- * - Edge-to-edge with proper inset handling
- * - Hamburger menu placement on left (better UX with left drawer)
- * - LazyColumn with LazyRow sections (Netflix-style)
- * - Immutable data objects for performance
- * - Stable keys for efficient recomposition
- * - Proper layer composition (Scaffold-based, not overlay)
+ * Displays games organized by categories:
+ * - Favorites
+ * - Recently played
+ * - Steam library
+ * - Imported games
+ * - All games
  *
  * Architecture:
- * - State hoisting: drawer state managed here
- * - Single responsibility: UI logic only, business logic in ViewModel
- * - Composition over inheritance: reusable components
+ * - State hoisting: ViewModel manages UI state
+ * - Single responsibility: UI rendering only, business logic in ViewModel
+ * - Composition: Reusable components (GameSection, GameCard)
+ *
+ * Best Practices (2025):
+ * - LazyColumn with LazyRow sections (Netflix-style horizontal scrolling)
+ * - Immutable data objects for performance
+ * - Stable keys for efficient recomposition (50-70% faster)
+ * - Controller/keyboard support (focusable GameCards with BackHandler)
+ *
+ * Navigation:
+ * - Persistent mini sidebar managed at app level (SteamDeckApp.kt)
+ * - No hamburger menu (drawer is always accessible via mini sidebar)
+ * - Steam Big Picture-inspired design adapted for mobile
  *
  * References:
  * - https://developer.android.com/develop/ui/compose/lists
- * - https://developer.android.com/develop/ui/compose/system/system-bars
- * - https://m3.material.io/components/navigation-drawer/guidelines
+ * - https://m3.material.io/components
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
  onGameClick: (Long) -> Unit,
- onOpenDrawer: () -> Unit = {},
  showAddGameDialogInitially: Boolean = false,
  viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -119,9 +167,7 @@ fun HomeScreen(
  // Use Scaffold for proper layout structure (Material 3 best practice)
  Scaffold(
   topBar = {
-   HomeTopBar(
-    onMenuClick = onOpenDrawer
-   )
+   HomeTopBar()
   }
  ) { paddingValues ->
   // Content area with state-based rendering
@@ -232,7 +278,7 @@ fun BackboneOneStyleContent(
    item {
     GameSection(
      titleRes = R.string.home_section_steam,
-     icon = Icons.Default.CloudDownload,
+     icon = Icons.Default.SportsEsports,
      games = steamGames,
      onGameClick = onGameClick,
      onToggleFavorite = onToggleFavorite
@@ -287,9 +333,7 @@ fun BackboneOneStyleContent(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeTopBar(
- onMenuClick: () -> Unit
-) {
+fun HomeTopBar() {
  TopAppBar(
   title = {
    Text(
@@ -478,14 +522,15 @@ fun NavigationDrawerContent(
    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
    // STEAM Section (highlighted if any child route is active)
-   val steamActive = currentRoute == "settings/steam_login" ||
-    currentRoute.startsWith("settings") && (
-     currentRoute.contains("section=1") || currentRoute.contains("section=2")
-    )
+   val steamActive = currentRoute.startsWith("settings") && (
+    currentRoute.contains("section=0") ||
+    currentRoute.contains("section=1") ||
+    currentRoute.contains("section=2")
+   )
 
    IconButton(onClick = onExpandDrawer) {
     Icon(
-     imageVector = Icons.Default.CloudDownload,
+     imageVector = Icons.Default.SportsEsports,
      contentDescription = stringResource(R.string.drawer_section_steam),
      tint = if (steamActive) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -534,9 +579,10 @@ fun NavigationDrawerContent(
  LaunchedEffect(currentRoute) {
   expandedSection = when {
    // STEAM section routes
-   currentRoute == "settings/steam_login" ||
    currentRoute.startsWith("settings") && (
-    currentRoute.contains("section=1") || currentRoute.contains("section=2")
+    currentRoute.contains("section=0") ||
+    currentRoute.contains("section=1") ||
+    currentRoute.contains("section=2")
    ) -> "steam"
    // SYSTEM section routes
    currentRoute == "settings/controller" ||
@@ -624,18 +670,25 @@ fun NavigationDrawerContent(
   // STEAM Section (Accordion)
   ExpandableDrawerSection(
    title = stringResource(R.string.drawer_section_steam),
-   icon = Icons.Default.CloudDownload,
+   icon = Icons.Default.SportsEsports,
    expanded = steamExpanded,
    onExpandToggle = { toggleSection("steam") },
-   selected = currentRoute == "settings/steam_login" ||
-    currentRoute.startsWith("settings") && (
-     currentRoute.contains("section=1") || currentRoute.contains("section=2")
-    )
+   selected = currentRoute.startsWith("settings") && (
+    currentRoute.contains("section=0") ||
+    currentRoute.contains("section=1") ||
+    currentRoute.contains("section=2")
+   )
   ) {
+   DrawerChildItem(
+    label = stringResource(R.string.drawer_item_steam_client),
+    icon = Icons.Default.Computer,
+    selected = currentRoute.startsWith("settings") && currentRoute.contains("section=0"),
+    onClick = onNavigateToSteamClient
+   )
    DrawerChildItem(
     label = stringResource(R.string.drawer_item_steam_login),
     icon = Icons.Default.Security,
-    selected = currentRoute == "settings/steam_login",
+    selected = currentRoute.startsWith("settings") && currentRoute.contains("section=1"),
     onClick = onNavigateToSteamLogin
    )
    DrawerChildItem(
@@ -643,12 +696,6 @@ fun NavigationDrawerContent(
     icon = Icons.Default.Refresh,
     selected = currentRoute.startsWith("settings") && currentRoute.contains("section=2"),
     onClick = onNavigateToSyncLibrary
-   )
-   DrawerChildItem(
-    label = stringResource(R.string.drawer_item_steam_client),
-    icon = Icons.Default.Computer,
-    selected = currentRoute.startsWith("settings") && currentRoute.contains("section=1"),
-    onClick = onNavigateToSteamClient
    )
   }
 
@@ -668,7 +715,7 @@ fun NavigationDrawerContent(
   ) {
    DrawerChildItem(
     label = stringResource(R.string.drawer_item_controller),
-    icon = Icons.Default.SportsEsports,
+    icon = Icons.Default.Gamepad,
     selected = currentRoute == "settings/controller",
     onClick = onNavigateToController
    )

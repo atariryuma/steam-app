@@ -10,9 +10,9 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
- * インストール済み Steam ゲームスキャン UseCase
+ * Installed Steam game scanner use case
  *
- * Steam フォルダをスキャンして、インストール済みゲームの実行ファイルパスを自動検出・更新する
+ * Scans Steam folders to automatically detect and update executable paths for installed games
  */
 class ScanInstalledGamesUseCase @Inject constructor(
  private val gameRepository: GameRepository,
@@ -23,40 +23,40 @@ class ScanInstalledGamesUseCase @Inject constructor(
  }
 
  /**
-  * 特定のゲームをスキャン
+  * Scan specific game
   *
-  * @param gameId ゲーム ID
-  * @return スキャン結果（成功した場合は true、失敗した場合は false）
+  * @param gameId Game ID
+  * @return Scan result (true if successful, false otherwise)
   */
  suspend operator fun invoke(gameId: Long): DataResult<Boolean> = withContext(Dispatchers.IO) {
   try {
    AppLogger.i(TAG, "Scanning game: gameId=$gameId")
 
-   // 1. ゲーム情報を取得
+   // 1. Get game information
    val game = gameRepository.getGameById(gameId)
     ?: return@withContext DataResult.Error(
      com.steamdeck.mobile.core.error.AppError.DatabaseError("Game not found: $gameId")
     )
 
-   // 2. Steam ゲームかチェック
+   // 2. Check if game is from Steam
    if (game.source != GameSource.STEAM) {
     AppLogger.w(TAG, "Game is not from Steam: ${game.name}")
     return@withContext DataResult.Success(false)
    }
 
-   // 3. Steam App ID チェック
+   // 3. Validate Steam App ID
    if (game.steamAppId == null) {
     AppLogger.w(TAG, "Game has no Steam App ID: ${game.name}")
     return@withContext DataResult.Success(false)
    }
 
-   // 4. コンテナ ID チェック
+   // 4. Validate container ID
    if (game.winlatorContainerId == null) {
     AppLogger.w(TAG, "Game has no container ID: ${game.name}")
     return@withContext DataResult.Success(false)
    }
 
-   // 5. スキャン実行
+   // 5. Execute scan
    val scanResult = steamGameScanner.findGameExecutable(
     containerId = game.winlatorContainerId.toString(),
     steamAppId = game.steamAppId
@@ -73,9 +73,9 @@ class ScanInstalledGamesUseCase @Inject constructor(
 
    val executablePath = scanResult.getOrNull()
 
-   // 6. 実行ファイルが見つかった場合、ゲーム情報を更新
+   // 6. Update game info if executable found
    if (executablePath != null) {
-    // Bug fix: インストールパスも設定（実行ファイルの親フォルダ）
+    // Bug fix: Set install path as well (parent folder of executable)
     // Handle cases where path separator might not be present
     val installPath = if (executablePath.contains("\\")) {
      executablePath.substringBeforeLast("\\")

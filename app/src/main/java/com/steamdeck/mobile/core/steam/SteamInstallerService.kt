@@ -29,8 +29,8 @@ class SteamInstallerService @Inject constructor(
   private const val TAG = "SteamInstallerService"
 
   // SteamSetup.exe (32-bit NSIS installer) - CURRENT METHOD
-  // Requires Windows 10 registry configuration (handled by WinlatorEmulator.setWindowsVersion())
-  // Works with WoW64 mode when Wine is configured as Windows 10
+  // NSIS extraction using 7-Zip-JBinding-4Android (bypasses Wine execution)
+  // Supports LZMA, BZIP2, ZLIB/Deflate compression formats
   private const val STEAM_INSTALLER_URL = "https://steamcdn-a.akamaihd.net/client/installer/SteamSetup.exe"
   private const val INSTALLER_FILENAME = "SteamSetup.exe"
 
@@ -161,7 +161,7 @@ class SteamInstallerService @Inject constructor(
   * Used as source for NSIS extraction (primary method) or Wine-based installation (fallback).
   *
   * @return Result containing downloaded installer file or error
-  * @see extractSteamFromNSIS Primary extraction method using Apache Commons Compress
+  * @see extractSteamFromNSIS Primary extraction method using 7-Zip-JBinding-4Android
   */
  suspend fun downloadInstaller(): Result<File> = withContext(Dispatchers.IO) {
   try {
@@ -210,11 +210,11 @@ class SteamInstallerService @Inject constructor(
  /**
   * Extract Steam Client from SteamSetup.exe NSIS installer
   *
-  * Uses Apache Commons Compress to extract Steam.exe and related files directly
+  * Uses 7-Zip-JBinding-4Android to extract Steam.exe and related files directly
   * from the NSIS installer, bypassing the need for Wine execution.
   *
   * This method extracts the Steam client files from SteamSetup.exe using
-  * Apache Commons Compress (Pure Java, ARM64 compatible).
+  * 7-Zip-JBinding-4Android (ARM64 compatible, supports LZMA/BZIP2/ZLIB compression).
   *
   * @param setupExe Downloaded SteamSetup.exe file
   * @param targetDir Target directory (e.g., container/drive_c/Program Files (x86)/Steam)
@@ -230,15 +230,33 @@ class SteamInstallerService @Inject constructor(
 
    targetDir.parentFile?.mkdirs()
 
-   Log.i(TAG, "Extracting Steam Client from NSIS installer using Apache Commons Compress")
+   Log.i(TAG, "Extracting Steam Client from NSIS installer using 7-Zip-JBinding library (ARM64 compatible)")
    Log.i(TAG, "Source: ${setupExe.absolutePath}")
    Log.i(TAG, "Target: ${targetDir.absolutePath}")
 
-   // TODO: Implement Apache Commons Compress NSIS extraction
-   // Note: NSIS extraction currently not implemented - use Wine installer method instead
-   return@withContext Result.failure(
-    Exception("NSIS extraction not yet implemented. Please use Wine installer method.")
-   )
+   // Use 7-Zip-JBinding library for NSIS extraction (supports LZMA, BZIP2, ZLIB/Deflate)
+   val extractor = NsisExtractor(setupExe)
+   val extractResult = extractor.extractSteamFiles(targetDir)
+
+   if (extractResult.isFailure) {
+    return@withContext Result.failure(
+     extractResult.exceptionOrNull() ?: Exception("NSIS extraction failed")
+    )
+   }
+
+   val extractedCount = extractResult.getOrDefault(0)
+   Log.i(TAG, "Extracted $extractedCount files from NSIS installer")
+
+   // Verify steam.exe exists
+   val steamExe = File(targetDir, "steam.exe")
+   if (!steamExe.exists()) {
+    return@withContext Result.failure(
+     Exception("steam.exe not found after extraction (extracted $extractedCount files)")
+    )
+   }
+
+   Log.i(TAG, "NSIS extraction successful: steam.exe found (${steamExe.length()} bytes)")
+   Result.success(Unit)
 
   } catch (e: Exception) {
    Log.e(TAG, "Failed to extract Steam from NSIS installer", e)

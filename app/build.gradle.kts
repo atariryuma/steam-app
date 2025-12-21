@@ -181,8 +181,9 @@ dependencies {
 
     // Compression (Wine/Box64 binaries & NSIS extraction)
     implementation(libs.zstd.jni) // Zstandard with JNI (includes Android ARM64 libs)
-    implementation(libs.commons.compress) // Apache Commons Compress for tar/zip/NSIS extraction
+    implementation(libs.commons.compress) // Apache Commons Compress for tar/zip
     implementation(libs.xz) // XZ-Java for .txz decompression
+    implementation(libs.sevenzipjbinding) // 7-Zip-JBinding-4Android for NSIS extraction (ARM64 compatible)
 
     // File Import
     // TODO: Re-enable when libaums v0.10.0 migration is complete

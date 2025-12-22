@@ -24,14 +24,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /**
- * Disclaimerダイアログ
+ * Disclaimer dialog
  *
- * Steam利用規約違反リスク ついてユーザー Warning
+ * Warning to users about Steam ToS violation risks
  *
  * Best Practice:
- * - 初回launch時 表示（DataStore フラグ管理）
- * - Disagree場合 アプリend
- * - 重要な法的情報 ため、スクロール可能 
+ * - Display on first launch (flag managed via DataStore)
+ * - Close app if user disagrees
+ * - Scrollable for important legal information
  */
 @Composable
 fun DisclaimerDialog(
@@ -40,7 +40,7 @@ fun DisclaimerDialog(
  modifier: Modifier = Modifier
 ) {
  AlertDialog(
-  onDismissRequest = { /* ダイアログ外タップDisabled */ },
+  onDismissRequest = { /* Tap outside dialog disabled */ },
   icon = {
    Icon(
     imageVector = Icons.Default.Warning,
@@ -73,9 +73,9 @@ fun DisclaimerDialog(
     Spacer(modifier = Modifier.height(12.dp))
 
     Text(
-     text = "Steam®、Steamロゴ、Steam Deck™、および関連doマーク 、" +
-       "米国およびそ 他 国 おけるValve Corporation 商標および/また " +
-       "登録商標 す。",
+     text = "Steam®, the Steam logo, Steam Deck™, and related marks are " +
+       "trademarks and/or registered trademarks of Valve Corporation in the " +
+       "United States and other countries.",
      style = MaterialTheme.typography.bodySmall
     )
 

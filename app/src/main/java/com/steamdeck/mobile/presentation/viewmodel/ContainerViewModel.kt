@@ -25,7 +25,7 @@ class ContainerViewModel @Inject constructor(
  val uiState: StateFlow<ContainerUiState> = _uiState.asStateFlow()
 
  /**
-  * Containerlist読み込み
+  * Load container list
   */
  fun loadContainers() {
   viewModelScope.launch {
@@ -37,14 +37,14 @@ class ContainerViewModel @Inject constructor(
     ContainerUiState.Success(result.getOrThrow())
    } else {
     ContainerUiState.Error(
-     result.exceptionOrNull()?.message ?: "Container 読み込み failed"
+     result.exceptionOrNull()?.message ?: "Failed to load containers"
     )
    }
   }
  }
 
  /**
-  * 新しいContainercreate
+  * Create new container
   */
  fun createContainer(name: String) {
   viewModelScope.launch {
@@ -58,14 +58,14 @@ class ContainerViewModel @Inject constructor(
     loadContainers()
    } else {
     _uiState.value = ContainerUiState.Error(
-     result.exceptionOrNull()?.message ?: "Container create failed"
+     result.exceptionOrNull()?.message ?: "Failed to create container"
     )
    }
   }
  }
 
  /**
-  * Containerdelete
+  * Delete container
   */
  fun deleteContainer(containerId: String) {
   viewModelScope.launch {
@@ -76,7 +76,7 @@ class ContainerViewModel @Inject constructor(
     loadContainers()
    } else {
     _uiState.value = ContainerUiState.Error(
-     result.exceptionOrNull()?.message ?: "Container delete failed"
+     result.exceptionOrNull()?.message ?: "Failed to delete container"
     )
    }
   }

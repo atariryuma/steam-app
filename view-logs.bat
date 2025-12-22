@@ -1,16 +1,16 @@
 @echo off
 REM SteamDeck Mobile - Log Viewer
-REM Steam認証のログをリアルタイムで表示します
+REM Displays Steam authentication logs in real-time
 
 echo ========================================
 echo SteamDeck Mobile - Log Viewer
 echo ========================================
 echo.
 
-REM adbのパス
+REM ADB path
 set ADB_PATH=C:\Android\sdk\platform-tools\adb.exe
 
-REM adbが存在するか確認
+REM Check if adb exists
 if not exist "%ADB_PATH%" (
     echo ERROR: adb not found at %ADB_PATH%
     echo Please install Android SDK Platform-Tools
@@ -22,7 +22,7 @@ echo [1/3] Checking connected devices...
 "%ADB_PATH%" devices
 echo.
 
-REM デバイスが接続されているか確認
+REM Check if device is connected
 "%ADB_PATH%" devices | findstr "device$" >nul
 if %errorlevel% neq 0 (
     echo.
@@ -51,5 +51,5 @@ echo Press Ctrl+C to stop
 echo ========================================
 echo.
 
-REM Steam認証関連のログをフィルタして表示
+REM Filter and display Steam authentication logs
 "%ADB_PATH%" logcat | findstr "SteamAuth SteamLogin SteamDeckNavHost"

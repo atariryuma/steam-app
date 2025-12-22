@@ -18,6 +18,8 @@ import com.steamdeck.mobile.domain.usecase.ScanInstalledGamesUseCase
 import com.steamdeck.mobile.domain.usecase.ToggleFavoriteUseCase
 import com.steamdeck.mobile.domain.usecase.TriggerGameDownloadUseCase
 import com.steamdeck.mobile.presentation.util.toUserMessage
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.takeWhile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,8 +69,18 @@ class GameDetailViewModel @Inject constructor(
  private val _isScanning = MutableStateFlow(false)
  val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+ // FIXED: Track process monitoring job to prevent memory leaks
+ private var processMonitoringJob: Job? = null
+
  init {
   checkSteamInstallation()
+ }
+
+ override fun onCleared() {
+  super.onCleared()
+  // Cancel process monitoring when ViewModel is cleared
+  processMonitoringJob?.cancel()
+  AppLogger.d(TAG, "ViewModel cleared, process monitoring cancelled")
  }
 
  /**
@@ -90,15 +102,25 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * Launch game
+  * Launch game (FIXED: Flow-based monitoring prevents memory leaks)
   */
  fun launchGame(gameId: Long) {
   viewModelScope.launch {
    _launchState.value = LaunchState.Launching
    when (val result = launchGameUseCase(gameId)) {
     is DataResult.Success -> {
-     _launchState.value = LaunchState.Running(result.data)
-     AppLogger.i(TAG, "Game launched: PID ${result.data}")
+     val launchInfo = result.data
+     _launchState.value = LaunchState.Running(launchInfo.processId)
+     AppLogger.i(TAG, "Game launched: PID ${launchInfo.processId}")
+
+     // FIXED: Start monitoring in viewModelScope (auto-cancelled on ViewModel clear)
+     processMonitoringJob?.cancel() // Cancel previous monitoring if exists
+     processMonitoringJob = viewModelScope.launch {
+      launchInfo.monitoringFlow.collect {
+       // Flow handles all play time tracking internally
+       // Just collect to keep it active
+      }
+     }
     }
     is DataResult.Error -> {
      val errorMessage = result.error.toUserMessage(context)
@@ -424,15 +446,25 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * Observe installation progress in real-time
+  * Observe installation progress in real-time (FIXED: Auto-stops on completion)
   *
   * NEW 2025: Monitors game installation status via Flow
   * Updates UI with download/install progress
+  * FIXED: takeWhile stops Flow when installation completes
   */
  private fun observeInstallationProgress(gameId: Long) {
   viewModelScope.launch {
    try {
-    gameRepository.observeGame(gameId).collect { game ->
+    gameRepository.observeGame(gameId)
+     .takeWhile { game ->
+      // CRITICAL FIX: Stop observing when installation is complete
+      // Prevents battery drain from unnecessary database polling
+      game?.installationStatus !in listOf(
+       InstallationStatus.INSTALLED,
+       InstallationStatus.VALIDATION_FAILED
+      )
+     }
+     .collect { game ->
      if (game == null) {
       AppLogger.w(TAG, "Game not found during progress monitoring")
       return@collect

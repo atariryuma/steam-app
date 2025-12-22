@@ -6,71 +6,71 @@ import com.steamdeck.mobile.domain.model.InstallationStatus
 import kotlinx.coroutines.flow.Flow
 
 /**
- * gameinformationmanagementリポジトリ interface
+ * Game information management repository interface
  */
 interface GameRepository {
  /**
-  * all gameretrieve
+  * Retrieve all games
   */
  fun getAllGames(): Flow<List<Game>>
 
  /**
-  * favoritegameretrieve
+  * Retrieve favorite games
   */
  fun getFavoriteGames(): Flow<List<Game>>
 
  /**
-  * gameID gameretrieve
+  * Retrieve game by ID
   */
  suspend fun getGameById(gameId: Long): Game?
 
  /**
-  * Steam App ID gameretrieve
+  * Retrieve game by Steam App ID
   */
  suspend fun getGameBySteamAppId(steamAppId: Long): Game?
 
  /**
-  * game名 検索
+  * Search games by name
   */
  fun searchGames(query: String): Flow<List<Game>>
 
  /**
-  * ソース別 gameretrieve
+  * Retrieve games by source
   */
  fun getGamesBySource(source: GameSource): Flow<List<Game>>
 
  /**
-  * gameadd
+  * Add game
   */
  suspend fun insertGame(game: Game): Long
 
  /**
-  * 複数 gameadd
+  * Add multiple games
   */
  suspend fun insertGames(games: List<Game>)
 
  /**
-  * gameupdate
+  * Update game
   */
  suspend fun updateGame(game: Game)
 
  /**
-  * gamedelete
+  * Delete game
   */
  suspend fun deleteGame(game: Game)
 
  /**
-  * play timeupdate
+  * Update play time
   */
  suspend fun updatePlayTime(gameId: Long, additionalMinutes: Long, timestamp: Long)
 
  /**
-  * favoritestate切り替え
+  * Toggle favorite status
   */
  suspend fun updateFavoriteStatus(gameId: Long, isFavorite: Boolean)
 
  /**
-  * all gamedelete
+  * Delete all games
   */
  suspend fun deleteAllGames()
 

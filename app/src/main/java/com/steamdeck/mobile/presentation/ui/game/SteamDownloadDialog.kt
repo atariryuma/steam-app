@@ -14,12 +14,12 @@ import com.steamdeck.mobile.R
 import com.steamdeck.mobile.domain.model.Game
 
 /**
- * Steamgamedownloadconfirmダイアログ
+ * Steam game download confirmation dialog
  *
- * Phase 5B実装版:
- * - Steam CDNdirectlydownload対応
- * - 代替手段 してファイルImport誘導
- * - download進捗表示to ナビゲーション
+ * Phase 5B implementation:
+ * - Steam CDN direct download support
+ * - Guide to file import as alternative
+ * - Navigate to download progress display
  */
 @Composable
 fun SteamDownloadDialog(
@@ -41,7 +41,7 @@ fun SteamDownloadDialog(
    },
    title = {
     Text(
-     text = "Steamgame download",
+     text = "Steam game download",
      style = MaterialTheme.typography.titleLarge
     )
    },
@@ -66,18 +66,18 @@ fun SteamDownloadDialog(
        verticalArrangement = Arrangement.spacedBy(8.dp)
       ) {
        Text(
-        text = "Steam CDN from directlydownload",
+        text = "Download directly from Steam CDN",
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onPrimaryContainer
        )
        Text(
-        text = "実験的機能: Steam CDN from gameファイルdownloadします。",
+        text = "Experimental feature: Download game files from Steam CDN.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onPrimaryContainer
        )
        Text(
-        text = "⚠️ 大容量 download なる場合 あります。Wi-Fi環境推奨します。",
+        text = "⚠️ Large downloads may occur. Wi-Fi connection recommended.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.error
        )
@@ -87,7 +87,7 @@ fun SteamDownloadDialog(
      HorizontalDivider()
 
      Text(
-      text = "また 代替方法:",
+      text = "Alternative method:",
       style = MaterialTheme.typography.bodyMedium,
       fontWeight = FontWeight.Bold
      )
@@ -96,7 +96,7 @@ fun SteamDownloadDialog(
       verticalArrangement = Arrangement.spacedBy(4.dp)
      ) {
       Text(
-       text = "• PC Steam from download → ファイル転送",
+       text = "• Download from PC Steam → Transfer files",
        style = MaterialTheme.typography.bodySmall,
        color = MaterialTheme.colorScheme.onSurfaceVariant
       )
@@ -112,13 +112,13 @@ fun SteamDownloadDialog(
     ) {
      Icon(Icons.Default.CloudDownload, contentDescription = null)
      Spacer(modifier = Modifier.width(8.dp))
-     Text("downloadstart")
+     Text("Start download")
     }
    },
    dismissButton = {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
      TextButton(onClick = onNavigateToImport) {
-      Text("ファイルImport")
+      Text("Import file")
      }
      TextButton(onClick = onDismiss) {
       Text("Cancel")

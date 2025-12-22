@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 REM SteamDeck Mobile - Environment Check Script
-REM Android開発に必要な環境が整っているかチェックします
+REM Checks if the required environment for Android development is set up
 
 echo ========================================
 echo SteamDeck Mobile - Environment Check
@@ -10,7 +10,7 @@ echo.
 
 set ERRORS=0
 
-REM Java チェック
+REM Java check
 echo [1/5] Checking Java...
 where java >nul 2>&1
 if %errorlevel% neq 0 (
@@ -22,13 +22,13 @@ if %errorlevel% neq 0 (
     echo [OK] Java found:
     java -version 2>&1 | findstr "version"
 
-    REM Java バージョンチェック
+    REM Java version check
     for /f "tokens=3" %%v in ('java -version 2^>^&1 ^| findstr "version"') do (
         set JAVA_VERSION=%%v
         set JAVA_VERSION=!JAVA_VERSION:"=!
         echo     Version: !JAVA_VERSION!
 
-        REM バージョンが17かチェック (簡易版)
+        REM Check if version is 17 (simplified)
         echo !JAVA_VERSION! | findstr /C:"17." >nul
         if !errorlevel! neq 0 (
             echo [!] WARNING: JDK 17 is required for this project
@@ -38,7 +38,7 @@ if %errorlevel% neq 0 (
 )
 echo.
 
-REM JAVA_HOME チェック
+REM JAVA_HOME check
 echo [2/5] Checking JAVA_HOME...
 if not defined JAVA_HOME (
     echo [!] JAVA_HOME is NOT SET
@@ -54,7 +54,7 @@ if not defined JAVA_HOME (
 )
 echo.
 
-REM Android SDK チェック
+REM Android SDK check
 echo [3/5] Checking Android SDK...
 if not defined ANDROID_HOME (
     if not defined ANDROID_SDK_ROOT (
@@ -78,7 +78,7 @@ if defined ANDROID_HOME (
 )
 echo.
 
-REM ADB チェック
+REM ADB check
 echo [4/5] Checking ADB (Android Debug Bridge)...
 where adb >nul 2>&1
 if %errorlevel% neq 0 (
@@ -91,7 +91,7 @@ if %errorlevel% neq 0 (
 )
 echo.
 
-REM Gradle チェック
+REM Gradle check
 echo [5/5] Checking Gradle Wrapper...
 if exist "gradlew.bat" (
     echo [OK] Gradle wrapper found
@@ -103,7 +103,7 @@ if exist "gradlew.bat" (
 )
 echo.
 
-REM 結果サマリー
+REM Summary
 echo ========================================
 echo Environment Check Complete
 echo ========================================

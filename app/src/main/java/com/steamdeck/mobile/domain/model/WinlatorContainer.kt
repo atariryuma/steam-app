@@ -21,7 +21,7 @@ data class WinlatorContainer(
  val createdTimestamp: Long = System.currentTimeMillis()
 ) {
  /**
-  * environmentvariableJSON文字列 conversion
+  * Convert environment variables to JSON string
   */
  fun environmentVarsToJson(): String {
   if (environmentVars.isEmpty()) return "{}"
@@ -34,7 +34,7 @@ data class WinlatorContainer(
 
  companion object {
   /**
-   * JSON文字列fromenvironmentvariableMapgenerate
+   * Generate environment variable Map from JSON string
    */
   fun parseEnvironmentVars(json: String): Map<String, String> {
    if (json.isBlank() || json == "{}") return emptyMap()
@@ -57,7 +57,7 @@ data class WinlatorContainer(
   }
 
   /**
-   * defaultcontainergenerate
+   * Generate default container
    */
   fun createDefault(name: String = "Default Container"): WinlatorContainer {
    return WinlatorContainer(
@@ -73,25 +73,25 @@ data class WinlatorContainer(
 }
 
 /**
- * Box64performanceプリセット
+ * Box64 performance preset
  */
 enum class Box64Preset {
- /** performance重視 */
+ /** Performance-focused */
  PERFORMANCE,
 
- /** 安定性重視（Unity Engineetc 推奨） */
+ /** Stability-focused (recommended for Unity Engine, etc.) */
  STABILITY,
 
- /** customconfiguration */
+ /** Custom configuration */
  CUSTOM;
 
  /**
-  * プリセット 説明文
+  * Preset description
   */
  val description: String
   get() = when (this) {
-   PERFORMANCE -> "performance優先（ほ んど game 推奨）"
-   STABILITY -> "安定性優先（Unity Enginegameetc 推奨）"
-   CUSTOM -> "customconfiguration"
+   PERFORMANCE -> "Performance priority (recommended for most games)"
+   STABILITY -> "Stability priority (recommended for Unity Engine games, etc.)"
+   CUSTOM -> "Custom configuration"
   }
 }

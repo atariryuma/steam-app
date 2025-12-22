@@ -1,489 +1,489 @@
-# SteamDeck Mobile ユーザーマニュアル
+# SteamDeck Mobile User Manual
 
-**Version**: 0.9.0 (MVP版)
-**最終更新**: 2025-01-16
+**Version**: 0.9.0 (MVP)
+**Last Updated**: 2025-01-16
 
 ---
 
-## 📱 はじめに
+## 📱 Introduction
 
-**SteamDeck Mobile**は、AndroidデバイスでWindowsゲームを実行するためのアプリです。
-Winlator（Wine + Box64）を内蔵しており、Steam以外のゲームも実行できます。
+**SteamDeck Mobile** is an app for running Windows games on Android devices.
+It includes Winlator (Wine + Box64) and can run non-Steam games as well.
 
-### ⚠️ 重要：このアプリは開発中です
+### ⚠️ Important: This App is Under Development
 
-- 現在は**MVP（最小限の動作版）**です
-- すべての機能が完全に動作するわけではありません
-- バグや不具合が発生する可能性があります
+- Currently an **MVP (Minimum Viable Product)**
+- Not all features are fully functional
+- Bugs and issues may occur
 
-### 🎯 できること・できないこと
+### 🎯 What You Can and Cannot Do
 
-| できること ✅ | できないこと ❌ |
+| Can Do ✅ | Cannot Do ❌ |
 |------------|---------------|
-| ローカルのWindowsゲーム（.exe）を実行 | Steam公式クライアントとしての認証 |
-| ゲームライブラリを管理・整理 | Steamストアからの直接ダウンロード |
-| Bluetoothコントローラーでプレイ | オンラインマルチプレイ（一部可能） |
-| USB/ネットワーク経由でゲームファイルをコピー | 最新AAAゲームの快適な動作 |
-| ゲーム起動設定のカスタマイズ | DRMで保護されたゲームの実行 |
+| Run local Windows games (.exe) | Authenticate as official Steam client |
+| Manage and organize game library | Direct downloads from Steam store |
+| Play with Bluetooth controllers | Online multiplayer (some possible) |
+| Copy game files via USB/network | Smooth performance with latest AAA games |
+| Customize game launch settings | Run DRM-protected games |
 
 ---
 
-## 📋 必要なもの
+## 📋 Requirements
 
-### 1. Android端末の要件
+### 1. Android Device Requirements
 
-| 項目 | 最低条件 | 推奨条件 |
-|------|---------|---------|
-| **Android OS** | 8.0 (API 26) | 11.0以上 |
-| **CPU** | ARM64-v8a対応 | Snapdragon 8 Gen 1以上 |
-| **RAM** | 4GB以上 | 8GB以上 |
-| **ストレージ** | 3GB以上の空き容量 | 10GB以上 |
-| **画面解像度** | 1280x720 (HD) | 1920x1080 (FHL) |
+| Item | Minimum | Recommended |
+|------|---------|-------------|
+| **Android OS** | 8.0 (API 26) | 11.0 or higher |
+| **CPU** | ARM64-v8a compatible | Snapdragon 8 Gen 1 or higher |
+| **RAM** | 4GB or more | 8GB or more |
+| **Storage** | 3GB free space | 10GB or more |
+| **Screen Resolution** | 1280x720 (HD) | 1920x1080 (FHD) |
 
-### 2. 対応デバイスの例
+### 2. Compatible Devices
 
-**動作確認済み（推奨）**:
+**Verified (Recommended)**:
 - Xiaomi Pad 6 Pro (Snapdragon 8+ Gen 1)
 - Samsung Galaxy Tab S8/S9
 - OnePlus Pad
 - Lenovo Legion Y700
 
-**動作する可能性がある**:
-- Snapdragon 845以上のスマートフォン/タブレット
-- MediaTek Dimensity 9000以上
+**May Work**:
+- Smartphones/tablets with Snapdragon 845 or higher
+- MediaTek Dimensity 9000 or higher
 
-**動作しない**:
-- Intel/AMD x86端末
-- 32bit ARM端末（ARMv7）
-- Androidエミュレーター（BlueStacksなど）
+**Will Not Work**:
+- Intel/AMD x86 devices
+- 32-bit ARM devices (ARMv7)
+- Android emulators (BlueStacks, etc.)
 
-### 3. あると便利なもの
+### 3. Optional Accessories
 
-- **Bluetoothゲームコントローラー**（Xbox/PlayStation/8BitDoなど）
-- **USBメモリ/外付けストレージ**（ゲームファイル転送用）
-- **Wi-Fi環境**（ファイル転送、Steam連携用）
-
----
-
-## 🚀 インストール方法
-
-### 方法1: APKファイルからインストール（推奨）
-
-1. **APKファイルをダウンロード**
-   - [Releases](https://github.com/atariryuma/steam-app/releases)ページから最新版をダウンロード
-   - `app-release.apk` または `app-debug.apk` を選択
-
-2. **提供元不明のアプリを許可**
-   - 設定 → セキュリティ → 提供元不明のアプリ
-   - ファイルマネージャーアプリに許可を与える
-
-3. **APKをタップしてインストール**
-   - ダウンロードしたAPKファイルをタップ
-   - 「インストール」をタップ
-
-### 方法2: Android Studioでビルド（開発者向け）
-
-詳しくは[SETUP.md](SETUP.md)または[README.md](README.md)を参照してください。
+- **Bluetooth game controller** (Xbox/PlayStation/8BitDo, etc.)
+- **USB storage/external drive** (for transferring game files)
+- **Wi-Fi environment** (for file transfer, Steam integration)
 
 ---
 
-## 📖 基本的な使い方
+## 🚀 Installation
 
-### 初回起動
+### Method 1: Install from APK File (Recommended)
 
-1. **アプリを起動**
-   - ホーム画面のアイコンをタップ
+1. **Download APK file**
+   - Download latest version from [Releases](https://github.com/atariryuma/steam-app/releases)
+   - Select `app-release.apk` or `app-debug.apk`
 
-2. **初期化を待つ**（初回のみ、1-3分程度）
-   - Winlator環境のセットアップが自動的に行われます
-   - 画面に「初期化中...」と表示されます
-   - **この間は画面を閉じないでください**
+2. **Allow installation from unknown sources**
+   - Settings → Security → Unknown sources
+   - Grant permission to file manager app
 
-3. **ゲームライブラリ画面が表示される**
-   - 初回は空のライブラリが表示されます
+3. **Tap APK to install**
+   - Tap downloaded APK file
+   - Tap "Install"
 
-### ゲームの追加方法
+### Method 2: Build with Android Studio (For Developers)
 
-#### 方法A: ローカルファイルから手動追加
-
-1. **ホーム画面で「+」ボタンをタップ**
-
-2. **ゲーム情報を入力**
-   - **ゲーム名**: 任意の名前（例: "Stardew Valley"）
-   - **実行ファイル**: 「選択」ボタンをタップして.exeファイルを選択
-   - **インストールフォルダ**: ゲームのフォルダを選択（任意）
-
-3. **「追加」をタップ**
-
-4. **ライブラリに表示される**
-
-#### 方法B: USB/外付けストレージからコピー
-
-1. **USBメモリを接続**
-   - OTG対応のUSBケーブルを使用
-
-2. **ファイルマネージャーで.exeファイルを探す**
-   - おすすめ: Solid Explorer、FX File Explorer
-
-3. **ゲームフォルダを端末にコピー**
-   - コピー先: `/sdcard/Games/` など
-
-4. **上記「方法A」でゲームを追加**
-
-#### 方法C: Steam連携（実験的機能）
-
-⚠️ **注意**: Steam連携は現在開発中です。以下の制限があります：
-- Steamライブラリの**表示のみ**可能
-- ゲームの**ダウンロードは未実装**
-- Steam認証は使用しません（公開APIのみ）
-
-**使い方**:
-1. ホーム画面右上の「⚙️」→「設定」をタップ
-2. 「Steam連携」セクションで「Steam ID」を入力
-   - 例: `76561198012345678`（17桁の数字）
-   - 確認方法: [steamid.io](https://steamid.io/)で検索
-3. 「同期」をタップ
-4. ライブラリに所持ゲームが**表示のみ**される
+See [SETUP.md](SETUP.md) or [README.md](README.md) for details.
 
 ---
 
-## 🎮 ゲームをプレイする
+## 📖 Basic Usage
 
-### 基本的な起動手順
+### First Launch
 
-1. **ライブラリからゲームをタップ**
+1. **Launch the app**
+   - Tap the icon on your home screen
 
-2. **詳細画面で「▶ プレイ」をタップ**
+2. **Wait for initialization** (first time only, 1-3 minutes)
+   - Winlator environment setup runs automatically
+   - Screen displays "Initializing..."
+   - **Do not close the screen during this process**
 
-3. **初回起動時の注意**
-   - Wineコンテナの作成に30秒〜1分かかります
-   - 画面に何も表示されない場合があります（正常です）
+3. **Game library screen appears**
+   - Empty library shown on first launch
 
-4. **ゲームが起動します**
+### Adding Games
 
-### コントローラーの使い方
+#### Method A: Manual Add from Local Files
 
-#### 接続方法
+1. **Tap "+" button on home screen**
 
-1. **Bluetoothコントローラーをペアリング**
-   - Android設定 → Bluetooth → デバイスを検索
-   - コントローラーのペアリングモードを有効化
+2. **Enter game information**
+   - **Game Name**: Any name (e.g., "Stardew Valley")
+   - **Executable**: Tap "Select" button to choose .exe file
+   - **Install Folder**: Select game folder (optional)
 
-2. **接続を確認**
-   - アプリ内で自動検出されます
-   - 設定 → コントローラー設定で確認可能
+3. **Tap "Add"**
 
-#### 対応コントローラー
+4. **Game appears in library**
 
-| メーカー | 自動検出 | 動作確認 |
+#### Method B: Copy from USB/External Storage
+
+1. **Connect USB storage**
+   - Use OTG-compatible USB cable
+
+2. **Find .exe file with file manager**
+   - Recommended: Solid Explorer, FX File Explorer
+
+3. **Copy game folder to device**
+   - Destination: `/sdcard/Games/` etc.
+
+4. **Add game using Method A above**
+
+#### Method C: Steam Integration (Experimental Feature)
+
+⚠️ **Note**: Steam integration is currently under development with the following limitations:
+- **View only** of Steam library
+- **Game downloads not implemented**
+- Does not use Steam authentication (public API only)
+
+**How to use**:
+1. Tap "⚙️" → "Settings" in upper right of home screen
+2. Enter "Steam ID" in "Steam Integration" section
+   - Example: `76561198012345678` (17-digit number)
+   - How to find: Search on [steamid.io](https://steamid.io/)
+3. Tap "Sync"
+4. Owned games are **displayed only** in library
+
+---
+
+## 🎮 Playing Games
+
+### Basic Launch Procedure
+
+1. **Tap game from library**
+
+2. **Tap "▶ Play" on detail screen**
+
+3. **First launch notes**
+   - Wine container creation takes 30 seconds to 1 minute
+   - Screen may show nothing (this is normal)
+
+4. **Game launches**
+
+### Using Controllers
+
+#### Connecting
+
+1. **Pair Bluetooth controller**
+   - Android Settings → Bluetooth → Search for devices
+   - Enable pairing mode on controller
+
+2. **Verify connection**
+   - Auto-detected in app
+   - Can verify in Settings → Controller Settings
+
+#### Supported Controllers
+
+| Brand | Auto-detect | Verified |
 |---------|----------|---------|
 | Xbox (One/Series) | ✅ | ✅ |
 | PlayStation (DualShock 4/5) | ✅ | ✅ |
-| Nintendo Switch Pro | ✅ | ⚠️ 要設定 |
+| Nintendo Switch Pro | ✅ | ⚠️ Needs setup |
 | 8BitDo | ✅ | ✅ |
 | Gamesir | ⚠️ | ⚠️ |
 
-#### ボタンマッピング設定
+#### Button Mapping
 
-1. **設定 → コントローラー設定**
+1. **Settings → Controller Settings**
 
-2. **「ボタンマッピング」をタップ**
+2. **Tap "Button Mapping"**
 
-3. **ボタンを押して設定**
-   - 画面の指示に従ってボタンを押す
-   - スティック/十字キーも設定可能
+3. **Press buttons to configure**
+   - Follow on-screen instructions
+   - Can also configure sticks/D-pad
 
-4. **「保存」をタップ**
+4. **Tap "Save"**
 
-### トラブルシューティング
+### Troubleshooting
 
-#### ゲームが起動しない
+#### Game Won't Launch
 
-**原因と対処法**:
+**Causes and Solutions**:
 
-1. **「実行ファイルが見つかりません」と表示される**
-   - .exeファイルのパスが正しいか確認
-   - ファイルが削除されていないか確認
+1. **"Executable not found" error**
+   - Verify .exe file path is correct
+   - Check file hasn't been deleted
 
-2. **画面が真っ黒のまま何も表示されない**
-   - 10-30秒待つ（Wineの初期化中）
-   - それでも起動しない場合:
-     - アプリを完全終了して再起動
-     - 設定 → Wine設定 → コンテナを再作成
+2. **Black screen with nothing displayed**
+   - Wait 10-30 seconds (Wine initializing)
+   - If still won't launch:
+     - Force close app and restart
+     - Settings → Wine Settings → Recreate container
 
-3. **「Winlatorの初期化に失敗しました」と表示される**
-   - ストレージ容量を確認（最低2GB必要）
-   - アプリを再インストール
-   - アプリのデータを削除: 設定 → アプリ → SteamDeck Mobile → データを削除
+3. **"Failed to initialize Winlator" error**
+   - Check storage space (minimum 2GB required)
+   - Reinstall app
+   - Clear app data: Settings → Apps → SteamDeck Mobile → Clear data
 
-4. **ゲームは起動するが操作できない**
-   - コントローラーが正しく接続されているか確認
-   - タッチ操作でメニューを開けるか試す
-   - 一部のゲームはマウス/キーボードのみ対応の場合があります
+4. **Game launches but no controls work**
+   - Verify controller is connected properly
+   - Try opening menu with touch controls
+   - Some games only support mouse/keyboard
 
-#### 動作が重い・カクつく
+#### Slow Performance/Stuttering
 
-**対処法**:
+**Solutions**:
 
-1. **グラフィック設定を下げる**
-   - ゲーム内設定で解像度を下げる
-   - アンチエイリアス、影品質を下げる
+1. **Lower graphics settings**
+   - Reduce resolution in game settings
+   - Lower anti-aliasing, shadow quality
 
-2. **Wine設定を変更**（上級者向け）
-   - 詳細画面 → コンテナ設定
-   - Box64 Presetを「互換性優先」に変更
-   - Wine Versionを変更（9.0 → 8.0など）
+2. **Change Wine settings** (Advanced users)
+   - Detail screen → Container settings
+   - Change Box64 Preset to "Compatibility Priority"
+   - Change Wine Version (9.0 → 8.0, etc.)
 
-3. **バックグラウンドアプリを終了**
-   - Androidの最近使ったアプリから他のアプリを終了
+3. **Close background apps**
+   - Close other apps from Android's recent apps
 
-#### コントローラーが認識されない
+#### Controller Not Recognized
 
-**対処法**:
+**Solutions**:
 
-1. **Android設定で確認**
-   - 設定 → Bluetooth → デバイスが「接続済み」か確認
+1. **Check in Android settings**
+   - Settings → Bluetooth → Verify device is "Connected"
 
-2. **再ペアリング**
-   - Bluetoothでデバイスを削除
-   - もう一度ペアリングする
+2. **Re-pair**
+   - Delete device from Bluetooth
+   - Pair again
 
-3. **アプリを再起動**
-   - アプリを完全終了して起動しなおす
+3. **Restart app**
+   - Force close and relaunch app
 
-4. **コントローラーのファームウェアを更新**
-   - メーカー公式アプリでアップデート
+4. **Update controller firmware**
+   - Update via manufacturer's official app
 
 ---
 
-## ⚙️ 設定ガイド
+## ⚙️ Settings Guide
 
-### 基本設定
+### Basic Settings
 
-#### Steam連携
+#### Steam Integration
 
-- **Steam IDの取得方法**:
-  1. [steamid.io](https://steamid.io/)にアクセス
-  2. 自分のSteamプロフィールURLを入力
-  3. 「steamID64 (Dec)」の17桁の数字をコピー
+- **How to get Steam ID**:
+  1. Visit [steamid.io](https://steamid.io/)
+  2. Enter your Steam profile URL
+  3. Copy the 17-digit "steamID64 (Dec)" number
 
-- **注意事項**:
-  - プロフィールが公開設定になっている必要があります
-  - プライベート設定の場合、同期できません
+- **Notes**:
+  - Profile must be set to public
+  - Cannot sync if set to private
 
-#### ストレージ設定
+#### Storage Settings
 
-- **ゲームインストール先**: デフォルトは `/sdcard/SteamDeckMobile/games/`
-- **変更方法**: 設定 → ストレージ → インストール先を変更
+- **Game install location**: Default is `/sdcard/SteamDeckMobile/games/`
+- **How to change**: Settings → Storage → Change install location
 
-### 詳細設定（上級者向け）
+### Advanced Settings (For Advanced Users)
 
-#### Wine設定
+#### Wine Settings
 
-- **Wineバージョン**: 9.0（デフォルト）
-  - 互換性問題がある場合は8.0などに変更可能
+- **Wine Version**: 9.0 (default)
+  - Can change to 8.0 etc. if compatibility issues
 
 - **Box64 Preset**:
-  - **高速**: 最新ゲーム、高性能端末向け
-  - **バランス**: ほとんどのゲームに推奨（デフォルト）
-  - **互換性優先**: 古いゲーム、動作が不安定な場合
+  - **Fast**: For latest games, high-performance devices
+  - **Balanced**: Recommended for most games (default)
+  - **Compatibility Priority**: For old games, unstable operation
 
-#### ゲームごとの設定
+#### Per-Game Settings
 
-1. **ライブラリでゲームをタップ**
-2. **「詳細」タブをタップ**
-3. **「コンテナ設定」を変更**
-   - Wineバージョン
+1. **Tap game in library**
+2. **Tap "Details" tab**
+3. **Change "Container Settings"**
+   - Wine version
    - Box64 Preset
-   - カスタム引数（-dx11、-openglなど）
+   - Custom arguments (-dx11, -opengl, etc.)
 
 ---
 
-## 🎯 よくある質問（FAQ）
+## 🎯 FAQ
 
-### Q1: どんなゲームが動きますか？
+### Q1: What games will run?
 
-**A**: 以下のゲームが比較的動作しやすいです：
+**A**: The following games are relatively likely to work:
 
-**動作する可能性が高い**:
-- 2D/軽量インディーズゲーム（Terraria、Stardew Valleyなど）
-- 古い3Dゲーム（Half-Life 2、Portal、Fallout 3など）
-- DirectX 9/10世代のゲーム
+**Likely to Work**:
+- 2D/lightweight indie games (Terraria, Stardew Valley, etc.)
+- Older 3D games (Half-Life 2, Portal, Fallout 3, etc.)
+- DirectX 9/10 generation games
 
-**動作が難しい**:
-- 最新AAAタイトル（Cyberpunk 2077、Elden Ringなど）
-- DRMで保護されたゲーム（Denuvo、EACなど）
-- DirectX 12専用ゲーム
+**Difficult to Run**:
+- Latest AAA titles (Cyberpunk 2077, Elden Ring, etc.)
+- DRM-protected games (Denuvo, EAC, etc.)
+- DirectX 12-only games
 
-### Q2: Steamのゲームはダウンロードできますか？
+### Q2: Can I download Steam games?
 
-**A**: **現在は未対応です**。以下のいずれかの方法でゲームファイルを用意してください：
-- PCでSteamからダウンロード → USB/ネットワーク経由で転送
-- DRM-free版を購入（GOG.comなど）
+**A**: **Not currently supported**. Obtain game files using one of these methods:
+- Download from Steam on PC → Transfer via USB/network
+- Purchase DRM-free version (GOG.com, etc.)
 
-### Q3: オンラインマルチプレイはできますか？
+### Q3: Does online multiplayer work?
 
-**A**: **ゲームによります**：
-- ✅ **Direct IP接続**: 可能（Minecraftなど）
-- ✅ **P2P接続**: 一部可能
-- ❌ **Steam公式サーバー**: 不可（Steam認証が必要なため）
-- ❌ **アンチチート搭載ゲーム**: 不可（EAC、BattlEyeなど）
+**A**: **Depends on the game**:
+- ✅ **Direct IP connection**: Possible (Minecraft, etc.)
+- ✅ **P2P connection**: Partially possible
+- ❌ **Official Steam servers**: Not possible (requires Steam authentication)
+- ❌ **Anti-cheat games**: Not possible (EAC, BattlEye, etc.)
 
-### Q4: MODは使えますか？
+### Q4: Can I use mods?
 
-**A**: **はい、使えます**：
-- MODファイルをゲームフォルダにコピー
-- MODローダー（Nexus Mod Manager、Valheimなど）も動作する可能性あり
-- 一部のMODは動作しない場合があります
+**A**: **Yes, you can**:
+- Copy mod files to game folder
+- Mod loaders (Nexus Mod Manager, Valhalla, etc.) may also work
+- Some mods may not function
 
-### Q5: セーブデータはどこに保存されますか？
+### Q5: Where are save files stored?
 
-**A**: Wineコンテナ内に保存されます：
-- パス: `/sdcard/Android/data/com.steamdeck.mobile/files/winlator/`
-- アプリをアンインストールすると**削除されます**
-- バックアップを推奨します
+**A**: Saved inside Wine container:
+- Path: `/sdcard/Android/data/com.steamdeck.mobile/files/winlator/`
+- **Deleted when app is uninstalled**
+- Backups recommended
 
-### Q6: 無料ですか？
+### Q6: Is it free?
 
-**A**: **はい、完全無料です**：
-- オープンソース（MITライセンス）
-- 広告なし
-- 課金要素なし
+**A**: **Yes, completely free**:
+- Open source (MIT License)
+- No ads
+- No in-app purchases
 
-### Q7: 違法ではないですか？
+### Q7: Is it illegal?
 
-**A**: **適切に使用すれば合法です**：
-- ✅ 正規購入したゲームを実行: **合法**
-- ✅ DRM-freeゲームを実行: **合法**
-- ❌ 海賊版ゲームを実行: **違法**
+**A**: **Legal when used appropriately**:
+- ✅ Running legally purchased games: **Legal**
+- ✅ Running DRM-free games: **Legal**
+- ❌ Running pirated games: **Illegal**
 
-**重要**: このアプリは合法的なゲーム実行ツールです。違法コピーの使用を推奨・支援するものではありません。
+**Important**: This app is a legal game execution tool. It does not recommend or support using illegal copies.
 
-### Q8: バッテリーの減りが早いです
+### Q8: Battery drains quickly
 
-**A**: 正常な動作です：
-- Windowsゲームのエミュレーションは高負荷
-- 対処法:
-  - 充電しながらプレイ
-  - グラフィック設定を下げる
-  - 画面輝度を下げる
+**A**: This is normal operation:
+- Windows game emulation is high load
+- Solutions:
+  - Play while charging
+  - Lower graphics settings
+  - Reduce screen brightness
 
-### Q9: 発熱が気になります
+### Q9: Device gets hot
 
-**A**: ゲーム実行中の発熱は避けられません：
-- 対処法:
-  - 冷却ファン付きケースを使用
-  - プレイ時間を区切る（30分ごとに休憩）
-  - 端末を冷ます
-
----
-
-## 🐛 バグ報告・機能要望
-
-### バグを見つけた場合
-
-1. **GitHub Issuesで報告**
-   - [Issues](https://github.com/atariryuma/steam-app/issues)ページ
-   - 「New Issue」→「Bug Report」を選択
-
-2. **報告内容**:
-   - 端末名・Android版
-   - 再現手順
-   - エラーメッセージ（あれば）
-   - スクリーンショット
-
-### 新機能を提案したい場合
-
-1. **GitHub Issuesで提案**
-   - 「New Issue」→「Feature Request」を選択
-
-2. **提案内容**:
-   - 欲しい機能の説明
-   - 使用シーン
-   - 類似アプリでの実装例（あれば）
+**A**: Heat during game execution is unavoidable:
+- Solutions:
+  - Use cooling fan case
+  - Take breaks (every 30 minutes)
+  - Let device cool down
 
 ---
 
-## 📚 参考資料・関連リンク
+## 🐛 Bug Reports & Feature Requests
 
-### 公式リソース
+### If You Find a Bug
 
-- [GitHub リポジトリ](https://github.com/atariryuma/steam-app)
-- [開発者向けドキュメント](README.md)
-- [セットアップガイド](SETUP.md)
+1. **Report on GitHub Issues**
+   - [Issues](https://github.com/atariryuma/steam-app/issues) page
+   - Select "New Issue" → "Bug Report"
 
-### 外部リソース
+2. **Report contents**:
+   - Device name & Android version
+   - Steps to reproduce
+   - Error message (if any)
+   - Screenshots
 
-- [Winlator プロジェクト](https://github.com/brunodev85/winlator) - エミュレーションエンジン
-- [WineHQ](https://www.winehq.org/) - Wine公式サイト
-- [ProtonDB](https://www.protondb.com/) - ゲーム互換性情報
+### To Suggest New Features
 
-### コミュニティ
+1. **Suggest on GitHub Issues**
+   - Select "New Issue" → "Feature Request"
 
-現在公式コミュニティはありませんが、GitHub Discussionsで情報交換が可能です。
+2. **Suggestion contents**:
+   - Description of desired feature
+   - Use case
+   - Implementation examples in similar apps (if any)
 
 ---
 
-## 📝 更新履歴
+## 📚 References & Related Links
+
+### Official Resources
+
+- [GitHub Repository](https://github.com/atariryuma/steam-app)
+- [Developer Documentation](README.md)
+- [Setup Guide](SETUP.md)
+
+### External Resources
+
+- [Winlator Project](https://github.com/brunodev85/winlator) - Emulation engine
+- [WineHQ](https://www.winehq.org/) - Wine official site
+- [ProtonDB](https://www.protondb.com/) - Game compatibility information
+
+### Community
+
+No official community currently, but discussions possible on GitHub Discussions.
+
+---
+
+## 📝 Update History
 
 ### Version 0.9.0 (2025-01-16)
-- ✅ Phase 5完了: コントローラーサポート実装
-- ✅ Xbox/PlayStation/Switch Pro自動検出
-- ✅ ボタンマッピング機能
-- ✅ デッドゾーン調整
+- ✅ Phase 5 complete: Controller support implemented
+- ✅ Xbox/PlayStation/Switch Pro auto-detection
+- ✅ Button mapping functionality
+- ✅ Deadzone adjustment
 
 ### Version 0.8.0 (2025-01-12)
-- ✅ Phase 4完了: ダウンロード管理実装
-- ✅ Wine 9.0 + Box64 0.3.6統合
-- ✅ APKサイズ最適化（63MB達成）
+- ✅ Phase 4 complete: Download management implemented
+- ✅ Wine 9.0 + Box64 0.3.6 integration
+- ✅ APK size optimization (63MB achieved)
 
 ### Version 0.7.0 (2025-01-08)
-- ✅ Phase 3完了: ファイルインポート機能
-- ✅ USB OTG/SMB/FTP対応
+- ✅ Phase 3 complete: File import features
+- ✅ USB OTG/SMB/FTP support
 
 ### Version 0.6.0 (2025-01-05)
-- ✅ Phase 2完了: Steam Web API統合
-- ✅ ライブラリ同期機能（表示のみ）
+- ✅ Phase 2 complete: Steam Web API integration
+- ✅ Library sync functionality (view only)
 
 ---
 
-## ⚖️ ライセンス・免責事項
+## ⚖️ License & Disclaimer
 
-### ライセンス
+### License
 
-このプロジェクトはMITライセンスで公開されています。
-詳細は[LICENSE](LICENSE)ファイルを参照してください。
+This project is released under the MIT License.
+See [LICENSE](LICENSE) file for details.
 
-### 免責事項
+### Disclaimer
 
-- このアプリは**非公式**です。Valve Corporation、Steamとは一切関係ありません
-- ゲームの動作を保証するものではありません
-- 端末の故障、データ損失について責任を負いません
-- 違法コピーの使用を推奨・支援するものではありません
+- This app is **unofficial**. Not affiliated with Valve Corporation or Steam
+- Does not guarantee game operation
+- Not responsible for device damage or data loss
+- Does not recommend or support use of illegal copies
 
-### 商標について
+### Trademarks
 
-- "Steam"は Valve Corporation の登録商標です
-- "PlayStation"は Sony Interactive Entertainment Inc. の登録商標です
-- "Xbox"は Microsoft Corporation の登録商標です
-- "Nintendo Switch"は任天堂株式会社の登録商標です
-
----
-
-## 🙏 謝辞
-
-このアプリは以下のオープンソースプロジェクトに基づいています：
-
-- **Winlator** by Bruno Guerreiro - Windowsエミュレーションエンジン
-- **Wine** - Windows互換レイヤー
-- **Box64** - x86_64エミュレーター
-- **Jetpack Compose** - Android UIフレームワーク
+- "Steam" is a registered trademark of Valve Corporation
+- "PlayStation" is a registered trademark of Sony Interactive Entertainment Inc.
+- "Xbox" is a registered trademark of Microsoft Corporation
+- "Nintendo Switch" is a registered trademark of Nintendo Co., Ltd.
 
 ---
 
-**最後に**: このアプリはまだ開発中です。温かい目で見守っていただけると幸いです 😊
+## 🙏 Acknowledgments
 
-何か問題があれば、遠慮なくGitHub Issuesで報告してください！
+This app is based on the following open source projects:
+
+- **Winlator** by Bruno Guerreiro - Windows emulation engine
+- **Wine** - Windows compatibility layer
+- **Box64** - x86_64 emulator
+- **Jetpack Compose** - Android UI framework
+
+---
+
+**Finally**: This app is still under development. Thank you for your patience 😊
+
+If you encounter any problems, please don't hesitate to report them on GitHub Issues!
 
 ---
 

@@ -1,6 +1,6 @@
 # SteamDeck Mobile
 
-**Steam特化のAndroidゲームエミュレーター - Winlator統合による軽量アプリ**
+**Steam-focused Android game emulator - Lightweight app with Winlator integration**
 
 [![Android CI](https://github.com/atariryuma/steam-app/workflows/Android%20CI/badge.svg)](https://github.com/atariryuma/steam-app/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -18,118 +18,118 @@
 - [🔒 Security Policy](SECURITY.md)
 - [🎮 Winlator Project](https://github.com/brunodev85/winlator)
 
-## 📱 概要
+## 📱 Overview
 
-SteamDeck MobileはSteamライブラリのWindowsゲームをAndroidデバイス上で実行できる軽量アプリです。
-Winlator（Wine + Box86/Box64）を統合し、Snapdragon搭載デバイスで快適なゲーム体験を提供します。
+SteamDeck Mobile is a lightweight app that enables running Windows games from your Steam library on Android devices.
+It integrates Winlator (Wine + Box86/Box64) to provide a smooth gaming experience on Snapdragon-powered devices.
 
-### 主要機能
+### Key Features
 
-- ✅ **Steamライブラリ統合**：Steam Web APIによる自動同期
-- ✅ **Windowsゲーム実行**：Winlatorを使用したネイティブ実行
-- ✅ **ファイルインポート**：USB OTG、SMB、FTP、ローカルストレージ対応
-- ✅ **ゲームコントローラーサポート**：Bluetooth/USB接続コントローラー
-- ✅ **高速ダウンロード管理**：マルチスレッド、一時停止/再開機能
+- ✅ **Steam Library Integration**: Automatic sync via Steam Web API
+- ✅ **Windows Game Execution**: Native execution using Winlator
+- ✅ **File Import**: Supports USB OTG, SMB, FTP, and local storage
+- ✅ **Game Controller Support**: Bluetooth/USB connected controllers
+- ✅ **Fast Download Management**: Multi-threaded with pause/resume functionality
 
-## 🚀 技術スタック
+## 🚀 Tech Stack
 
-- **言語**: Kotlin 2.1.0
-- **UI**: Jetpack Compose（Material3）
-- **アーキテクチャ**: Clean Architecture + MVVM
+- **Language**: Kotlin 2.1.0
+- **UI**: Jetpack Compose (Material3)
+- **Architecture**: Clean Architecture + MVVM
 - **DI**: Hilt 2.52
 - **DB**: Room 2.6.1
-- **非同期**: Coroutines + Flow
-- **ネットワーク**: Retrofit 2.11.0 + OkHttp 4.12.0
-- **画像読み込み**: Coil 2.7.0
-- **エミュレーション**: Winlator（Wine + Box86/Box64）
+- **Async**: Coroutines + Flow
+- **Network**: Retrofit 2.11.0 + OkHttp 4.12.0
+- **Image Loading**: Coil 2.7.0
+- **Emulation**: Winlator (Wine + Box86/Box64)
 
-## 📋 システム要件
+## 📋 System Requirements
 
-- **Android**: 8.0 (API 26) 以降
-- **アーキテクチャ**: ARM64-v8a
-- **推奨デバイス**: Snapdragon 8 Gen 1以上
-- **最小解像度**: 1280x720 (HD)
-- **ストレージ**: 最低1GB以上の空き容量
+- **Android**: 8.0 (API 26) or higher
+- **Architecture**: ARM64-v8a
+- **Recommended Device**: Snapdragon 8 Gen 1 or higher
+- **Minimum Resolution**: 1280x720 (HD)
+- **Storage**: At least 1GB free space
 
-## 🛠️ 開発環境
+## 🛠️ Development Environment
 
-### 必要なツール
+### Required Tools
 
 - Android Studio Ladybug 2024.2.1+
 - JDK 21+
 - Git
 
-### セットアップ手順
+### Setup Instructions
 
-詳細な手順は [SETUP.md](SETUP.md) を参照してください。
+For detailed instructions, see [SETUP.md](SETUP.md).
 
-#### クイックスタート
+#### Quick Start
 
 ```bash
-# 1. 環境チェック（初回のみ）
+# 1. Check environment (first time only)
 check-environment.bat
 
-# 2. (オプション) 開発用API Key設定
-# local.propertiesに以下を追加:
+# 2. (Optional) Set up development API Key
+# Add to local.properties:
 # STEAM_API_KEY=YOUR_32_CHAR_HEX_KEY
 
-# 3. Debug APKビルド + インストール
+# 3. Build Debug APK + Install
 build-debug.bat
 ```
 
-#### Android Studioを使う場合
+#### Using Android Studio
 
 ```bash
-# リポジトリクローン
+# Clone repository
 git clone https://github.com/atariryuma/steam-app.git
 cd steam-app
 
-# Android Studioでプロジェクトを開く
-# File > Open > "steam app" フォルダを選択
+# Open project in Android Studio
+# File > Open > Select "steam-app" folder
 
-# 自動的に依存関係がダウンロードされる
-# Run > Run 'app' (Shift+F10) で実行
+# Dependencies will be downloaded automatically
+# Run > Run 'app' (Shift+F10) to execute
 ```
 
-### ビルド方法
+### Build Methods
 
-#### 利用可能なビルドスクリプト
+#### Available Build Scripts
 
 ```bash
-# Debug APK (開発用 - 推奨)
-build-debug.bat                # ビルド + adbインストール
+# Debug APK (for development - recommended)
+build-debug.bat                # Build + adb install
 
-# Release APK (配布用 - R8最適化)
-build-release.bat              # ビルドのみ
-build-and-install.bat          # ビルド + adbインストール
+# Release APK (for distribution - R8 optimized)
+build-release.bat              # Build only
+build-and-install.bat          # Build + adb install
 
-# 既存APKの再インストール
-install-debug.bat              # ビルド済みDebug APKをインストール
+# Reinstall existing APK
+install-debug.bat              # Install pre-built Debug APK
 ```
 
-#### Gradleコマンド
+#### Gradle Commands
 
 ```bash
-# Debug APKをビルド（開発用）
+# Build Debug APK (for development)
 ./gradlew assembleDebug
 
-# Release APKをビルド（配布用、最適化済み）
+# Build Release APK (for distribution, optimized)
 ./gradlew assembleRelease
 
-# テスト実行
+# Run tests
 ./gradlew test
 
-# インストルメンテーションテスト
+# Run instrumentation tests
 ./gradlew connectedAndroidTest
 ```
 
-#### ビルド成果物の場所
+#### Build Output Locations
 
 - **Debug APK**: `app/build/outputs/apk/debug/app-debug.apk`
 - **Release APK**: `app/build/outputs/apk/release/app-release.apk`
 - **Android App Bundle**: `app/build/outputs/bundle/release/app-release.aab`
 
-## 📂 プロジェクト構造
+## 📂 Project Structure
 
 ```
 SteamDeckMobile/
@@ -137,125 +137,125 @@ SteamDeckMobile/
 │   ├── src/
 │   │   ├── main/
 │   │   │   ├── java/com/steamdeck/mobile/
-│   │   │   │   ├── presentation/       # UI層（Compose）
-│   │   │   │   │   ├── ui/            # 画面
+│   │   │   │   ├── presentation/       # UI layer (Compose)
+│   │   │   │   │   ├── ui/            # Screens
 │   │   │   │   │   ├── viewmodel/     # ViewModels
-│   │   │   │   │   └── theme/         # テーマ
-│   │   │   │   ├── domain/            # ドメイン層
-│   │   │   │   │   ├── model/         # ドメインモデル
-│   │   │   │   │   ├── usecase/       # ユースケース
-│   │   │   │   │   └── repository/    # リポジトリIF
-│   │   │   │   ├── data/              # データ層
-│   │   │   │   │   ├── local/         # ローカルデータ
-│   │   │   │   │   ├── remote/        # リモートデータ
-│   │   │   │   │   └── repository/    # リポジトリ実装
-│   │   │   │   ├── core/              # コア機能
-│   │   │   │   │   ├── winlator/      # Winlator統合
-│   │   │   │   │   ├── fileimport/    # ファイルインポート
-│   │   │   │   │   ├── download/      # ダウンロード管理
-│   │   │   │   │   └── controller/    # コントローラー
-│   │   │   │   └── di/                # 依存性注入
+│   │   │   │   │   └── theme/         # Theme
+│   │   │   │   ├── domain/            # Domain layer
+│   │   │   │   │   ├── model/         # Domain models
+│   │   │   │   │   ├── usecase/       # Use cases
+│   │   │   │   │   └── repository/    # Repository interfaces
+│   │   │   │   ├── data/              # Data layer
+│   │   │   │   │   ├── local/         # Local data
+│   │   │   │   │   ├── remote/        # Remote data
+│   │   │   │   │   └── repository/    # Repository implementations
+│   │   │   │   ├── core/              # Core functionality
+│   │   │   │   │   ├── winlator/      # Winlator integration
+│   │   │   │   │   ├── fileimport/    # File import
+│   │   │   │   │   ├── download/      # Download management
+│   │   │   │   │   └── controller/    # Controller
+│   │   │   │   └── di/                # Dependency injection
 │   │   │   └── AndroidManifest.xml
-│   │   └── test/                       # ユニットテスト
+│   │   └── test/                       # Unit tests
 │   └── build.gradle.kts
 ├── gradle/
-│   └── libs.versions.toml              # バージョンカタログ
+│   └── libs.versions.toml              # Version catalog
 ├── build.gradle.kts
 └── settings.gradle.kts
 ```
 
-## 🎯 開発ロードマップ
+## 🎯 Development Roadmap
 
-### Phase 1: MVP ✅ 完了
-- [x] プロジェクトセットアップ
-- [x] Clean Architectureパッケージ構造
-- [x] Room DB実装（ゲーム、コンテナ管理）
-- [x] 基本UI（ホーム、詳細画面）
-- [x] Winlator統合（スタブ実装）
+### Phase 1: MVP ✅ Completed
+- [x] Project setup
+- [x] Clean Architecture package structure
+- [x] Room DB implementation (games, container management)
+- [x] Basic UI (home, detail screens)
+- [x] Winlator integration (stub implementation)
 
-### Phase 2: Steam統合 ✅ 完了
+### Phase 2: Steam Integration ✅ Completed
 
-- [x] Steam Web API統合
-- [x] Steam API Service実装
-- [x] ライブラリ同期機能
-- [x] Settings画面とSteam認証UI
-- [x] DataStore統合
+- [x] Steam Web API integration
+- [x] Steam API Service implementation
+- [x] Library sync functionality
+- [x] Settings screen and Steam authentication UI
+- [x] DataStore integration
 
-### Phase 3: ファイルインポート ✅ 完了
-- [x] USB OTGサポート（libaums）
-- [x] SMB/CIFS統合（jcifs-ng SMB2/3）
-- [x] FTP/FTPS統合（Apache Commons Net）
-- [x] SAFローカルストレージ
+### Phase 3: File Import ✅ Completed
+- [x] USB OTG support (libaums)
+- [x] SMB/CIFS integration (jcifs-ng SMB2/3)
+- [x] FTP/FTPS integration (Apache Commons Net)
+- [x] SAF local storage
 
-### Phase 4: ダウンロード管理 ✅ 完了
+### Phase 4: Download Management ✅ Completed
 
-- [x] WorkManager統合
-- [x] マルチスレッドダウンロード（8MBチャンク）
-- [x] 一時停止/再開機能
-- [x] バックグラウンドダウンロード
-- [x] ダウンロードUI実装（Material3）
+- [x] WorkManager integration
+- [x] Multi-threaded downloads (8MB chunks)
+- [x] Pause/resume functionality
+- [x] Background downloads
+- [x] Download UI implementation (Material3)
 
-### Phase 4C: Wine統合 ✅ 完了
+### Phase 4C: Wine Integration ✅ Completed
 
-- [x] Winlator 10.1 APKからWine 9.0+抽出
-- [x] XZ圧縮解凍サポート（Apache Commons Compress）
-- [x] Wine rootfs (53MB) 展開実装
-- [x] Box64 0.3.6バイナリ統合
-- [x] R8最適化（63MB Release APK）
-- [x] ProGuard rules（JNI/セキュリティ保護）
+- [x] Extract Wine 9.0+ from Winlator 10.1 APK
+- [x] XZ compression/decompression support (Apache Commons Compress)
+- [x] Wine rootfs (53MB) extraction implementation
+- [x] Box64 0.3.6 binary integration
+- [x] R8 optimization (63MB Release APK)
+- [x] ProGuard rules (JNI/security protection)
 
-**成果**: 63MB APK (Winlatorの55%サイズ、141MB→63MB)
+**Result**: 63MB APK (55% of Winlator size, 141MB→63MB)
 
-### Phase 5: コントローラーサポート ✅ 完了
+### Phase 5: Controller Support ✅ Completed
 
-- [x] InputDevice API統合（自動検出）
-- [x] ボタンマッピングシステム（16ボタン + 4軸）
-- [x] プロファイル管理（Room Database v3）
-- [x] ジョイスティックリアルタイムプレビュー
-- [x] Xbox/PlayStation/Nintendo自動検出（Vendor ID）
-- [x] デッドゾーン調整機能（0-50%）
-- [x] Material3 UI実装（ControllerSettingsScreen）
-- [ ] バイブレーション対応（Phase 5.1で実装予定）
+- [x] InputDevice API integration (auto-detection)
+- [x] Button mapping system (16 buttons + 4 axes)
+- [x] Profile management (Room Database v3)
+- [x] Real-time joystick preview
+- [x] Xbox/PlayStation/Nintendo auto-detection (Vendor ID)
+- [x] Deadzone adjustment (0-50%)
+- [x] Material3 UI implementation (ControllerSettingsScreen)
+- [ ] Vibration support (planned for Phase 5.1)
 
-**成果**: 11ファイル追加（~1,813行）、APKサイズ据え置き（76MB）
+**Result**: 11 files added (~1,813 lines), APK size maintained (76MB)
 
-### Phase 6: リリース準備
-- [x] APK軽量化（目標: <80MB）✅ 達成（63MB）
-- [x] R8最適化（-17%サイズ削減）
-- [ ] UIテスト完全カバレッジ
-- [ ] 実機動作検証（Wine実行テスト）
+### Phase 6: Release Preparation
+- [x] APK optimization (target: <80MB) ✅ Achieved (63MB)
+- [x] R8 optimization (-17% size reduction)
+- [ ] Full UI test coverage
+- [ ] Real device verification (Wine execution test)
 
-## 🤝 貢献
+## 🤝 Contributing
 
-現在、個人開発プロジェクトですが、Issue報告は歓迎します。
+Currently a personal development project, but issue reports are welcome.
 
-### 報告方法
+### How to Report
 
-1. [Issues](https://github.com/atariryuma/steam-app/issues)ページを開く
-2. 「New Issue」をクリック
-3. バグ報告または機能リクエストのテンプレートを選択
-4. 詳細を記入して送信
+1. Open the [Issues](https://github.com/atariryuma/steam-app/issues) page
+2. Click "New Issue"
+3. Select bug report or feature request template
+4. Fill in details and submit
 
-## 📄 ライセンス
+## 📄 License
 
-このプロジェクトはMITライセンスの下で公開されています。詳細は[LICENSE](LICENSE)ファイルを参照してください。
+This project is released under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-## 🙏 謝辞
+## 🙏 Acknowledgments
 
-- [Winlator](https://github.com/brunodev85/winlator) - Windowsエミュレーション
-- [Steam Web API](https://steamcommunity.com/dev) - Steamライブラリ統合
-- Android Jetpack Compose - モダンUI構築
+- [Winlator](https://github.com/brunodev85/winlator) - Windows emulation
+- [Steam Web API](https://steamcommunity.com/dev) - Steam library integration
+- Android Jetpack Compose - Modern UI framework
 
-## 📞 サポート
+## 📞 Support
 
-問題が発生した場合：
+If you encounter issues:
 
-1. [既存のIssue](https://github.com/atariryuma/steam-app/issues)を検索
-2. 該当するものがなければ新しいIssueを作成
-3. [Contributing Guide](CONTRIBUTING.md)を参照
+1. Search [existing Issues](https://github.com/atariryuma/steam-app/issues)
+2. Create a new Issue if none exists
+3. Refer to [Contributing Guide](CONTRIBUTING.md)
 
 ---
 
-**現在の状態**: Phase 5（コントローラーサポート）完了 - MVP + Steam統合 + ファイルインポート + ダウンロード管理 + Wine統合 + コントローラーサポート完成
+**Current Status**: Phase 5 (Controller Support) completed - MVP + Steam integration + File import + Download management + Wine integration + Controller support complete
 
 Made with ❤️ for Steam gamers on Android

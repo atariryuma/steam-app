@@ -71,12 +71,12 @@ class WinlatorInitViewModel @Inject constructor(
     } else {
      val error = initResult.exceptionOrNull()
      _uiState.value = WinlatorInitUiState.Error(
-      error?.message ?: "初期化 failed"
+      error?.message ?: "Initialization failed"
      )
     }
    } catch (e: Exception) {
     _uiState.value = WinlatorInitUiState.Error(
-     e.message ?: "初期化in Error 発生しました"
+     e.message ?: "An error occurred during initialization"
     )
    }
   }

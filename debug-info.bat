@@ -1,16 +1,16 @@
 @echo off
 REM SteamDeck Mobile - Debug Info Collector
-REM デバッグに必要な情報を一括取得します
+REM Collects all information needed for debugging
 
 echo ========================================
 echo SteamDeck Mobile - Debug Info Collector
 echo ========================================
 echo.
 
-REM adbのパス
+REM ADB path
 set ADB_PATH=C:\Android\sdk\platform-tools\adb.exe
 
-REM 保存先ファイル
+REM Output file
 set OUTPUT_FILE=debug_info.txt
 
 if exist "%OUTPUT_FILE%" del "%OUTPUT_FILE%"
@@ -18,7 +18,7 @@ if exist "%OUTPUT_FILE%" del "%OUTPUT_FILE%"
 echo Collecting debug information...
 echo.
 
-REM adbが存在するか確認
+REM Check if adb exists
 if not exist "%ADB_PATH%" (
     echo ERROR: adb not found at %ADB_PATH%
     pause
@@ -67,7 +67,7 @@ echo.
 echo You can share this file when reporting issues.
 echo.
 
-REM ファイルを開く
+REM Display file
 type "%OUTPUT_FILE%"
 echo.
 pause

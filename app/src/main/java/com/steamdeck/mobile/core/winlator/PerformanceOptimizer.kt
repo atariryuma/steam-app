@@ -60,7 +60,7 @@ class PerformanceOptimizer @Inject constructor(
  }
 
  /**
-  * Box64environmentvariableconfiguration
+  * Box64 environment variable configuration
   *
   * Research findings:
   * - BOX64_DYNAREC_BIGBLOCK=3 (best for Wine)
@@ -113,16 +113,16 @@ class PerformanceOptimizer @Inject constructor(
  }
 
  /**
-  * DXVKconfigurationfilecopy
+  * Copy DXVK configuration file
   */
  private suspend fun applyDxvkConfig(winePrefixPath: File) {
   withContext(Dispatchers.IO) {
    try {
-    // assetsfromdxvk.conf読み込み
+    // Load dxvk.conf from assets
     val assetManager = context.assets
     val dxvkConfigStream = assetManager.open("winlator/dxvk.conf")
 
-    // Wine prefix drive_ccopy to
+    // Copy to Wine prefix drive_c
     val targetFile = File(winePrefixPath, "drive_c/dxvk.conf")
     targetFile.parentFile?.mkdirs()
 
@@ -138,7 +138,7 @@ class PerformanceOptimizer @Inject constructor(
  }
 
  /**
-  * Wine レジストリoptimizationapply
+  * Apply Wine registry optimizations
   */
  private suspend fun applyWineRegistryOptimizations(
   winePrefixPath: File,
@@ -146,18 +146,18 @@ class PerformanceOptimizer @Inject constructor(
  ) {
   withContext(Dispatchers.IO) {
    try {
-    // assetsfromperformance.reg読み込み
+    // Load performance.reg from assets
     val assetManager = context.assets
     val regStream = assetManager.open("winlator/performance.reg")
 
-    // 一時filecopy to
+    // Copy to temporary file
     val tempRegFile = File(context.cacheDir, "performance.reg")
     tempRegFile.outputStream().use { output ->
      regStream.copyTo(output)
     }
 
-    // TODO: wine regedit performance.reg execution
-    // WinlatorEmulatorviaapplydo必要 ある
+    // TODO: Execute wine regedit performance.reg
+    // Need to apply via WinlatorEmulator
     AppLogger.d(TAG, "Wine registry optimizations prepared: ${tempRegFile.absolutePath}")
    } catch (e: Exception) {
     AppLogger.w(TAG, "Failed to prepare Wine registry optimizations", e)
@@ -166,7 +166,7 @@ class PerformanceOptimizer @Inject constructor(
  }
 
  /**
-  * DXVKget environment variables
+  * Get DXVK environment variables
   */
  fun getDxvkEnvironmentVariables(preset: Box64PerformancePreset): Map<String, String> {
   return when (preset) {
@@ -189,7 +189,7 @@ class PerformanceOptimizer @Inject constructor(
  }
 
  /**
-  * VKD3D-Protonget environment variables
+  * Get VKD3D-Proton environment variables
   */
  fun getVkd3dEnvironmentVariables(): Map<String, String> {
   return mapOf(
@@ -200,7 +200,7 @@ class PerformanceOptimizer @Inject constructor(
  }
 
  /**
-  * Wineget environment variables
+  * Get Wine environment variables
   */
  fun getWineEnvironmentVariables(): Map<String, String> {
   return mapOf(
@@ -212,7 +212,7 @@ class PerformanceOptimizer @Inject constructor(
  }
 
  /**
-  * Vulkan/Mesaget environment variables（Turnip driver）
+  * Get Vulkan/Mesa environment variables (Turnip driver)
   */
  fun getVulkanEnvironmentVariables(): Map<String, String> {
   return mapOf(
@@ -227,7 +227,7 @@ class PerformanceOptimizer @Inject constructor(
  }
 
  /**
-  * all environmentvariableintegration
+  * Integrate all environment variables
   */
  fun getAllEnvironmentVariables(preset: Box64PerformancePreset): Map<String, String> {
   return getDxvkEnvironmentVariables(preset) +
@@ -238,28 +238,28 @@ class PerformanceOptimizer @Inject constructor(
 }
 
 /**
- * Box64/DXVK performanceプリセット
- * (domain層 PerformancePresetfrom独立)
+ * Box64/DXVK performance presets
+ * (Independent from domain layer PerformancePreset)
  */
 enum class Box64PerformancePreset {
  /**
-  * maximumperformance
-  * - ゲーミングoptimization
-  * - 高速だ 一部game 不安定
+  * Maximum performance
+  * - Gaming optimized
+  * - Fast but some games may be unstable
   */
  MAXIMUM_PERFORMANCE,
 
  /**
-  * バランス
-  * - defaultconfiguration
-  * - 安定性 performance 両立
+  * Balanced
+  * - Default configuration
+  * - Balance between stability and performance
   */
  BALANCED,
 
  /**
-  * maximum安定性
-  * - Unity/問題 あるgame向け
-  * - 低速だ 互換性高い
+  * Maximum stability
+  * - For Unity/problematic games
+  * - Slower but higher compatibility
   */
  MAXIMUM_STABILITY
 }

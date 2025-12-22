@@ -178,6 +178,18 @@ object ElfPatcher {
  }
 
  /**
+  * Java-friendly wrapper for patchInterpreterPath
+  *
+  * @param binaryFile ELF binary file to patch
+  * @param newInterpreterPath New interpreter path
+  * @return true if successful, false otherwise
+  */
+ @JvmStatic
+ fun patchInterpreterPathJava(binaryFile: File, newInterpreterPath: String): Boolean {
+  return patchInterpreterPath(binaryFile, newInterpreterPath).isSuccess
+ }
+
+ /**
   * Rewrite ELF binary interpreter path
   *
   * Rewrite interpreter path embedded in binaries like Box64

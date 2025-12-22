@@ -5,7 +5,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * download履歴・state格納doエンティティ
+ * Download history and state storage entity
  *
  * Performance optimization (2025 best practice):
  * - Added installationStatus for automatic game installation
@@ -24,106 +24,106 @@ data class DownloadEntity(
  @PrimaryKey(autoGenerate = true)
  val id: Long = 0,
 
- /** 関連dogameID */
+ /** Related game ID */
  val gameId: Long? = null,
 
  /** File name */
  val fileName: String,
 
- /** downloadURL */
+ /** Download URL */
  val url: String,
 
- /** downloadstate */
+ /** Download status */
  val status: DownloadStatus,
 
- /** installationstate (downloadcompleted後 processing) */
+ /** Installation status (processing after download completion) */
  val installationStatus: InstallationStatus = InstallationStatus.NOT_INSTALLED,
 
- /** progress率（0-100） */
+ /** Progress percentage (0-100) */
  val progress: Int = 0,
 
- /** download済みバイト数 */
+ /** Downloaded bytes */
  val downloadedBytes: Long = 0,
 
- /** 総fileサイズ（バイト） */
+ /** Total file size (bytes) */
  val totalBytes: Long = 0,
 
- /** download速度（バイト/秒） */
+ /** Download speed (bytes/second) */
  val speedBytesPerSecond: Long = 0,
 
  /** Destination path */
  val destinationPath: String = "",
 
  /**
-  * downloadstartdate and time（Unix timestamp）
+  * Download start date/time (Unix timestamp)
   *
-  * Note: defaultvalue して System.currentTimeMillis() useしています 、
-  * 実際 利用時 明示的 value渡すこ 推奨do。
+  * Note: Uses System.currentTimeMillis() as default value,
+  * but it is recommended to pass an explicit value when using.
   */
  val startedTimestamp: Long = System.currentTimeMillis(),
 
  /**
-  * createdate and time（Unix timestamp）
+  * Created date/time (Unix timestamp)
   *
-  * Note: defaultvalue して System.currentTimeMillis() useしています 、
-  * 実際 利用時 明示的 value渡すこ 推奨do。
+  * Note: Uses System.currentTimeMillis() as default value,
+  * but it is recommended to pass an explicit value when using.
   */
  val createdAt: Long = System.currentTimeMillis(),
 
  /**
-  * updatedate and time（Unix timestamp）
+  * Updated date/time (Unix timestamp)
   *
-  * Note: defaultvalue して System.currentTimeMillis() useしています 、
-  * 実際 利用時 明示的 value渡すこ 推奨do。
+  * Note: Uses System.currentTimeMillis() as default value,
+  * but it is recommended to pass an explicit value when using.
   */
  val updatedAt: Long = System.currentTimeMillis(),
 
- /** downloadcompleteddate and time（Unix timestamp） */
+ /** Download completed date/time (Unix timestamp) */
  val completedTimestamp: Long? = null,
 
- /** errorメッセージ */
+ /** Error message */
  val errorMessage: String? = null
 )
 
 /**
- * downloadstate
+ * Download status
  */
 enum class DownloadStatus {
- /** downloadwaiting */
+ /** Waiting for download */
  PENDING,
 
- /** downloadin */
+ /** Downloading */
  DOWNLOADING,
 
- /** pausein */
+ /** Paused */
  PAUSED,
 
- /** completed */
+ /** Completed */
  COMPLETED,
 
- /** error */
+ /** Failed */
  FAILED,
 
- /** cancel */
+ /** Cancelled */
  CANCELLED
 }
 
 /**
- * installationstate (downloadcompleted後)
+ * Installation status (after download completion)
  */
 enum class InstallationStatus {
- /** 未installation (download みcompleted) */
+ /** Not installed (download only completed) */
  NOT_INSTALLED,
 
- /** installationwaiting */
+ /** Waiting for installation */
  PENDING,
 
- /** installationin */
+ /** Installing */
  INSTALLING,
 
- /** installationcompleted */
+ /** Installation completed */
  INSTALLED,
 
- /** installationfailure */
+ /** Installation failed */
  FAILED
 }

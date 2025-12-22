@@ -8,7 +8,7 @@ import com.steamdeck.mobile.domain.model.InstallationStatus as DomainInstallatio
 import com.steamdeck.mobile.data.local.database.entity.InstallationStatus as EntityInstallationStatus
 
 /**
- * DownloadEntity <-> Download マッパー
+ * DownloadEntity <-> Download mapper
  */
 object DownloadMapper {
  /**

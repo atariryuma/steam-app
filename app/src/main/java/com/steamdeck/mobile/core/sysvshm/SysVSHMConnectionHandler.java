@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.sysvshm;
 
-import com.steamdeck.mobile.xconnector.Client;
-import com.steamdeck.mobile.xconnector.ConnectionHandler;
+import com.steamdeck.mobile.core.xconnector.Client;
+import com.steamdeck.mobile.core.xconnector.ConnectionHandler;
 
 public class SysVSHMConnectionHandler implements ConnectionHandler {
     private final SysVSharedMemory sysVSharedMemory;

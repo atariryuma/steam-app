@@ -1,6 +1,6 @@
 package com.steamdeck.mobile.core.xenvironment.components;
 
-import com.steamdeck.mobile.xenvironment.EnvironmentComponent;
+import com.steamdeck.mobile.core.xenvironment.EnvironmentComponent;
 import com.steamdeck.mobile.core.xconnector.XConnectorEpoll;
 import com.steamdeck.mobile.core.xconnector.UnixSocketConfig;
 import com.steamdeck.mobile.core.xserver.XClientConnectionHandler;

@@ -15,6 +15,7 @@ public class XServerView extends GLSurfaceView {
 
     public XServerView(Context context, XServer xServer) {
         super(context);
+        android.util.Log.e("XServerView", "Constructor called");
         setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setEGLContextClientVersion(3);
         setEGLConfigChooser(8, 8, 8, 8, 0, 0);
@@ -22,6 +23,19 @@ public class XServerView extends GLSurfaceView {
         renderer = new GLRenderer(this, xServer);
         setRenderer(renderer);
         setRenderMode(RENDERMODE_WHEN_DIRTY);
+        android.util.Log.e("XServerView", "Renderer set, renderMode=WHEN_DIRTY");
+    }
+
+    @Override
+    public void onResume() {
+        android.util.Log.e("XServerView", "onResume() called");
+        super.onResume();
+    }
+
+    @Override
+    public void onPause() {
+        android.util.Log.e("XServerView", "onPause() called");
+        super.onPause();
     }
 
     public GLRenderer getRenderer() {

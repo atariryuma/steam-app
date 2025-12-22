@@ -60,36 +60,41 @@ class SettingsViewModel @Inject constructor(
  init {
   loadSettings()
   checkSteamInstallation()
-  autoConfigureDevApiKey() // Auto-configure API key from BuildConfig for development
+  autoConfigureDevApiKey() // Auto-configure API key for debug builds
  }
 
  /**
-  * Development API Key Auto-Configuration
+  * Auto-configure Development API Key (Debug builds only)
   *
-  * Automatically configures Steam API Key from BuildConfig for development builds
-  * if the user hasn't set one yet.
+  * This function automatically sets the API key from BuildConfig on first launch
+  * for debug builds. This provides a better developer experience by pre-filling
+  * the API key field.
   *
-  * Security Note:
-  * - DEV_STEAM_API_KEY is loaded from local.properties (not committed to git)
-  * - Only available in debug builds
-  * - For production, users must obtain their own API key from:
-  *   https://steamcommunity.com/dev/apikey
+  * Security:
+  * - ONLY available in debug builds (DEV_STEAM_API_KEY is not in release builds)
+  * - Loaded from local.properties (not committed to git)
+  * - Only sets if user hasn't already configured an API key
   */
  private fun autoConfigureDevApiKey() {
   viewModelScope.launch {
    try {
     val existingKey = securePreferences.getSteamApiKey()
     if (existingKey.isNullOrBlank()) {
+     // Only available in debug builds
      val devKey = com.steamdeck.mobile.BuildConfig.DEV_STEAM_API_KEY
      if (devKey.isNotBlank()) {
       securePreferences.saveSteamApiKey(devKey)
-      AppLogger.d(TAG, "Auto-configured development API key from BuildConfig")
+      AppLogger.i(TAG, "Auto-configured development API key from BuildConfig")
+      // Reload settings to update UI
+      loadSettings()
      } else {
-      AppLogger.w(TAG, "DEV_STEAM_API_KEY not found in BuildConfig. Add to local.properties: STEAM_API_KEY=your_key")
+      AppLogger.d(TAG, "No development API key found in BuildConfig. Add STEAM_API_KEY to local.properties")
      }
+    } else {
+     AppLogger.d(TAG, "API key already configured, skipping auto-configuration")
     }
    } catch (e: Exception) {
-    AppLogger.e(TAG, "Failed to auto-configure API key", e)
+    AppLogger.e(TAG, "Failed to auto-configure development API key", e)
    }
   }
  }
@@ -117,6 +122,9 @@ class SettingsViewModel @Inject constructor(
    val usernameFlow = securePreferences.getSteamUsername()
    val lastSyncFlow = securePreferences.getLastSyncTimestamp()
 
+   // Load API Key (single read, not Flow)
+   val apiKey = securePreferences.getSteamApiKey()
+
    combine(
     steamIdFlow,
     usernameFlow,
@@ -126,6 +134,7 @@ class SettingsViewModel @Inject constructor(
     SettingsData(
      steamId = steamId.orEmpty(),
      steamUsername = username.orEmpty(),
+     steamApiKey = apiKey,
      lastSyncTimestamp = lastSync,
      isSteamConfigured = isConfigured
     )
@@ -519,6 +528,7 @@ sealed class SettingsUiState {
 data class SettingsData(
  val steamId: String,
  val steamUsername: String,
+ val steamApiKey: String?,
  val lastSyncTimestamp: Long?,
  val isSteamConfigured: Boolean
 ) {

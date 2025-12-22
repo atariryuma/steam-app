@@ -25,7 +25,7 @@ import com.steamdeck.mobile.core.input.ExternalController;
 import com.steamdeck.mobile.core.input.ExternalControllerBinding;
 import com.steamdeck.mobile.core.input.GamepadState;
 import com.steamdeck.mobile.core.math.Mathf;
-import com.steamdeck.mobile.winhandler.WinHandler;
+import com.steamdeck.mobile.core.winhandler.WinHandler;
 import com.steamdeck.mobile.core.xserver.Pointer;
 import com.steamdeck.mobile.core.xserver.XServer;
 

@@ -7,7 +7,7 @@ import com.steamdeck.mobile.domain.model.GameSource as DomainGameSource
 import com.steamdeck.mobile.data.local.database.entity.GameSource as EntityGameSource
 
 /**
- * GameEntity <-> Game マッパー
+ * GameEntity <-> Game mapper
  */
 object GameMapper {
  /**

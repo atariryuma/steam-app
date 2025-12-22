@@ -68,7 +68,7 @@ class SteamRepositoryImpl @Inject constructor(
       AppLogger.d(TAG, "Successfully fetched player: ${player.personaName}")
       Result.success(player)
      } else {
-      Result.failure(Exception("プレイヤーinformation not found"))
+      Result.failure(Exception("Player information not found"))
      }
     } else {
      val errorMsg = "Steam API error: ${response.code()} ${response.message()}"
@@ -91,7 +91,7 @@ class SteamRepositoryImpl @Inject constructor(
 
     okHttpClient.newCall(request).execute().use { response ->
      if (!response.isSuccessful) {
-      return@withContext Result.failure(Exception("画像downloadfailure: ${response.code}"))
+      return@withContext Result.failure(Exception("Image download failed: ${response.code}"))
      }
 
      val file = File(destinationPath)

@@ -14,14 +14,14 @@ class SteamDeckMobileApp : Application(), Configuration.Provider {
 
  override fun onCreate() {
   super.onCreate()
-  // アプリケーション初期化処理
+  // Application initialization
  }
 
  /**
-  * WorkManager 2.9.0+ Configuration.Provider 実装 
-  * getWorkManagerConfiguration() メソッド from workManagerConfiguration プロパティ 変更された。
-  * Hilt usedo場合、workerFactory 注入される前 アクセスされるクラッシュ防ぐため、
-  * getter useして遅延初期化行う。
+  * WorkManager 2.9.0+ Configuration.Provider implementation
+  * getWorkManagerConfiguration() method changed to workManagerConfiguration property.
+  * When using Hilt, use getter for lazy initialization to prevent crashes
+  * when workerFactory is accessed before being injected.
   */
  override val workManagerConfiguration: Configuration
   get() = Configuration.Builder()

@@ -6,7 +6,7 @@ import com.steamdeck.mobile.domain.repository.GameRepository
 import javax.inject.Inject
 
 /**
- * play timeupdatedoUseCase
+ * Update play time UseCase
  *
  * 2025 Best Practice: DataResult<T> for type-safe error handling
  */
@@ -14,15 +14,15 @@ class UpdatePlayTimeUseCase @Inject constructor(
  private val gameRepository: GameRepository
 ) {
  /**
-  * play timeupdate
-  * @param gameId gameID
-  * @param additionalMinutes addplay time（minutes）
+  * Update play time
+  * @param gameId Game ID
+  * @param additionalMinutes Additional play time (minutes)
   */
  suspend operator fun invoke(gameId: Long, additionalMinutes: Long): DataResult<Unit> {
   return try {
    if (additionalMinutes < 0) {
     return DataResult.Error(
-     AppError.DatabaseError("play time 正 value ある必要 あります", null)
+     AppError.DatabaseError("Play time must be a positive value", null)
     )
    }
    val timestamp = System.currentTimeMillis()

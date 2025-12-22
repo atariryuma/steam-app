@@ -17,7 +17,7 @@ import com.steamdeck.mobile.presentation.theme.SteamDeckMobileTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
- * アプリケーションのメインActivity
+ * Main application Activity
  *
  * Single Activity Architecture with Jetpack Compose Navigation
  * Immersive fullscreen mode for controller/gaming experience

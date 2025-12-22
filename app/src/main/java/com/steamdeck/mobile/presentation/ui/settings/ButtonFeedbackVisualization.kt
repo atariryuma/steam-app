@@ -23,17 +23,17 @@ import com.steamdeck.mobile.domain.model.GameAction
 import kotlin.math.min
 
 /**
- * リアルタイムボタンフィードバック可視化コンポーネント
+ * Real-time button feedback visualization component
  *
  * Research findings:
- * - ベストプラクティス: Material3デザインシステム 準拠
- * - アクセシビリティ: contentDescription + stateDescription対応
- * - パフォーマンス: derivedStateOf不要（StateFlow 最適化済み）
- * - タッチターゲット: 最小48dp x 48dp (Androidアクセシビリティガイドライン)
+ * - Best practice: Compliant with Material3 design system
+ * - Accessibility: contentDescription + stateDescription support
+ * - Performance: derivedStateOf unnecessary (StateFlow optimized)
+ * - Touch target: Minimum 48dp x 48dp (Android accessibility guidelines)
  */
 
 /**
- * ボタン押下状態 視覚的フィードバック（グリッドレイアウト）
+ * Visual feedback for button press state (grid layout)
  */
 @Composable
 fun ButtonFeedbackGrid(
@@ -55,14 +55,14 @@ fun ButtonFeedbackGrid(
    verticalArrangement = Arrangement.spacedBy(12.dp)
   ) {
    Text(
-    "ボタンTest",
+    "Button Test",
     style = MaterialTheme.typography.titleSmall,
     fontWeight = FontWeight.Bold
    )
 
    if (controllerState == null) {
     Text(
-     "controller選択please",
+     "Please select a controller",
      style = MaterialTheme.typography.bodySmall,
      color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -116,12 +116,12 @@ fun ButtonFeedbackGrid(
 }
 
 /**
- * 個別ボタンインジケーターチップ
+ * Individual button indicator chip
  *
- * アクセシビリティベストプラクティス:
- * - 48dp 最小タッチターゲット
+ * Accessibility best practices:
+ * - 48dp minimum touch target
  * - contentDescription + stateDescription
- * - 高コントラスト対応
+ * - High contrast support
  */
 @Composable
 private fun ButtonIndicatorChip(
@@ -170,12 +170,12 @@ private fun ButtonIndicatorChip(
 }
 
 /**
- * 2Dジョイスティック位置可視化（Canvasベース）
+ * 2D joystick position visualization (Canvas-based)
  *
  * Research findings:
- * - Canvas API customグラフィックス
- * - Deadzone表示（通常0.1 = 10%）
- * - スティック位置 リアルタイムUpdate
+ * - Canvas API for custom graphics
+ * - Deadzone display (typically 0.1 = 10%)
+ * - Real-time stick position updates
  */
 @Composable
 fun JoystickVisualization(
@@ -201,7 +201,7 @@ fun JoystickVisualization(
    verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
    Text(
-    "ジョイスティック可視化",
+    "Joystick Visualization",
     style = MaterialTheme.typography.titleSmall,
     fontWeight = FontWeight.Bold
    )
@@ -263,7 +263,7 @@ fun JoystickVisualization(
 }
 
 /**
- * ジョイスティック Canvas 描画
+ * Joystick Canvas drawing
  */
 @Composable
 private fun JoystickCanvas(
@@ -280,7 +280,7 @@ private fun JoystickCanvas(
   val center = Offset(size.width / 2, size.height / 2)
   val radius = min(size.width, size.height) / 2
 
-  // 外側 円（range）
+  // Outer circle (range)
   drawCircle(
    color = onSurfaceVariant.copy(alpha = 0.3f),
    radius = radius,
@@ -288,14 +288,14 @@ private fun JoystickCanvas(
    style = Stroke(width = 2.dp.toPx())
   )
 
-  // Deadzone円
+  // Deadzone circle
   drawCircle(
    color = errorColor.copy(alpha = 0.2f),
    radius = radius * deadzone,
    center = center
   )
 
-  // 十字線
+  // Crosshairs
   drawLine(
    color = onSurfaceVariant.copy(alpha = 0.5f),
    start = Offset(center.x, 0f),
@@ -309,7 +309,7 @@ private fun JoystickCanvas(
    strokeWidth = 1.dp.toPx()
   )
 
-  // スティック位置
+  // Stick position
   val stickX = x * radius
   val stickY = y * radius
   drawCircle(
@@ -318,7 +318,7 @@ private fun JoystickCanvas(
    center = center + Offset(stickX, stickY)
   )
 
-  // スティック from in心to 線
+  // Line from center to stick
   drawLine(
    color = primaryColor.copy(alpha = 0.5f),
    start = center,
@@ -329,7 +329,7 @@ private fun JoystickCanvas(
 }
 
 /**
- * Trigger圧力バー（アナログL2/R2）
+ * Trigger pressure bar (analog L2/R2)
  */
 @Composable
 fun TriggerPressureBar(
@@ -352,19 +352,19 @@ fun TriggerPressureBar(
    verticalArrangement = Arrangement.spacedBy(12.dp)
   ) {
    Text(
-    "Trigger圧力",
+    "Trigger Pressure",
     style = MaterialTheme.typography.titleSmall,
     fontWeight = FontWeight.Bold
    )
 
-   // L2Trigger
+   // L2 Trigger
    TriggerIndicator(
     label = "L2",
     value = leftTrigger,
     modifier = Modifier.fillMaxWidth()
    )
 
-   // R2Trigger
+   // R2 Trigger
    TriggerIndicator(
     label = "R2",
     value = rightTrigger,

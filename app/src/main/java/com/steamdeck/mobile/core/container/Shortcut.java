@@ -3,8 +3,8 @@ package com.steamdeck.mobile.core.container;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
-import com.steamdeck.mobile.core.FileUtils;
-import com.steamdeck.mobile.core.StringUtils;
+import com.steamdeck.mobile.core.util.FileUtils;
+import com.steamdeck.mobile.core.util.StringUtils;
 
 import org.json.JSONException;
 import org.json.JSONObject;

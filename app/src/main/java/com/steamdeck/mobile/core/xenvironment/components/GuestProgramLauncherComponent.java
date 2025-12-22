@@ -4,17 +4,18 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Process;
 
-import androidx.preference.PreferenceManager;
+import android.preference.PreferenceManager;
 
 import com.steamdeck.mobile.box86_64.Box86_64Preset;
 import com.steamdeck.mobile.box86_64.Box86_64PresetManager;
 import com.steamdeck.mobile.core.util.Callback;
 import com.steamdeck.mobile.core.util.DefaultVersion;
+import com.steamdeck.mobile.core.util.ElfPatcher;
 import com.steamdeck.mobile.core.util.EnvVars;
 import com.steamdeck.mobile.core.util.ProcessHelper;
 import com.steamdeck.mobile.core.util.TarCompressorUtils;
 import com.steamdeck.mobile.core.xconnector.UnixSocketConfig;
-import com.steamdeck.mobile.xenvironment.EnvironmentComponent;
+import com.steamdeck.mobile.core.xenvironment.EnvironmentComponent;
 import com.steamdeck.mobile.core.xenvironment.ImageFs;
 
 import java.io.File;
@@ -32,10 +33,14 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
     @Override
     public void start() {
+        android.util.Log.e("GuestProgramLauncher", "start() called");
         synchronized (lock) {
             stop();
+            android.util.Log.e("GuestProgramLauncher", "Extracting Box86/64 files");
             extractBox86_64Files();
+            android.util.Log.e("GuestProgramLauncher", "Executing guest program: " + guestExecutable);
             pid = execGuestProgram();
+            android.util.Log.e("GuestProgramLauncher", "Guest program PID: " + pid);
         }
     }
 
@@ -110,7 +115,46 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         ImageFs imageFs = environment.getImageFs();
         File rootDir = imageFs.getRootDir();
         File tmpDir = environment.getTmpDir();
+        // CRITICAL: Android nativeLibraryDir points to lib/arm64 but libraries are at lib/arm64-v8a
+        // We need to try multiple paths to find libproot.so
         String nativeLibraryDir = context.getApplicationInfo().nativeLibraryDir;
+
+        // Possible library paths (Android inconsistency between platforms)
+        String[] possiblePaths = {
+            nativeLibraryDir + "/libproot.so",                    // lib/arm64/
+            nativeLibraryDir + "-v8a/libproot.so",               // lib/arm64-v8a/
+            nativeLibraryDir.replace("/arm64", "/arm64-v8a") + "/libproot.so"  // Explicit replace
+        };
+
+        File prootBinary = null;
+        String prootPath = null;
+
+        for (String path : possiblePaths) {
+            File candidate = new File(path);
+            android.util.Log.e("GuestProgramLauncher", "Trying path: " + path);
+            if (candidate.exists()) {
+                prootBinary = candidate;
+                prootPath = path;
+                android.util.Log.e("GuestProgramLauncher", "Found proot at: " + prootPath);
+                break;
+            }
+        }
+
+        if (prootBinary == null || !prootBinary.exists()) {
+            android.util.Log.e("GuestProgramLauncher", "PRoot library not found in any of the expected paths");
+            android.util.Log.e("GuestProgramLauncher", "Searched paths:");
+            for (String path : possiblePaths) {
+                android.util.Log.e("GuestProgramLauncher", "  - " + path);
+            }
+            return -1;
+        }
+
+        // CRITICAL: Bind mount box64 binary into rootfs
+        File box64Binary = new File(context.getFilesDir(), "winlator/box64/box64");
+        if (!box64Binary.exists()) {
+            android.util.Log.e("GuestProgramLauncher", "Box64 binary not found: " + box64Binary.getAbsolutePath());
+            return -1;
+        }
 
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         boolean enableBox86_64Logs = preferences.getBoolean("enable_box86_64_logs", false);
@@ -133,10 +177,28 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         boolean bindSHM = envVars.get("WINEESYNC").equals("1");
 
-        String command = nativeLibraryDir+"/libproot.so";
+        // Use libproot.so from native library directory (Winlator approach)
+        String command = prootBinary.getAbsolutePath();
+        // CRITICAL: Winlator's proot doesn't support -k flag
+        // Seccomp bypass is handled internally by libproot.so build configuration
         command += " --kill-on-exit";
-        command += " --rootfs="+rootDir;
-        command += " --cwd="+ImageFs.HOME_PATH;
+
+        // CRITICAL: DO NOT use --rootfs option!
+        // --rootfs puts PRoot in chroot mode, which blocks Android filesystem paths
+        // Instead, use bind mounts only (matches WinlatorEmulator.kt line 797)
+        // This allows box64 to run from Android path while accessing rootfs files via binds
+        command += " -b " + rootDir.getAbsolutePath() + ":/data/data/com.winlator/files/rootfs";
+
+        // Bind /tmp to rootfs/tmp for XServer socket access
+        command += " -b " + new File(rootDir, "tmp").getAbsolutePath() + ":/tmp";
+
+        // CRITICAL: Bind Wine directory so box64 can find wine binary
+        // Wine path from ImageFs (e.g., /opt/wine) → Android real path
+        File wineDir = new File(rootDir, imageFs.getWinePath().substring(1)); // Remove leading /
+        if (wineDir.exists()) {
+            command += " -b " + wineDir.getAbsolutePath() + ":" + imageFs.getWinePath();
+        }
+
         command += " --bind=/dev";
 
         if (bindSHM) {
@@ -148,16 +210,90 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         command += " --bind=/proc";
         command += " --bind=/sys";
 
+        // CRITICAL: Bind-mount Android's /system directory for box64's ELF interpreter
+        // box64 needs /system/bin/linker64 and /system/lib64/*.so
+        // Bind the entire /system directory to ensure all dependencies are accessible
+        command += " --bind=/system";
+
         if (bindingPaths != null) {
             for (String path : bindingPaths) command += " --bind="+(new File(path)).getAbsolutePath();
         }
 
-        command += " /usr/bin/env "+envVars.toEscapedString()+" box64 "+guestExecutable;
+        // CRITICAL FIX: Copy box64 into rootfs instead of symlinking
+        // Symlinks from inside PRoot chroot cannot reference files outside the chroot
+        // We need to physically copy the box64 binary into the rootfs
+        File box64InRootfs = new File(rootDir, "usr/local/bin/box64");
+        File box64ParentDir = box64InRootfs.getParentFile();
+        if (box64ParentDir != null && !box64ParentDir.exists()) {
+            box64ParentDir.mkdirs();
+        }
 
-        envVars.clear();
-        envVars.put("PROOT_TMP_DIR", tmpDir);
-        envVars.put("PROOT_LOADER", nativeLibraryDir+"/libproot-loader.so");
-        if (!wow64Mode) envVars.put("PROOT_LOADER_32", nativeLibraryDir+"/libproot-loader32.so");
+        // CRITICAL: Delete existing symlink/file first to force fresh copy
+        // Previous iterations may have created symlinks that don't work in PRoot
+        if (box64InRootfs.exists()) {
+            android.util.Log.e("GuestProgramLauncher", "Deleting existing box64 (symlink or outdated file): " + box64InRootfs.getAbsolutePath());
+            box64InRootfs.delete();
+        }
+
+        // Copy box64 using Java file I/O (more reliable than shell commands)
+        try {
+            android.util.Log.e("GuestProgramLauncher", "Copying box64: " + box64Binary.getAbsolutePath() + " -> " + box64InRootfs.getAbsolutePath());
+
+            // Use Java streams for reliable file copying
+            java.io.FileInputStream fis = new java.io.FileInputStream(box64Binary);
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(box64InRootfs);
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                fos.write(buffer, 0, bytesRead);
+            }
+            fis.close();
+            fos.close();
+
+            // Make executable using chmod
+            Runtime.getRuntime().exec(new String[]{"chmod", "755", box64InRootfs.getAbsolutePath()}).waitFor();
+
+            android.util.Log.e("GuestProgramLauncher", "Box64 copy successful, size: " + box64InRootfs.length() + " bytes");
+
+            // CRITICAL: Patch box64's ELF interpreter path to use Android linker
+            // box64 binary references /lib/ld-linux-aarch64.so.1 (standard Linux path)
+            // but Android uses /system/bin/linker64
+            // Since we bind-mount /system, we can directly use /system/bin/linker64
+            File androidLinker = new File("/system/bin/linker64");
+            if (androidLinker.exists()) {
+                // Patch box64's interpreter path to use Android's linker directly
+                // /system is bind-mounted in PRoot, so /system/bin/linker64 is accessible
+                String interpreterPath = "/system/bin/linker64";
+                boolean patchSuccess = ElfPatcher.patchInterpreterPathJava(box64InRootfs, interpreterPath);
+                if (patchSuccess) {
+                    android.util.Log.e("GuestProgramLauncher", "Successfully patched box64 interpreter to: " + interpreterPath);
+                } else {
+                    android.util.Log.e("GuestProgramLauncher", "Failed to patch box64 interpreter (check ElfPatcher logs for details)");
+                }
+            } else {
+                android.util.Log.e("GuestProgramLauncher", "Android linker not found: " + androidLinker.getAbsolutePath());
+            }
+        } catch (Exception e) {
+            android.util.Log.e("GuestProgramLauncher", "Failed to copy box64", e);
+        }
+
+        // CRITICAL FIX: Execute box64 using original Android filesystem path (NOT rootfs copy)
+        // Using rootfs copy causes ELF version mismatch with rootfs libc.so.6
+        // Using Android original (box64Binary) avoids version conflicts
+        // This matches WinlatorEmulator.kt's successful approach (line 806: box64ToUse.absolutePath)
+        // Environment variables are passed via ProcessHelper.exec's envp parameter
+        // PRoot will inherit these variables and make them available to box64/wine
+        command += " " + box64Binary.getAbsolutePath() + " " + guestExecutable;
+
+        // Prepend PROOT_TMP_DIR to environment variables
+        // These will be passed to Runtime.exec() as the environment for the proot process
+        envVars.put("PROOT_TMP_DIR", tmpDir.getAbsolutePath());
+
+        // CRITICAL: PROOT_LOADER may be needed for Seccomp bypass on Android 10+
+        // libproot-loader.so provides alternative dynamic linker that avoids Seccomp restrictions
+        String nativeLibraryDir2 = environment.getContext().getApplicationInfo().nativeLibraryDir;
+        envVars.put("PROOT_LOADER", nativeLibraryDir2+"/libproot-loader.so");
+        if (!wow64Mode) envVars.put("PROOT_LOADER_32", nativeLibraryDir2+"/libproot-loader32.so");
 
         return ProcessHelper.exec(command, envVars.toStringArray(), rootDir, (status) -> {
             synchronized (lock) {

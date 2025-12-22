@@ -23,14 +23,14 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * リポジトリ 依存性注入module
+ * Repository dependency injection module
  * Clean Architecture: Domain interfaces bound to data layer implementations
  */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
  /**
-  * GameRepository implementationbind
+  * Bind GameRepository implementation
   */
  @Binds
  @Singleton
@@ -39,7 +39,7 @@ abstract class RepositoryModule {
  ): GameRepository
 
  /**
-  * WinlatorContainerRepository implementationbind
+  * Bind WinlatorContainerRepository implementation
   */
  @Binds
  @Singleton
@@ -48,7 +48,7 @@ abstract class RepositoryModule {
  ): WinlatorContainerRepository
 
  /**
-  * DownloadRepository implementationbind
+  * Bind DownloadRepository implementation
   */
  @Binds
  @Singleton
@@ -57,7 +57,7 @@ abstract class RepositoryModule {
  ): DownloadRepository
 
  /**
-  * FileImportRepository implementationbind
+  * Bind FileImportRepository implementation
   */
  @Binds
  @Singleton
@@ -68,7 +68,7 @@ abstract class RepositoryModule {
  // ControllerRepository binding removed - provided by ControllerModule
 
  /**
-  * ISecurePreferences implementationbind
+  * Bind ISecurePreferences implementation
   * Clean Architecture: Domain interface for secure storage
   */
  @Binds
@@ -80,7 +80,7 @@ abstract class RepositoryModule {
  // SteamRepository binding removed - provided by SteamModule in NetworkModule
 
  /**
-  * ISteamRepository implementationbind
+  * Bind ISteamRepository implementation
   * Clean Architecture: Domain interface adapter for Steam operations
   */
  @Binds

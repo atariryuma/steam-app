@@ -1,129 +1,129 @@
-# ビルド安定性ガイド
+# Build Stability Guide
 
-## 問題の原因
+## Root Causes
 
-以下の4つの要因が複合的にビルド不安定性を引き起こしていました:
+Four factors were contributing to build instability:
 
-### 1. Configuration Cache の副作用
-- Gradle 8.7 の Configuration Cache は KSP (Hilt/Room) との相性が悪い
-- キャッシュ破損時に変更が反映されない
-- ビルド失敗後の復旧が不安定
+### 1. Configuration Cache Side Effects
+- Gradle 8.7's Configuration Cache has poor compatibility with KSP (Hilt/Room)
+- Changes not reflected when cache is corrupted
+- Unstable recovery after build failures
 
-### 2. Gradle Daemon のメモリリーク
-- 長時間稼働したデーモンがヒープメモリを消費
-- Parallel build との組み合わせで競合状態が発生
-- 前回のビルド状態が残存して誤動作
+### 2. Gradle Daemon Memory Leaks
+- Long-running daemons consume heap memory
+- Race conditions occur with parallel builds
+- Previous build state persists causing errors
 
-### 3. 増分ビルドのキャッシュ不整合
-- KSP生成コード (Hilt, Room) のキャッシュが古いまま残る
-- `.gradle/caches/` と `.kotlin/` のメタデータ破損
-- R8最適化のキャッシュが不整合を起こす
+### 3. Incremental Build Cache Inconsistencies
+- KSP-generated code (Hilt, Room) cache remains stale
+- `.gradle/caches/` and `.kotlin/` metadata corruption
+- R8 optimization cache inconsistencies
 
-### 4. Windows ファイルロック問題
-- Gradleデーモンがファイルをロックし続ける
-- ビルド中のファイル削除・上書き失敗
+### 4. Windows File Locking Issues
+- Gradle daemon keeps files locked
+- File deletion/overwriting fails during build
 
 ---
 
-## 適用済みの修正
+## Applied Fixes
 
-### gradle.properties の変更
+### gradle.properties Changes
 ```properties
-# Configuration Cache を無効化 (KSP との相性問題)
+# Disable Configuration Cache (KSP compatibility issues)
 # org.gradle.configuration-cache=true
 
-# KSP 増分コンパイルを無効化 (安定性優先)
+# Disable KSP incremental compilation (stability priority)
 ksp.incremental=false
 ksp.incremental.intermodule=false
 
-# Gradle キャッシュを無効化 (クリーンビルド優先)
+# Disable Gradle caching (clean build priority)
 org.gradle.caching=false
 ```
 
-### ビルドスクリプトの追加
-- `clean-build.bat`: 完全クリーンビルド (問題発生時)
-- `quick-build.bat`: 通常の開発ビルド
-- `restart-gradle.bat`: デーモン再起動
+### Build Scripts Added
+- `clean-build.bat`: Full clean build (when issues occur)
+- `quick-build.bat`: Normal development build
+- `restart-gradle.bat`: Restart daemon
 
 ---
 
-## 使用方法
+## Usage
 
-### 通常の開発ビルド
+### Normal Development Build
 ```batch
 quick-build.bat
 ```
 
-### 変更が反映されない場合
+### When Changes Not Reflected
 ```batch
 clean-build.bat
 ```
 
-### ビルドがハングした場合
+### When Build Hangs
 ```batch
 restart-gradle.bat
 ```
 
 ---
 
-## ビルド失敗時のチェックリスト
+## Build Failure Checklist
 
-1. **Gradle デーモンを再起動**
+1. **Restart Gradle Daemon**
    ```batch
    gradlew.bat --stop
    ```
 
-2. **キャッシュをクリア**
+2. **Clear Caches**
    ```batch
    rmdir /s /q .gradle\caches
    rmdir /s /q .kotlin
    rmdir /s /q app\build
    ```
 
-3. **クリーンビルド実行**
+3. **Execute Clean Build**
    ```batch
    gradlew.bat clean --no-configuration-cache
    gradlew.bat assembleDebug --no-configuration-cache
    ```
 
-4. **それでも失敗する場合**
-   - Android Studio / IntelliJ IDEA を再起動
-   - PC を再起動 (Windows ファイルロック解放)
+4. **If Still Failing**
+   - Restart Android Studio / IntelliJ IDEA
+   - Restart PC (release Windows file locks)
 
 ---
 
-## パフォーマンスへの影響
+## Performance Impact
 
-### トレードオフ
-- ❌ **Configuration Cache 無効化**: 初回ビルド時間が若干増加 (+5~10秒)
-- ❌ **KSP 増分コンパイル無効化**: Hilt/Room 変更時のリビルドが遅延 (+10~20秒)
-- ❌ **Gradle キャッシュ無効化**: 依存関係の再ダウンロード頻度増加
+### Trade-offs
+- ❌ **Configuration Cache disabled**: Slightly increased initial build time (+5~10 seconds)
+- ❌ **KSP incremental compilation disabled**: Slower rebuilds when Hilt/Room changes (+10~20 seconds)
+- ❌ **Gradle cache disabled**: More frequent dependency re-downloads
 
-### メリット
-- ✅ **確実な変更反映**: コード変更が100%反映される
-- ✅ **ビルド成功率向上**: エラー発生率が大幅に減少
-- ✅ **デバッグ効率化**: 古いコードが残らない
-
----
-
-## 今後の改善案
-
-### Gradle 9.0 以降で検討
-- Configuration Cache の KSP サポート改善を待つ
-- 安定版になったら再有効化を検討
-
-### KSP 2.0 以降で検討
-- 増分コンパイルの安定性が向上したら再有効化
-- Kotlin 2.1+ との組み合わせで検証
-
-### 現時点の推奨設定
-- **開発中**: 現在の設定を維持 (安定性優先)
-- **CI/CD**: `--no-daemon` + `--no-configuration-cache` でクリーンビルド
-- **リリース**: 完全クリーンビルド必須
+### Benefits
+- ✅ **Reliable change detection**: Code changes are 100% reflected
+- ✅ **Improved build success rate**: Significantly fewer errors
+- ✅ **Debugging efficiency**: No stale code remains
 
 ---
 
-## 参考資料
+## Future Improvements
+
+### Consider with Gradle 9.0+
+- Wait for improved KSP support in Configuration Cache
+- Re-enable when stable
+
+### Consider with KSP 2.0+
+- Re-enable incremental compilation when stability improves
+- Verify with Kotlin 2.1+
+
+### Current Recommended Settings
+- **During development**: Maintain current settings (stability priority)
+- **CI/CD**: Clean build with `--no-daemon` + `--no-configuration-cache`
+- **Release**: Full clean build mandatory
+
+---
+
+## References
 
 - [Gradle Configuration Cache](https://docs.gradle.org/current/userguide/configuration_cache.html)
 - [KSP Incremental Processing](https://kotlinlang.org/docs/ksp-incremental.html)

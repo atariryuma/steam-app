@@ -5,7 +5,7 @@ import android.net.Uri;
 
 import com.steamdeck.mobile.core.container.Container;
 import com.steamdeck.mobile.core.xenvironment.ImageFs;
-import com.steamdeck.mobile.xenvironment.XEnvironment;
+import com.steamdeck.mobile.core.xenvironment.XEnvironment;
 import com.steamdeck.mobile.core.xenvironment.components.GuestProgramLauncherComponent;
 
 import org.json.JSONArray;

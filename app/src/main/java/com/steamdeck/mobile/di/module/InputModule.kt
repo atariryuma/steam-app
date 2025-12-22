@@ -10,7 +10,7 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * 入力（controller）関連 DImodule
+ * Input (controller) related DI module
  */
 @Module
 @InstallIn(SingletonComponent::class)

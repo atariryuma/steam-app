@@ -16,22 +16,22 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * database関連 依存性注入module
+ * Database-related dependency injection module
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
  /**
-  * databaseマイグレーション 1→2
+  * Database migration 1→2
   *
-  * 変更内容:
-  * - downloads.error カラムdelete
-  * - DownloadStatus.ERROR delete
+  * Changes:
+  * - Delete downloads.error column
+  * - Delete DownloadStatus.ERROR
   */
  private val MIGRATION_1_2 = object : Migration(1, 2) {
   override fun migrate(database: SupportSQLiteDatabase) {
-   // downloadsテーブル from errorカラムdeletedoため、新しいテーブルcreate
+   // Create new table to remove error column from downloads table
    database.execSQL("""
     CREATE TABLE downloads_new (
      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -52,7 +52,7 @@ object DatabaseModule {
     )
    """.trimIndent())
 
-   // 既存datacopy（ERROR FAILED conversion）
+   // Copy existing data (convert ERROR to FAILED)
    database.execSQL("""
     INSERT INTO downloads_new
     SELECT
@@ -64,23 +64,23 @@ object DatabaseModule {
     FROM downloads
    """.trimIndent())
 
-   // 古いテーブルdelete
+   // Delete old table
    database.execSQL("DROP TABLE downloads")
 
-   // 新しいテーブルリネーム
+   // Rename new table
    database.execSQL("ALTER TABLE downloads_new RENAME TO downloads")
   }
  }
 
  /**
-  * databaseマイグレーション 2→3
+  * Database migration 2→3
   *
-  * 変更内容:
-  * - controller_profiles テーブルadd
+  * Changes:
+  * - Add controller_profiles table
   */
  private val MIGRATION_2_3 = object : Migration(2, 3) {
   override fun migrate(database: SupportSQLiteDatabase) {
-   // controller_profilesテーブルcreate
+   // Create controller_profiles table
    database.execSQL("""
     CREATE TABLE IF NOT EXISTS controller_profiles (
      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -109,7 +109,7 @@ object DatabaseModule {
     )
    """.trimIndent())
 
-   // インデックスcreate（パフォーマンス最適化）
+   // Create indexes (performance optimization)
    database.execSQL("""
     CREATE INDEX IF NOT EXISTS index_controller_profiles_controllerId
     ON controller_profiles(controllerId)
@@ -123,17 +123,17 @@ object DatabaseModule {
  }
 
  /**
-  * databaseマイグレーション 3→4
+  * Database migration 3→4
   *
-  * 変更内容:
-  * - steam_installations テーブルadd
+  * Changes:
+  * - Add steam_installations table
   *
   * Best Practice: Explicit schema definition for migration
   * Reference: https://developer.android.com/training/data-storage/room/migrating-db-versions
   */
  private val MIGRATION_3_4 = object : Migration(3, 4) {
   override fun migrate(database: SupportSQLiteDatabase) {
-   // steam_installationsテーブルcreate
+   // Create steam_installations table
    database.execSQL("""
     CREATE TABLE IF NOT EXISTS steam_installations (
      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -146,7 +146,7 @@ object DatabaseModule {
     )
    """.trimIndent())
 
-   // インデックスcreate（パフォーマンス最適化）
+   // Create indexes (performance optimization)
    database.execSQL("""
     CREATE INDEX IF NOT EXISTS index_steam_installations_container_id
     ON steam_installations(container_id)
@@ -331,7 +331,7 @@ object DatabaseModule {
  }
 
  /**
-  * GameDao提供
+  * Provide GameDao
   */
  @Provides
  @Singleton
@@ -340,7 +340,7 @@ object DatabaseModule {
  }
 
  /**
-  * WinlatorContainerDao提供
+  * Provide WinlatorContainerDao
   */
  @Provides
  @Singleton
@@ -349,7 +349,7 @@ object DatabaseModule {
  }
 
  /**
-  * DownloadDao提供
+  * Provide DownloadDao
   */
  @Provides
  @Singleton

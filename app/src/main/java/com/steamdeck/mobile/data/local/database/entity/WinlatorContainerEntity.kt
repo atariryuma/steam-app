@@ -4,51 +4,51 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * Winlatorcontainerconfiguration格納doエンティティ
+ * Winlator container configuration storage entity
  */
 @Entity(tableName = "winlator_containers")
 data class WinlatorContainerEntity(
  @PrimaryKey(autoGenerate = true)
  val id: Long = 0,
 
- /** container名 */
+ /** Container name */
  val name: String,
 
- /** Box64プリセット (PERFORMANCE / STABILITY) */
+ /** Box64 preset (PERFORMANCE / STABILITY) */
  val box64Preset: Box64Preset,
 
- /** Wineバージョン */
+ /** Wine version */
  val wineVersion: String,
 
- /** environmentvariable（JSON形式） */
+ /** Environment variables (JSON format) */
  val environmentVars: String = "{}",
 
- /** 画面解像度（Example: "1920x1080"） */
+ /** Screen resolution (Example: "1920x1080") */
  val screenResolution: String = "1280x720",
 
- /** DXVK有効化 */
+ /** Enable DXVK */
  val enableDXVK: Boolean = true,
 
- /** D3D Extras有効化 */
+ /** Enable D3D Extras */
  val enableD3DExtras: Boolean = false,
 
- /** customcommandラインargument */
+ /** Custom command line arguments */
  val customArgs: String = "",
 
- /** createdate and time（Unix timestamp） */
+ /** Created date/time (Unix timestamp) */
  val createdTimestamp: Long = System.currentTimeMillis()
 )
 
 /**
- * Box64performanceプリセット
+ * Box64 performance preset
  */
 enum class Box64Preset {
- /** performance重視 */
+ /** Performance-focused */
  PERFORMANCE,
 
- /** 安定性重視（Unity Engineetc 推奨） */
+ /** Stability-focused (recommended for Unity Engine etc.) */
  STABILITY,
 
- /** customconfiguration */
+ /** Custom configuration */
  CUSTOM
 }

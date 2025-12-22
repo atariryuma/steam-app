@@ -84,12 +84,12 @@ data class Game(
 }
 
 /**
- * game ソース種別
+ * Game source type
  */
 enum class GameSource {
- /** Steamlibraryfrom同期 */
+ /** Synced from Steam library */
  STEAM,
 
- /** ユーザー 手動 インポート */
+ /** Manually imported by user */
  IMPORTED
 }

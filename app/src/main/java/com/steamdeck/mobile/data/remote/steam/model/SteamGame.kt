@@ -3,7 +3,7 @@ package com.steamdeck.mobile.data.remote.steam.model
 import com.google.gson.annotations.SerializedName
 
 /**
- * Steam Web APIfromretrieveされるgameinformation
+ * Game information retrieved from Steam Web API
  */
 data class SteamGame(
  @SerializedName("appid")
@@ -28,28 +28,28 @@ data class SteamGame(
  val hasCommunityVisibleStats: Boolean? = null
 ) {
  /**
-  * アイコンURLgenerate
+  * Generate icon URL
   */
  fun getIconUrl(): String {
   return "https://media.steampowered.com/steamcommunity/public/images/apps/$appId/$imgIconUrl.jpg"
  }
 
  /**
-  * ロゴURLgenerate
+  * Generate logo URL
   */
  fun getLogoUrl(): String {
   return "https://media.steampowered.com/steamcommunity/public/images/apps/$appId/$imgLogoUrl.jpg"
  }
 
  /**
-  * ヘッダー画像URLgenerate（460x215）
+  * Generate header image URL (460x215)
   */
  fun getHeaderUrl(): String {
   return "https://cdn.cloudflare.steamstatic.com/steam/apps/$appId/header.jpg"
  }
 
  /**
-  * libraryアセットURL（600x900）
+  * Library asset URL (600x900)
   */
  fun getLibraryAssetUrl(): String {
   return "https://cdn.cloudflare.steamstatic.com/steam/apps/$appId/library_600x900.jpg"
@@ -57,7 +57,7 @@ data class SteamGame(
 }
 
 /**
- * Steam API GetOwnedGamesレスポンス
+ * Steam API GetOwnedGames response
  */
 data class GetOwnedGamesResponse(
  @SerializedName("response")
@@ -73,7 +73,7 @@ data class OwnedGamesData(
 )
 
 /**
- * Steam API GetPlayerSummariesレスポンス
+ * Steam API GetPlayerSummaries response
  */
 data class GetPlayerSummariesResponse(
  @SerializedName("response")

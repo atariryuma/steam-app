@@ -247,7 +247,7 @@ fun HomeScreen(
 }
 
 /**
- * BackboneOne風コンテンツ (横スクロールセクション)
+ * BackboneOne-style content (horizontal scrolling sections)
  *
  * Best Practice: LazyColumn with nested LazyRow
  * Reference: https://www.droidcon.com/2023/01/23/nested-scroll-with-jetpack-compose/
@@ -343,7 +343,7 @@ fun BackboneOneStyleContent(
 }
 
 /**
- * ホーム画面トップバー
+ * Home screen top bar
  *
  * Material Design 3 TopAppBar with edge-to-edge support
  * - Hamburger menu on left for navigation drawer

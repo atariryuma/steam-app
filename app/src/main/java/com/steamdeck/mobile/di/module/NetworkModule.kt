@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 /**
- * network関連 依存性注入module
+ * Network-related dependency injection module
  *
  * Best Practice (2025):
  * - DataResultCallAdapterFactory for automatic error handling
@@ -43,7 +43,7 @@ object NetworkModule {
  /**
   * DataResult CallAdapter Factory
   *
-  * 全て Retrofit APIコール 自動的 DataResult<T> ラップ
+  * Automatically wraps all Retrofit API calls with DataResult<T>
   */
  @Provides
  @Singleton
@@ -64,8 +64,8 @@ object NetworkModule {
      chain.proceed(request)
     }
 
-    // デバッグビルド みログ出力有効化（本番環境 無効）
-    // セキュリティBest practice: API Key Token ログ 露出しないよう do
+    // Enable logging only for debug builds (disabled in production)
+    // Security best practice: Prevent API keys/tokens from appearing in logs
     if (com.steamdeck.mobile.BuildConfig.DEBUG) {
      val loggingInterceptor = HttpLoggingInterceptor().apply {
       level = HttpLoggingInterceptor.Level.BODY
@@ -73,12 +73,12 @@ object NetworkModule {
      addInterceptor(loggingInterceptor)
     }
    }
-   // Timeoutsettings
-   .connectTimeout(30, TimeUnit.SECONDS)  // connectionTimeout
-   .readTimeout(60, TimeUnit.SECONDS)   // 読み取りTimeout
-   .writeTimeout(60, TimeUnit.SECONDS)  // 書き込みTimeout
-   // retrysettings
-   .retryOnConnectionFailure(true)   // connection失敗時 自動retry
+   // Timeout settings
+   .connectTimeout(30, TimeUnit.SECONDS)  // Connection timeout
+   .readTimeout(60, TimeUnit.SECONDS)   // Read timeout
+   .writeTimeout(60, TimeUnit.SECONDS)  // Write timeout
+   // Retry settings
+   .retryOnConnectionFailure(true)   // Auto-retry on connection failure
    .build()
  }
 

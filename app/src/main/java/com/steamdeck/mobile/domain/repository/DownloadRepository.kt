@@ -5,66 +5,66 @@ import com.steamdeck.mobile.domain.model.DownloadStatus
 import kotlinx.coroutines.flow.Flow
 
 /**
- * downloadmanagementリポジトリ interface
+ * Download management repository interface
  */
 interface DownloadRepository {
  /**
-  * all downloadretrieve
+  * Retrieve all downloads
   */
  fun getAllDownloads(): Flow<List<Download>>
 
  /**
-  * アクティブなdownload（downloadin・waiting）retrieve
+  * Retrieve active downloads (downloading or waiting)
   */
  fun getActiveDownloads(): Flow<List<Download>>
 
  /**
-  * gameID 関連dodownloadretrieve
+  * Retrieve downloads related to game ID
   */
  fun getDownloadsByGameId(gameId: Long): Flow<List<Download>>
 
  /**
-  * downloadID downloadretrieve
+  * Retrieve download by ID
   */
  suspend fun getDownloadById(downloadId: Long): Download?
 
  /**
-  * downloadadd
+  * Add download
   */
  suspend fun insertDownload(download: Download): Long
 
  /**
-  * downloadupdate
+  * Update download
   */
  suspend fun updateDownload(download: Download)
 
  /**
-  * downloaddelete
+  * Delete download
   */
  suspend fun deleteDownload(download: Download)
 
  /**
-  * downloadprogressupdate
+  * Update download progress
   */
  suspend fun updateDownloadProgress(downloadId: Long, progress: Int, downloadedBytes: Long, status: DownloadStatus)
 
  /**
-  * downloadcompleted記録
+  * Mark download as completed
   */
  suspend fun markDownloadCompleted(downloadId: Long, status: DownloadStatus, completedTimestamp: Long)
 
  /**
-  * downloaderror記録
+  * Record download error
   */
  suspend fun markDownloadError(downloadId: Long, status: DownloadStatus, errorMessage: String)
 
  /**
-  * completedしたdownloaddelete
+  * Delete completed downloads
   */
  suspend fun deleteCompletedDownloads()
 
  /**
-  * all downloaddelete
+  * Delete all downloads
   */
  suspend fun deleteAllDownloads()
 }

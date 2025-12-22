@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 /**
- * game検索doUseCase
+ * Search games UseCase
  */
 class SearchGamesUseCase @Inject constructor(
  private val gameRepository: GameRepository

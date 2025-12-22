@@ -46,13 +46,48 @@ public class XrActivity {
      * Begin VR frame rendering (stub)
      */
     public Object beginFrame(boolean immersive, boolean sbs) {
-        return null;
+        return false;  // Return false instead of null for boolean check
     }
 
     /**
      * Bind VR framebuffer (stub)
      */
     public void bindFramebuffer() {
+        // No-op
+    }
+
+    /**
+     * Initialize VR (stub)
+     */
+    public void init() {
+        // No-op
+    }
+
+    /**
+     * Get VR width (stub)
+     */
+    public int getWidth() {
+        return 0;
+    }
+
+    /**
+     * Get VR height (stub)
+     */
+    public int getHeight() {
+        return 0;
+    }
+
+    /**
+     * End VR frame (stub)
+     */
+    public void endFrame() {
+        // No-op
+    }
+
+    /**
+     * Update VR controllers (stub)
+     */
+    public static void updateControllers() {
         // No-op
     }
 }

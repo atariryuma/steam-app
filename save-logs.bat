@@ -1,21 +1,21 @@
 @echo off
 REM SteamDeck Mobile - Log Saver
-REM Steam認証のログをファイルに保存します
+REM Saves Steam authentication logs to file
 
 echo ========================================
 echo SteamDeck Mobile - Log Saver
 echo ========================================
 echo.
 
-REM adbのパス
+REM ADB path
 set ADB_PATH=C:\Android\sdk\platform-tools\adb.exe
 
-REM 保存先ファイル名（タイムスタンプ付き）
+REM Output filename (with timestamp)
 set TIMESTAMP=%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%
 set TIMESTAMP=%TIMESTAMP: =0%
 set LOG_FILE=steam_auth_log_%TIMESTAMP%.txt
 
-REM adbが存在するか確認
+REM Check if adb exists
 if not exist "%ADB_PATH%" (
     echo ERROR: adb not found at %ADB_PATH%
     pause
@@ -26,7 +26,7 @@ echo [1/4] Checking connected devices...
 "%ADB_PATH%" devices
 echo.
 
-REM デバイスが接続されているか確認
+REM Check if device is connected
 "%ADB_PATH%" devices | findstr "device$" >nul
 if %errorlevel% neq 0 (
     echo ERROR: No devices connected!
@@ -45,14 +45,14 @@ echo.
 echo TIP: Now open the app and try Steam authentication
 echo.
 
-REM ログをファイルに保存（フィルタなし、全ログ）
+REM Save logs to file (no filter, all logs)
 "%ADB_PATH%" logcat > "%LOG_FILE%"
 
 echo.
 echo [4/4] Log saved to: %LOG_FILE%
 echo.
 
-REM Steam関連のログを抽出
+REM Extract Steam-related logs
 echo Extracting Steam-related logs...
 findstr /C:"SteamAuth" /C:"SteamLogin" /C:"SteamDeckNavHost" "%LOG_FILE%" > steam_filtered_%TIMESTAMP%.txt
 

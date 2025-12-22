@@ -791,8 +791,18 @@ class WinlatorEmulator @Inject constructor(
    // Passing linker to proot causes proot to try executing ld-linux directly → SIGSEGV
    val command = buildList {
     add(prootBinary.absolutePath)
+
+    // Bind rootfs directory for Wine system files
     add("-b")
     add("${rootfsDir.absolutePath}:/data/data/com.winlator/files/rootfs")
+
+    // CRITICAL: Bind /tmp to rootfs/tmp for XServer socket access
+    // XServer creates socket at: rootfsDir/tmp/.X11-unix/X0 (Android filesystem)
+    // Wine expects socket at: /tmp/.X11-unix/X0 (inside PRoot chroot)
+    // This bind mount makes them the same file, allowing Wine to connect to XServer
+    add("-b")
+    add("${rootfsDir.absolutePath}/tmp:/tmp")
+
     add(box64ToUse.absolutePath)  // ✅ Execute Box64 directly (PT_INTERP handles linker)
     add(wineBinary.absolutePath)
     add(executable.absolutePath)
@@ -963,7 +973,9 @@ class WinlatorEmulator @Inject constructor(
    AppLogger.e(TAG, "Process monitoring failed: $processId", e)
    // Flow will complete naturally
   } finally {
-   AppLogger.d(TAG, "Process monitoring stopped: $processId")
+   // CRITICAL FIX: Remove process from activeProcesses to prevent memory leak
+   activeProcesses.remove(processId)
+   AppLogger.d(TAG, "Process monitoring stopped and cleaned up: $processId (remaining active processes: ${activeProcesses.size})")
   }
  }.flowOn(Dispatchers.IO)
 
@@ -1086,6 +1098,7 @@ class WinlatorEmulator @Inject constructor(
    // CRITICAL: PRoot requires PROOT_TMP_DIR for temporary files
    // Without this, proot fails with "can't create temporary directory"
    put("PROOT_TMP_DIR", context.cacheDir.absolutePath)
+
    put("LANG", "C")
    put("LC_ALL", "C")
 
@@ -1743,6 +1756,11 @@ REGEDIT4
     put("BOX64_NOBANNER", "1")
     put("TMPDIR", context.cacheDir.absolutePath)
     put("PROOT_TMP_DIR", context.cacheDir.absolutePath)
+
+    // CRITICAL FIX: Android 10+ Seccomp workaround
+    // Android 10+ blocks ptrace/execve/chmod/chdir syscalls via Seccomp filter
+    // Setting PROOT_NO_SECCOMP=1 tells proot to ignore Seccomp events
+    put("PROOT_NO_SECCOMP", "1")
    }
 
    processBuilder.environment().putAll(fullEnv)
@@ -1982,6 +2000,7 @@ REGEDIT4
    // CRITICAL: PRoot requires PROOT_TMP_DIR for temporary files
    // Without this, proot fails with "can't create temporary directory"
    put("PROOT_TMP_DIR", context.cacheDir.absolutePath)
+
    put("LANG", "C")
    put("LC_ALL", "C")
    // CRITICAL: Use minimal logging to prevent SIGSEGV crashes
@@ -2038,6 +2057,10 @@ REGEDIT4
 
    // Display configuration
    put("DISPLAY", ":0")
+   // CRITICAL: XAUTHORITY is required for Wine X11 authentication (even for local connections)
+   // Without this, Wine's libX11 will fail to connect to XServer silently
+   // Path must be in PRoot chroot namespace: /tmp/.Xauthority (maps to rootfs/tmp/.Xauthority)
+   put("XAUTHORITY", "/tmp/.Xauthority")
    put("MESA_GL_VERSION_OVERRIDE", "4.6")
    put("MESA_GLSL_VERSION_OVERRIDE", "460")
 

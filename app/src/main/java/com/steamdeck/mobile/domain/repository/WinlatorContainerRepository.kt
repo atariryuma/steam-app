@@ -4,41 +4,41 @@ import com.steamdeck.mobile.domain.model.WinlatorContainer
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Winlatorcontainermanagementリポジトリ interface
+ * Winlator container management repository interface
  */
 interface WinlatorContainerRepository {
  /**
-  * all containerretrieve
+  * Retrieve all containers
   */
  fun getAllContainers(): Flow<List<WinlatorContainer>>
 
  /**
-  * containerID containerretrieve
+  * Retrieve container by ID
   */
  suspend fun getContainerById(containerId: Long): WinlatorContainer?
 
  /**
-  * container名 container検索
+  * Search containers by name
   */
  fun searchContainers(query: String): Flow<List<WinlatorContainer>>
 
  /**
-  * containeradd
+  * Add container
   */
  suspend fun insertContainer(container: WinlatorContainer): Long
 
  /**
-  * containerupdate
+  * Update container
   */
  suspend fun updateContainer(container: WinlatorContainer)
 
  /**
-  * containerdelete
+  * Delete container
   */
  suspend fun deleteContainer(container: WinlatorContainer)
 
  /**
-  * all containerdelete
+  * Delete all containers
   */
  suspend fun deleteAllContainers()
 }

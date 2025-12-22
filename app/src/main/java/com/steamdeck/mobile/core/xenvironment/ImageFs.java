@@ -24,7 +24,10 @@ public class ImageFs {
     }
 
     public static ImageFs find(Context context) {
-        return new ImageFs(new File(context.getFilesDir(), "imagefs"));
+        // CRITICAL: Use winlator/rootfs directory (not imagefs)
+        // This matches WinlatorEmulator.rootfsDir configuration
+        // Path: /data/data/com.steamdeck.mobile/files/winlator/rootfs
+        return new ImageFs(new File(context.getFilesDir(), "winlator/rootfs"));
     }
 
     public File getRootDir() {

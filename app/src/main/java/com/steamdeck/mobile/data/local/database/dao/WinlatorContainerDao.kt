@@ -5,48 +5,48 @@ import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Winlatorcontainerconfigurationto dataアクセスobject
+ * Winlator container configuration data access object
  */
 @Dao
 interface WinlatorContainerDao {
  /**
-  * all containerretrieve
+  * Get all containers
   */
  @Query("SELECT * FROM winlator_containers ORDER BY createdTimestamp DESC")
  fun getAllContainers(): Flow<List<WinlatorContainerEntity>>
 
  /**
-  * containerID containerretrieve
+  * Get container by container ID
   */
  @Query("SELECT * FROM winlator_containers WHERE id = :containerId")
  suspend fun getContainerById(containerId: Long): WinlatorContainerEntity?
 
  /**
-  * container名 container検索
+  * Search containers by container name
   */
  @Query("SELECT * FROM winlator_containers WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
  fun searchContainers(query: String): Flow<List<WinlatorContainerEntity>>
 
  /**
-  * container挿入
+  * Insert container
   */
  @Insert(onConflict = OnConflictStrategy.REPLACE)
  suspend fun insertContainer(container: WinlatorContainerEntity): Long
 
  /**
-  * containerupdate
+  * Update container
   */
  @Update
  suspend fun updateContainer(container: WinlatorContainerEntity)
 
  /**
-  * containerdelete
+  * Delete container
   */
  @Delete
  suspend fun deleteContainer(container: WinlatorContainerEntity)
 
  /**
-  * all containerdelete
+  * Delete all containers
   */
  @Query("DELETE FROM winlator_containers")
  suspend fun deleteAllContainers()

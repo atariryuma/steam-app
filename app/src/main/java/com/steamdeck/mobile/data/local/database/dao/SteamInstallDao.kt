@@ -18,37 +18,37 @@ import kotlinx.coroutines.flow.Flow
 interface SteamInstallDao {
 
  /**
-  * Steam installationinformation挿入
+  * Insert Steam installation information
   */
  @Insert(onConflict = OnConflictStrategy.REPLACE)
  suspend fun insert(installation: SteamInstallEntity): Long
 
  /**
-  * Steam installationinformationupdate
+  * Update Steam installation information
   */
  @Update
  suspend fun update(installation: SteamInstallEntity)
 
  /**
-  * 最新 Steam installationinformationretrieve (通常 1件 み)
+  * Get latest Steam installation information (usually only 1 record)
   */
  @Query("SELECT * FROM steam_installations ORDER BY installed_at DESC LIMIT 1")
  suspend fun getInstallation(): SteamInstallEntity?
 
  /**
-  * Steam installationinformation Flow monitor
+  * Monitor Steam installation information via Flow
   */
  @Query("SELECT * FROM steam_installations ORDER BY installed_at DESC LIMIT 1")
  fun observeInstallation(): Flow<SteamInstallEntity?>
 
  /**
-  * container ID Steam installationinformationretrieve
+  * Get Steam installation information by container ID
   */
  @Query("SELECT * FROM steam_installations WHERE container_id = :containerId LIMIT 1")
  suspend fun getInstallationByContainerId(containerId: String): SteamInstallEntity?
 
  /**
-  * 全て Steam installationinformationdelete
+  * Delete all Steam installation information
   */
  @Query("DELETE FROM steam_installations")
  suspend fun deleteAll()

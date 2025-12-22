@@ -21,7 +21,7 @@ class AppErrorTest {
     fun `NetworkError creates correct message for 401`() {
         val error = AppError.NetworkError(401)
 
-        assertEquals("認証エラー (code: 401)", error.message)
+        assertEquals("Authentication error (code: 401)", error.message)
         assertFalse(error.isRetryable())
     }
 
@@ -29,7 +29,7 @@ class AppErrorTest {
     fun `NetworkError creates correct message for 403`() {
         val error = AppError.NetworkError(403)
 
-        assertEquals("アクセス拒否 (code: 403)", error.message)
+        assertEquals("Access denied (code: 403)", error.message)
         assertFalse(error.isRetryable())
     }
 
@@ -37,7 +37,7 @@ class AppErrorTest {
     fun `NetworkError creates correct message for 404`() {
         val error = AppError.NetworkError(404)
 
-        assertEquals("リソースが見つかりません (code: 404)", error.message)
+        assertEquals("Resource not found (code: 404)", error.message)
         assertFalse(error.isRetryable())
     }
 
@@ -45,7 +45,7 @@ class AppErrorTest {
     fun `NetworkError creates correct message for 429`() {
         val error = AppError.NetworkError(429)
 
-        assertEquals("レート制限 (code: 429)", error.message)
+        assertEquals("Rate limit (code: 429)", error.message)
         assertTrue(error.isRetryable())
     }
 
@@ -53,7 +53,7 @@ class AppErrorTest {
     fun `NetworkError creates correct message for 500`() {
         val error = AppError.NetworkError(500)
 
-        assertEquals("サーバーエラー (code: 500)", error.message)
+        assertEquals("Server error (code: 500)", error.message)
         assertTrue(error.isRetryable())
     }
 

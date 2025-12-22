@@ -11,12 +11,11 @@ import com.steamdeck.mobile.domain.emulator.WindowsEmulator
 import com.steamdeck.mobile.domain.repository.GameRepository
 import com.steamdeck.mobile.domain.repository.WinlatorContainerRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -25,11 +24,12 @@ import javax.inject.Inject
 /**
  * Use case for launching games
  *
- * 2025 Best Practice:
+ * 2025 Best Practice (FIXED):
  * - DataResult<T> for type-safe error handling
  * - AppLogger for centralized logging
- * - Process monitoring for accurate play time tracking
+ * - Flow-based process monitoring (prevents memory leaks)
  * - Pre-launch validation (executable, Steam manifest, DLLs)
+ * - No background scope (monitoring Flow is collected in ViewModelScope)
  */
 class LaunchGameUseCase @Inject constructor(
  @ApplicationContext private val context: Context,
@@ -39,14 +39,12 @@ class LaunchGameUseCase @Inject constructor(
  private val windowsEmulator: WindowsEmulator,
  private val validateGameInstallationUseCase: ValidateGameInstallationUseCase
 ) {
- // Background scope for process monitoring (survives ViewModel lifecycle)
- private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
  /**
-  * Launch game
+  * Launch game and return launch info with monitoring Flow
   * @param gameId Game ID
-  * @return Launch result
+  * @return Launch result with process monitoring Flow
   */
- suspend operator fun invoke(gameId: Long): DataResult<Int> {
+ suspend operator fun invoke(gameId: Long): DataResult<LaunchInfo> {
   return try {
    // Get game information
    val game = gameRepository.getGameById(gameId)
@@ -107,12 +105,17 @@ class LaunchGameUseCase @Inject constructor(
       AppLogger.w(TAG, "Failed to record start time", e)
      }
 
-     // Performance optimization (2025 best practice):
-     // Monitor process lifecycle for accurate play time tracking
-     startProcessMonitoring(gameId, result.processId, startTime)
+     // FIXED (2025): Return Flow for ViewModel to collect
+     // No background scope - prevents memory leaks
+     val monitoringFlow = createProcessMonitoringFlow(gameId, result.processId, startTime)
 
      AppLogger.i(TAG, "Game launched successfully: ${game.name} (PID: ${result.processId})")
-     DataResult.Success(result.processId)
+     DataResult.Success(
+      LaunchInfo(
+       processId = result.processId,
+       monitoringFlow = monitoringFlow
+      )
+     )
     }
     is LaunchResult.Error -> {
      AppLogger.e(TAG, "Game launch failed: ${result.message}", result.cause)
@@ -168,62 +171,76 @@ class LaunchGameUseCase @Inject constructor(
  }
 
  /**
-  * Monitor process and record play time
+  * Create process monitoring Flow (FIXED: No background scope)
+  * ViewModel collects this Flow in viewModelScope
   */
- private fun startProcessMonitoring(gameId: Long, processId: Int, startTime: Long) {
-  monitoringScope.launch {
-   AppLogger.i(TAG, "Starting process monitoring for game $gameId (PID: $processId)")
+ private fun createProcessMonitoringFlow(
+  gameId: Long,
+  processId: Int,
+  startTime: Long
+ ): Flow<Unit> {
+  AppLogger.i(TAG, "Creating process monitoring flow for game $gameId (PID: $processId)")
 
-   // Bug fix: Track last checkpoint to avoid duplicate saves
-   var lastCheckpointMinute = 0
+  // Track last checkpoint to avoid duplicate saves
+  var lastCheckpointMinute = 0
 
-   windowsEmulator.monitorProcess(processId.toString())
-    .onCompletion { cause ->
-     if (cause == null) {
-      // Normal termination - calculate play time
-      val endTime = System.currentTimeMillis()
-      val durationMinutes = ((endTime - startTime) / 60000).toInt()
+  return windowsEmulator.monitorProcess(processId.toString())
+   .onCompletion { cause ->
+    if (cause == null) {
+     // Normal termination - calculate play time
+     val endTime = System.currentTimeMillis()
+     val durationMinutes = ((endTime - startTime) / 60000).toInt()
 
-      AppLogger.i(TAG, "Game $gameId finished. Play time: $durationMinutes minutes")
+     AppLogger.i(TAG, "Game $gameId finished. Play time: $durationMinutes minutes")
 
+     try {
+      gameRepository.updatePlayTime(gameId, durationMinutes.toLong(), endTime)
+      AppLogger.d(TAG, "Play time saved successfully")
+     } catch (e: Exception) {
+      AppLogger.e(TAG, "Failed to save play time", e)
+      // TODO: Queue for retry later
+     }
+    } else {
+     AppLogger.w(TAG, "Process monitoring error: ${cause.message}", cause)
+    }
+
+    // Note: WinlatorEngine cleanup is handled automatically by the engine implementation
+    // No manual cleanup needed as the engine manages its own resources
+   }
+   .catch { e ->
+    AppLogger.e(TAG, "Process monitoring exception", e)
+   }
+   .map { status ->
+    if (status.isRunning) {
+     // Periodic checkpoint: save intermediate play time every 5 minutes
+     val currentDuration = ((System.currentTimeMillis() - startTime) / 60000).toInt()
+     // Only save when we cross a 5-minute boundary
+     val currentCheckpoint = (currentDuration / 5) * 5
+     if (currentCheckpoint > lastCheckpointMinute && currentCheckpoint > 0) {
+      lastCheckpointMinute = currentCheckpoint
       try {
-       gameRepository.updatePlayTime(gameId, durationMinutes.toLong(), endTime)
-       AppLogger.d(TAG, "Play time saved successfully")
+       gameRepository.updatePlayTime(gameId, currentDuration.toLong(), System.currentTimeMillis())
+       AppLogger.d(TAG, "Checkpoint: Play time updated to $currentDuration minutes")
       } catch (e: Exception) {
-       AppLogger.e(TAG, "Failed to save play time", e)
-       // TODO: Queue for retry later
-      }
-     } else {
-      AppLogger.w(TAG, "Process monitoring error: ${cause.message}", cause)
-     }
-
-     // Note: WinlatorEngine cleanup is handled automatically by the engine implementation
-     // No manual cleanup needed as the engine manages its own resources
-    }
-    .catch { e ->
-     AppLogger.e(TAG, "Process monitoring exception", e)
-    }
-    .collect { status ->
-     if (status.isRunning) {
-      // Periodic checkpoint: save intermediate play time every 5 minutes
-      val currentDuration = ((System.currentTimeMillis() - startTime) / 60000).toInt()
-      // Bug fix: Only save when we cross a 5-minute boundary
-      val currentCheckpoint = (currentDuration / 5) * 5
-      if (currentCheckpoint > lastCheckpointMinute && currentCheckpoint > 0) {
-       lastCheckpointMinute = currentCheckpoint
-       try {
-        gameRepository.updatePlayTime(gameId, currentDuration.toLong(), System.currentTimeMillis())
-        AppLogger.d(TAG, "Checkpoint: Play time updated to $currentDuration minutes")
-       } catch (e: Exception) {
-        AppLogger.w(TAG, "Failed to save checkpoint", e)
-       }
+       AppLogger.w(TAG, "Failed to save checkpoint", e)
       }
      }
     }
-  }
+   }
  }
 
  companion object {
   private const val TAG = "LaunchGameUseCase"
  }
 }
+
+/**
+ * Launch information with process monitoring Flow
+ *
+ * FIXED (2025): Flow-based design prevents memory leaks
+ * ViewModel collects monitoringFlow in viewModelScope
+ */
+data class LaunchInfo(
+ val processId: Int,
+ val monitoringFlow: Flow<Unit>
+)

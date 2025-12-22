@@ -147,42 +147,42 @@ class InputBridgeAppIntegration @Inject constructor(
    ## InputBridge Setup Guide
 
    1. **Installation**
-    - Google Playストアfrom「InputBridge」Installation
+    - Install "InputBridge" from Google Play Store
     - or APK: https://inputbridge.net/download
 
-   2. **configuration**
+   2. **Configuration**
     - Open InputBridge app
     - Tap "Create Virtual Controller"
     - Select controller type (Xbox 360 recommended)
 
-   3. **game use**
-    - SteamDeck Mobile gamelaunch
-    - InputBridge 自動的 controllerdetection
-    - game内configuration ボタンマッピングconfirmation
+   3. **Game Usage**
+    - Launch game in SteamDeck Mobile
+    - InputBridge automatically detects controller
+    - Confirm button mapping in game configuration
 
-   ## トラブルシューティング
+   ## Troubleshooting
 
-   - controller 認識されないcase
-    → InputBridgeアプリ controller再create
+   - Controller not recognized
+    → Recreate controller in InputBridge app
 
-   - ボタン 反応しないcase
-    → game内configuration controller再detection
+   - Buttons not responding
+    → Re-detect controller in game configuration
 
-   - Wineconfiguration confirmation
-    → `wine control joy.cpl` controllerテスト
+   - Wine configuration check
+    → Test controller with `wine control joy.cpl`
   """.trimIndent()
  }
 }
 
 /**
- * Native uinputimplementation（futureimplementation）
+ * Native uinput implementation (future implementation)
  *
  * Research findings:
- * - /dev/uinputvia仮想Xbox 360controllercreate
- * - rootorinputグループ権限必要
- * - 最低レイテンシ、Wine完全互換
+ * - Create virtual Xbox 360 controller via /dev/uinput
+ * - Requires root or input group permissions
+ * - Lowest latency, fully Wine-compatible
  *
- * TODO: NDK native libraryimplementation
+ * TODO: Implement NDK native library
  * - libuinput_bridge.so
  * - JNI bindings
  * - SELinux policy (optional)
@@ -259,14 +259,14 @@ class NativeUInputBridge @Inject constructor(
 }
 
 /**
- * custom例外: InputBridge未Installation
+ * Custom exception: InputBridge not installed
  */
 class InputBridgeNotInstalledException : Exception(
  "InputBridge app not installed. Please install from Google Play or https://inputbridge.net/"
 )
 
 /**
- * 入力ブリッジconfiguration
+ * Input bridge configuration
  */
 data class InputBridgeConfig(
  val preferredStrategy: InputBridgeStrategy = InputBridgeStrategy.INPUT_BRIDGE_APP,
@@ -275,7 +275,7 @@ data class InputBridgeConfig(
 )
 
 /**
- * 入力ブリッジstrategy
+ * Input bridge strategy
  */
 enum class InputBridgeStrategy {
  INPUT_BRIDGE_APP, // Strategy 3: App integration (current)

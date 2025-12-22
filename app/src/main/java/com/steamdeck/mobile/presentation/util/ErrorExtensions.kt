@@ -6,16 +6,16 @@ import com.steamdeck.mobile.core.error.AppError
 import com.steamdeck.mobile.domain.error.SteamSyncError
 
 /**
- * UI層用Error拡張関数
+ * Error extension functions for UI layer
  *
  * Best Practice (2025):
- * - ドメインErroruser-friendlyなメッセージ conversion
- * - strings.xml 多言語対応
- * - Contextuse（UI層 みuse）
+ * - Convert domain errors to user-friendly messages
+ * - Multi-language support via strings.xml
+ * - Uses Context (UI layer only)
  */
 
 /**
- * AppError文字列リSourceID conversion
+ * Convert AppError to string resource ID
  */
 fun AppError.toStringRes(): Int {
  return when (this) {
@@ -37,10 +37,10 @@ fun AppError.toStringRes(): Int {
 }
 
 /**
- * AppErrorユーザー向けメッセージ conversion
+ * Convert AppError to user-facing message
  *
  * @param context Android Context
- * @return ローカライズされたErrorメッセージ
+ * @return Localized error message
  */
 fun AppError.toUserMessage(context: Context): String {
  return when (this) {
@@ -62,7 +62,7 @@ fun AppError.toUserMessage(context: Context): String {
 }
 
 /**
- * SteamSyncError文字列リSourceID conversion
+ * Convert SteamSyncError to string resource ID
  */
 fun SteamSyncError.toStringRes(): Int {
  return when (this) {
@@ -74,10 +74,10 @@ fun SteamSyncError.toStringRes(): Int {
 }
 
 /**
- * SteamSyncErrorユーザー向けメッセージ conversion
+ * Convert SteamSyncError to user-facing message
  *
  * @param context Android Context
- * @return ローカライズされたErrorメッセージ
+ * @return Localized error message
  */
 fun SteamSyncError.toUserMessage(context: Context): String {
  return when (this) {
@@ -89,9 +89,9 @@ fun SteamSyncError.toUserMessage(context: Context): String {
 }
 
 /**
- * Throwableユーザー向けメッセージ conversion
+ * Convert Throwable to user-facing message
  *
- * 汎用的なErrorハンドリング用
+ * For general error handling
  */
 fun Throwable.toUserMessage(context: Context): String {
  return when (this) {

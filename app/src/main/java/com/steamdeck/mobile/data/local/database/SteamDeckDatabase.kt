@@ -15,7 +15,7 @@ import com.steamdeck.mobile.data.local.database.entity.SteamInstallEntity
 import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
 
 /**
- * SteamDeck Mobile アプリケーション メインdataベース
+ * SteamDeck Mobile application main database
  *
  * Version 5 changes:
  * - Added database indexes on GameEntity for performance optimization
@@ -48,27 +48,27 @@ import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
 @TypeConverters(Converters::class)
 abstract class SteamDeckDatabase : RoomDatabase() {
  /**
-  * gameinformationto DAO
+  * Game information DAO
   */
  abstract fun gameDao(): GameDao
 
  /**
-  * Winlatorcontainerconfigurationto DAO
+  * Winlator container configuration DAO
   */
  abstract fun winlatorContainerDao(): WinlatorContainerDao
 
  /**
-  * download履歴to DAO
+  * Download history DAO
   */
  abstract fun downloadDao(): DownloadDao
 
  /**
-  * controllerプロfileto DAO
+  * Controller profile DAO
   */
  abstract fun controllerProfileDao(): ControllerProfileDao
 
  /**
-  * Steam installationinformationto DAO
+  * Steam installation information DAO
   */
  abstract fun steamInstallDao(): SteamInstallDao
 

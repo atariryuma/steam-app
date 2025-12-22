@@ -11,14 +11,14 @@ import org.junit.Test
 import java.io.File
 
 /**
- * WinlatorEmulatorの単体テスト
+ * WinlatorEmulator unit test
  *
- * テスト対象:
- * - 初期化フロー（Box64/Wine抽出）
- * - コンテナ作成とWine prefix初期化
- * - プロセス起動とライフサイクル管理
- * - エラーハンドリング（カスタムException）
- * - プロセスステータス取得
+ * Test targets:
+ * - Initialization flow (Box64/Wine extraction)
+ * - Container creation and Wine prefix initialization
+ * - Process launch and lifecycle management
+ * - Error handling (custom Exceptions)
+ * - Process status retrieval
  *
  * Best Practices:
  * - Android Context mocking
@@ -48,7 +48,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * エミュレータ情報取得テスト
+     * Test emulator information retrieval
      */
     @Test
     fun `getEmulatorInfo returns correct information`() {
@@ -66,12 +66,12 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * isAvailable: バイナリが存在しない場合のテスト
+     * Test isAvailable when binaries do not exist
      */
     @Test
     fun `isAvailable returns false when binaries do not exist`() = runTest {
         // Given
-        // アセットが存在しないと仮定
+        // Assume assets do not exist
         every { context.assets.open(any()) } throws java.io.FileNotFoundException()
 
         // When
@@ -83,7 +83,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * コンテナ作成テスト
+     * Test container creation
      */
     @Test
     fun `createContainer creates directory structure`() = runTest {
@@ -106,7 +106,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * コンテナ削除: 存在しないコンテナのテスト
+     * Test container deletion when container does not exist
      */
     @Test
     fun `deleteContainer fails when container does not exist`() = runTest {
@@ -124,7 +124,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * launchExecutable: 実行ファイルが存在しない場合のテスト
+     * Test launchExecutable when executable does not exist
      */
     @Test
     fun `launchExecutable fails when executable does not exist`() = runTest {
@@ -152,7 +152,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * launchExecutable: Box64が初期化されていない場合のテスト
+     * Test launchExecutable when Box64 is not initialized
      */
     @Test
     fun `launchExecutable fails when Box64 not initialized`() = runTest {
@@ -167,7 +167,7 @@ class WinlatorEmulatorTest {
             sizeBytes = 0L
         )
 
-        // 実行ファイルは存在するがBox64が存在しない
+        // Executable exists but Box64 does not exist
         val mockExe = mockk<File>(relaxed = true)
         every { mockExe.exists() } returns true
         every { mockExe.absolutePath } returns "/tmp/game.exe"
@@ -183,7 +183,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * getProcessStatus: 存在しないプロセスのテスト
+     * Test getProcessStatus when process does not exist
      */
     @Test
     fun `getProcessStatus fails when process does not exist`() = runTest {
@@ -201,7 +201,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * killProcess: 存在しないプロセスのテスト
+     * Test killProcess when process does not exist
      */
     @Test
     fun `killProcess fails when process does not exist`() = runTest {
@@ -219,7 +219,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * cleanup: 一時ファイルとキャッシュの削除テスト
+     * Test cleanup removes temporary files and cache
      */
     @Test
     fun `cleanup removes temporary files and cache`() = runTest {
@@ -230,12 +230,12 @@ class WinlatorEmulatorTest {
         assertTrue(result.isSuccess)
         val bytesFreed = result.getOrNull()
         assertNotNull(bytesFreed)
-        // 最初は何もないので0バイト
+        // Initially nothing exists so 0 bytes
         assertEquals(0L, bytesFreed)
     }
 
     /**
-     * name/version プロパティのテスト
+     * Test name/version properties
      */
     @Test
     fun `name and version properties are correct`() {
@@ -245,7 +245,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * listContainers: 空リストのテスト
+     * Test listContainers returns empty list
      */
     @Test
     fun `listContainers returns empty list when no containers exist`() = runTest {
@@ -260,7 +260,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * installApplication: 未実装のテスト
+     * Test installApplication not implemented error
      */
     @Test
     fun `installApplication returns not implemented error`() = runTest {
@@ -286,7 +286,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * カスタムException型の検証テスト
+     * Test custom exception types validation
      */
     @Test
     fun `custom exceptions are properly typed`() {
@@ -322,7 +322,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * Exception with cause のテスト
+     * Test exception with cause
      */
     @Test
     fun `exceptions preserve cause chain`() {
@@ -339,7 +339,7 @@ class WinlatorEmulatorTest {
     }
 
     /**
-     * EmulatorContainer拡張関数のテスト
+     * Test EmulatorContainer extension functions
      */
     @Test
     fun `EmulatorContainer extension functions work correctly`() {
@@ -358,6 +358,6 @@ class WinlatorEmulatorTest {
         // Then
         assertEquals(File(rootPath, "drive_c"), container.getWinePrefix())
         assertEquals(File(rootPath, "drive_c/Program Files"), container.getProgramFiles())
-        assertFalse(container.isInitialized()) // ディレクトリが存在しないのでfalse
+        assertFalse(container.isInitialized()) // false because directory does not exist
     }
 }

@@ -4,15 +4,15 @@ import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.model.WinlatorContainer
 
 /**
- * Winlatorエンジン interface
- * Windowsgame execution、containermanagement行う
+ * Winlator engine interface
+ * Handles Windows game execution and container management
  */
 interface WinlatorEngine {
  /**
-  * gamelaunch
-  * @param game launchdogame
-  * @param container usedoWinlatorcontainer
-  * @return launchresult
+  * Launch game
+  * @param game Game to launch
+  * @param container Winlator container to use
+  * @return Launch result
   */
  suspend fun launchGame(game: Game, container: WinlatorContainer?): LaunchResult
 
@@ -24,49 +24,49 @@ interface WinlatorEngine {
  suspend fun isGameRunning(): Boolean
 
  /**
-  * executionin gamestop
+  * Stop running game
   */
  suspend fun stopGame(): Result<Unit>
 
  /**
-  * containercreate
-  * @param container containerconfiguration
-  * @return createresult
+  * Create container
+  * @param container Container configuration
+  * @return Creation result
   */
  suspend fun createContainer(container: WinlatorContainer): Result<WinlatorContainer>
 
  /**
-  * containerdelete
-  * @param containerId containerID
+  * Delete container
+  * @param containerId Container ID
   */
  suspend fun deleteContainer(containerId: Long): Result<Unit>
 
  /**
-  * gameエンジン自動detection（Unity, Unrealetc）
-  * @param executablePath executionfilepath
-  * @return detectionされたエンジン
+  * Auto-detect game engine (Unity, Unreal, etc.)
+  * @param executablePath Executable file path
+  * @return Detected engine
   */
  suspend fun detectGameEngine(executablePath: String): GameEngine
 
  /**
-  * エンジン optimizationされたcontainerconfigurationretrieve
+  * Get engine-optimized container configuration
   */
  fun getOptimizedContainerSettings(engine: GameEngine): WinlatorContainer
 }
 
 /**
- * gamelaunchresult
+ * Game launch result
  */
 sealed class LaunchResult {
- /** launchsuccess */
+ /** Launch success */
  data class Success(val processId: Int) : LaunchResult()
 
- /** launchfailure */
+ /** Launch failure */
  data class Error(val message: String, val cause: Throwable? = null) : LaunchResult()
 }
 
 /**
- * gameエンジン種別
+ * Game engine type
  */
 enum class GameEngine {
  /** Unity Engine */
@@ -78,17 +78,17 @@ enum class GameEngine {
  /** .NET Framework */
  DOTNET,
 
- /** そ 他/不明 */
+ /** Other/Unknown */
  UNKNOWN;
 
  /**
-  * エンジン名
+  * Engine display name
   */
  val displayName: String
   get() = when (this) {
    UNITY -> "Unity Engine"
    UNREAL -> "Unreal Engine"
    DOTNET -> ".NET Framework"
-   UNKNOWN -> "不明"
+   UNKNOWN -> "Unknown"
   }
 }

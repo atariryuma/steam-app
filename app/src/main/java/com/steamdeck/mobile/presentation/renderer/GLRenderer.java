@@ -70,7 +70,13 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
-        GPUImage.checkIsSupported();
+        android.util.Log.d("GLRenderer", "onSurfaceCreated called");
+        // Try to check GPU image support, but don't crash if not available
+        try {
+            GPUImage.checkIsSupported();
+        } catch (UnsatisfiedLinkError e) {
+            android.util.Log.w("GLRenderer", "GPUImage not supported: " + e.getMessage());
+        }
 
         GLES20.glFrontFace(GLES20.GL_CCW);
         GLES20.glDisable(GLES20.GL_CULL_FACE);
@@ -112,7 +118,8 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
     private void drawFrame() {
         boolean xrFrame = false;
-        if (XrActivity.isSupported()) xrFrame = XrActivity.getInstance().beginFrame(XrActivity.getImmersive(), XrActivity.getSBS());
+        // XrActivity.isSupported() always returns false in Steam Deck Mobile
+        // if (XrActivity.isSupported()) xrFrame = XrActivity.getInstance().beginFrame(XrActivity.getImmersive(), XrActivity.getSBS());
 
         if (viewportNeedsUpdate && magnifierEnabled) {
             if (fullscreen) {
@@ -171,6 +178,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
     @Override
     public void onMapWindow(Window window) {
+        android.util.Log.d("GLRenderer", "onMapWindow called: class=" + window.getClassName());
         xServerView.queueEvent(this::updateScene);
         xServerView.requestRender();
     }
@@ -244,6 +252,9 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         quadVertices.bind(windowMaterial.programId);
 
         try (XLock lock = xServer.lock(XServer.Lockable.DRAWABLE_MANAGER)) {
+            if (renderableWindows.size() > 0) {
+                android.util.Log.d("GLRenderer", "renderWindows: rendering " + renderableWindows.size() + " windows");
+            }
             for (RenderableWindow window : renderableWindows) {
                 renderDrawable(window.content, window.rootX, window.rootY, windowMaterial, window.forceFullscreen);
             }
@@ -289,6 +300,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         try (XLock lock = xServer.lock(XServer.Lockable.WINDOW_MANAGER, XServer.Lockable.DRAWABLE_MANAGER)) {
             renderableWindows.clear();
             collectRenderableWindows(xServer.windowManager.rootWindow, xServer.windowManager.rootWindow.getX(), xServer.windowManager.rootWindow.getY());
+            android.util.Log.d("GLRenderer", "updateScene: renderableWindows.size=" + renderableWindows.size());
         }
     }
 

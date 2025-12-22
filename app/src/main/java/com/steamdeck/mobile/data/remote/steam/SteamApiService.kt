@@ -9,17 +9,17 @@ import retrofit2.http.Query
 /**
  * Steam Web API service
  *
- * API Keyretrieve: https://steamcommunity.com/dev/apikey
- * API ドキュメント: https://developer.valvesoftware.com/wiki/Steam_Web_API
+ * API Key retrieve: https://steamcommunity.com/dev/apikey
+ * API documentation: https://developer.valvesoftware.com/wiki/Steam_Web_API
  */
 interface SteamApiService {
  /**
-  * ユーザー 所有dogamelistretrieve
+  * Retrieve list of games owned by user
   *
   * @param key Steam Web API Key
-  * @param steamId ユーザー Steam ID
-  * @param includeAppInfo アプリinformation含めるか（名前、アイコンURLetc）
-  * @param includePlayedFreeGames 無料game含めるか
+  * @param steamId User's Steam ID
+  * @param includeAppInfo Whether to include app information (name, icon URL, etc.)
+  * @param includePlayedFreeGames Whether to include free games
   */
  @GET("IPlayerService/GetOwnedGames/v0001/")
  suspend fun getOwnedGames(
@@ -31,10 +31,10 @@ interface SteamApiService {
  ): Response<GetOwnedGamesResponse>
 
  /**
-  * ユーザー プロフィールinformationretrieve
+  * Retrieve user profile information
   *
   * @param key Steam Web API Key
-  * @param steamIds Steam ID カンマ区切りリスト
+  * @param steamIds Comma-separated list of Steam IDs
   */
  @GET("ISteamUser/GetPlayerSummaries/v0002/")
  suspend fun getPlayerSummaries(
@@ -44,12 +44,12 @@ interface SteamApiService {
  ): Response<GetPlayerSummariesResponse>
 
  /**
-  * アプリdetailsinformationretrieve (Store API)
+  * Retrieve app details information (Store API)
   *
-  * Note: これ Steam Web API なく、Steam Store APIuse
+  * Note: This uses Steam Store API, not Steam Web API
   * URL: https://store.steampowered.com/api/appdetails
   *
-  * @param appIds App ID カンマ区切りリスト
+  * @param appIds Comma-separated list of App IDs
   */
  @GET("https://store.steampowered.com/api/appdetails")
  suspend fun getAppDetails(

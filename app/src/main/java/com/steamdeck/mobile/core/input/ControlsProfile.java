@@ -5,7 +5,7 @@ import android.content.Context;
 import androidx.annotation.NonNull;
 
 import com.steamdeck.mobile.core.util.FileUtils;
-import com.steamdeck.mobile.widget.InputControlsView;
+import com.steamdeck.mobile.presentation.widget.InputControlsView;
 
 import org.json.JSONArray;
 import org.json.JSONException;

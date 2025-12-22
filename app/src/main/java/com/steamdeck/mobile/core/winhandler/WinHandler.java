@@ -7,7 +7,7 @@ import com.steamdeck.mobile.presentation.ui.steam.XServerDisplayActivity;
 import com.steamdeck.mobile.core.util.StringUtils;
 import com.steamdeck.mobile.core.input.ControlsProfile;
 import com.steamdeck.mobile.core.input.ExternalController;
-import com.steamdeck.mobile.xserver.XServer;
+import com.steamdeck.mobile.core.xserver.XServer;
 
 import java.io.IOException;
 import java.net.DatagramPacket;

@@ -12,7 +12,7 @@ import java.io.File
 import javax.inject.Inject
 
 /**
- * downloadcompletedしたgameinstallationdoUseCase
+ * Install downloaded game UseCase
  *
  * 2025 Best Practice:
  * - DataResult<T> for type-safe error handling
@@ -25,22 +25,22 @@ class InstallDownloadedGameUseCase @Inject constructor(
  private val gameRepository: GameRepository
 ) {
  /**
-  * download済みfilegame installationpathへcopyしてinstallation
+  * Copy downloaded file to game installation path and install
   *
-  * @param downloadId downloadID
-  * @return installationresult
+  * @param downloadId Download ID
+  * @return Installation result
   */
  suspend operator fun invoke(downloadId: Long): DataResult<Unit> = withContext(Dispatchers.IO) {
   try {
    AppLogger.i(TAG, "Starting game installation for download ID: $downloadId")
 
-   // 1. downloadinformationretrieve
+   // 1. Retrieve download information
    val download = downloadRepository.getDownloadById(downloadId)
     ?: return@withContext DataResult.Error(
-     AppError.DatabaseError("download not found (ID: $downloadId)", null)
+     AppError.DatabaseError("Download not found (ID: $downloadId)", null)
     )
 
-   // 2. gameinformationretrieve
+   // 2. Retrieve game information
    val gameId = download.gameId
     ?: return@withContext DataResult.Error(
      AppError.Unknown(Exception("Download has no associated game ID"))
@@ -48,31 +48,31 @@ class InstallDownloadedGameUseCase @Inject constructor(
 
    val game = gameRepository.getGameById(gameId)
     ?: return@withContext DataResult.Error(
-     AppError.DatabaseError("game not found (ID: $gameId)", null)
+     AppError.DatabaseError("Game not found (ID: $gameId)", null)
     )
 
-   // 3. downloadfile existconfirmation
+   // 3. Confirm downloaded file exists
    // Bug fix: destinationPath is directory, need to append fileName
    val downloadedFile = File(download.destinationPath, download.fileName)
    if (!downloadedFile.exists()) {
     AppLogger.e(TAG, "Downloaded file not found: ${download.destinationPath}")
 
-    // installationfailureマーク
+    // Mark installation failure
     val updatedDownload = download.copy(installationStatus = InstallationStatus.VALIDATION_FAILED)
     downloadRepository.updateDownload(updatedDownload)
 
     return@withContext DataResult.Error(
-     AppError.FileError("downloadfile not found", null)
+     AppError.FileError("Downloaded file not found", null)
     )
    }
 
    AppLogger.d(TAG, "Downloaded file found: ${downloadedFile.absolutePath} (${downloadedFile.length()} bytes)")
 
-   // 4. installationstartマーク
+   // 4. Mark installation start
    val downloadInstalling = download.copy(installationStatus = InstallationStatus.INSTALLING)
    downloadRepository.updateDownload(downloadInstalling)
 
-   // 5. installation先directorycreate
+   // 5. Create installation directory
    val installDir = File(game.installPath)
    if (!installDir.exists()) {
     AppLogger.d(TAG, "Creating install directory: ${installDir.absolutePath}")
@@ -83,12 +83,12 @@ class InstallDownloadedGameUseCase @Inject constructor(
      downloadRepository.updateDownload(updatedDownload)
 
      return@withContext DataResult.Error(
-      AppError.FileError("installationdirectory create failuredid", null)
+      AppError.FileError("Failed to create installation directory", null)
      )
     }
    }
 
-   // 6. filecopy（既存file あるcase 上書き）
+   // 6. Copy file (overwrite if existing file exists)
    val targetFile = File(installDir, downloadedFile.name)
    AppLogger.d(TAG, "Copying file to: ${targetFile.absolutePath}")
 
@@ -98,16 +98,16 @@ class InstallDownloadedGameUseCase @Inject constructor(
    } catch (e: Exception) {
     AppLogger.e(TAG, "Failed to copy file", e)
 
-    // installationfailureマーク
+    // Mark installation failure
     val updatedDownload = download.copy(installationStatus = InstallationStatus.VALIDATION_FAILED)
     downloadRepository.updateDownload(updatedDownload)
 
     return@withContext DataResult.Error(
-     AppError.FileError("file copy failuredid: ${e.message}", e)
+     AppError.FileError("File copy failed: ${e.message}", e)
     )
    }
 
-   // 7. copysuccess後、downloadfiledelete（ストレージ節約）
+   // 7. After successful copy, delete download file (save storage)
    try {
     if (downloadedFile.delete()) {
      AppLogger.d(TAG, "Downloaded file deleted: ${downloadedFile.absolutePath}")
@@ -115,11 +115,11 @@ class InstallDownloadedGameUseCase @Inject constructor(
      AppLogger.w(TAG, "Failed to delete downloaded file (non-critical)")
     }
    } catch (e: Exception) {
-    // deletefailure 非致命的error
+    // Delete failure is non-fatal error
     AppLogger.w(TAG, "Exception while deleting downloaded file (non-critical)", e)
    }
 
-   // 8. installationcompletedマーク
+   // 8. Mark installation completed
    val downloadCompleted = download.copy(installationStatus = InstallationStatus.INSTALLED)
    downloadRepository.updateDownload(downloadCompleted)
 

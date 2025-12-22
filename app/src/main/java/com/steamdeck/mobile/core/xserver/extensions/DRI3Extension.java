@@ -1,6 +1,6 @@
 package com.steamdeck.mobile.core.xserver.extensions;
 
-import static com.winlator.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
+import static com.steamdeck.mobile.core.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
 
 import com.steamdeck.mobile.core.util.Callback;
 import com.steamdeck.mobile.core.sysvshm.SysVSharedMemory;

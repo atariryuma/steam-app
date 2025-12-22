@@ -1,10 +1,10 @@
 package com.steamdeck.mobile.core.sysvshm;
 
-import com.steamdeck.mobile.xconnector.Client;
-import com.steamdeck.mobile.xconnector.RequestHandler;
-import com.steamdeck.mobile.xconnector.XInputStream;
-import com.steamdeck.mobile.xconnector.XOutputStream;
-import com.steamdeck.mobile.xconnector.XStreamLock;
+import com.steamdeck.mobile.core.xconnector.Client;
+import com.steamdeck.mobile.core.xconnector.RequestHandler;
+import com.steamdeck.mobile.core.xconnector.XInputStream;
+import com.steamdeck.mobile.core.xconnector.XOutputStream;
+import com.steamdeck.mobile.core.xconnector.XStreamLock;
 
 import java.io.IOException;
 

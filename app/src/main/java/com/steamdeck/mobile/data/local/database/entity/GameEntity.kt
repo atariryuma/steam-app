@@ -5,7 +5,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * gameinformation格納doエンティティ
+ * Game information storage entity
  *
  * Performance optimization (2025 best practice):
  * - Indexes on frequently queried columns for 40-60% query speed improvement
@@ -30,40 +30,40 @@ data class GameEntity(
  @PrimaryKey(autoGenerate = true)
  val id: Long = 0,
 
- /** game名 */
+ /** Game name */
  val name: String,
 
- /** Steam App ID (Steamintegration時 use) */
+ /** Steam App ID (used for Steam integration) */
  val steamAppId: Long? = null,
 
- /** execution可能file path (.exe) */
+ /** Executable file path (.exe) */
  val executablePath: String,
 
- /** game installationpath */
+ /** Game installation path */
  val installPath: String,
 
- /** game ソース (STEAM / IMPORTED) */
+ /** Game source (STEAM / IMPORTED) */
  val source: GameSource,
 
- /** 関連doWinlatorcontainerID */
+ /** Related Winlator container ID */
  val winlatorContainerId: Long? = null,
 
- /** play time（minutes） */
+ /** Play time (minutes) */
  val playTimeMinutes: Long = 0,
 
- /** 最後 プレイしたdate and time（Unix timestamp） */
+ /** Last played date/time (Unix timestamp) */
  val lastPlayedTimestamp: Long? = null,
 
- /** gameアイコン ローカルpath */
+ /** Game icon local path */
  val iconPath: String? = null,
 
- /** gameバナー ローカルpath */
+ /** Game banner local path */
  val bannerPath: String? = null,
 
- /** adddate and time（Unix timestamp） */
+ /** Added date/time (Unix timestamp) */
  val addedTimestamp: Long = System.currentTimeMillis(),
 
- /** favoriteフラグ */
+ /** Favorite flag */
  val isFavorite: Boolean = false,
 
  /** Installation status (NOT_INSTALLED, DOWNLOADING, INSTALLING, INSTALLED, etc.) */
@@ -77,12 +77,12 @@ data class GameEntity(
 )
 
 /**
- * game ソース種別
+ * Game source type
  */
 enum class GameSource {
- /** Steamlibraryfrom同期 */
+ /** Synced from Steam library */
  STEAM,
 
- /** ユーザー 手動 インポート */
+ /** Manually imported by user */
  IMPORTED
 }

@@ -119,13 +119,13 @@ abstract class RepositoryModule {
 
 ### Auth (Steam OpenID 2.0 + Security)
 
-- **ONLY OpenID 2.0**: Valve公式推奨のサードパーティ向け認証方式
+- **ONLY OpenID 2.0**: Valve's officially recommended authentication method for third-party apps
 - `SteamOpenIdAuthenticator` with CSRF protection (256-bit secure random state)
 - OpenID 2.0 signature verification (MITM attack prevention)
 - SteamID64 validation (range: 76561197960265728 ~ 76561202255233023)
 - **No embedded API keys**: Users provide their own Steam Web API Key
 - Encrypted token storage via `SecurePreferencesImpl` (AES256-GCM)
-- WebView-based login (Steam公式ログインページ経由)
+- WebView-based login (via official Steam login page)
 
 ### Wine Container Management (2025 Best Practice)
 
@@ -227,7 +227,7 @@ containers/
 - HTTP errors: `AppError.fromHttpCode()` auto-mapping
 - Retryability: `AppError.isRetryable()` for smart retry logic
 - Log via `android.util.Log` with TAG
-- User messages in strings.xml (ja/en)
+- User messages in strings.xml (English)
 
 ### Code Quality
 - NEVER use `GlobalScope` or `!!`
@@ -525,7 +525,7 @@ fun `launchGame should return error when game not found`() { ... }
 - Material3 dynamic colors (Android 12+)
 - Immersive fullscreen (no status/nav bars)
 - Landscape optimized (2400×1080px)
-- Primary language: Japanese (English fallback via `strings.xml`)
+- Primary language: English (via `strings.xml`)
 
 **Known limitations:**
 

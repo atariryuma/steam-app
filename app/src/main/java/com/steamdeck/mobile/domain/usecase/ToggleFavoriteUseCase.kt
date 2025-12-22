@@ -6,7 +6,7 @@ import com.steamdeck.mobile.domain.repository.GameRepository
 import javax.inject.Inject
 
 /**
- * favoritestate切り替えるUseCase
+ * Toggle favorite state UseCase
  *
  * 2025 Best Practice: DataResult<T> for type-safe error handling
  */

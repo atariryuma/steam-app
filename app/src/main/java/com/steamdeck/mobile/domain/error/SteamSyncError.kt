@@ -1,18 +1,18 @@
 package com.steamdeck.mobile.domain.error
 
 /**
- * Steam同期専用error
+ * Steam sync specific errors
  *
  * Best Practice (2025):
- * - ドメイン層 Sealed class errortype安全 表現
- * - UI層 strings.xml conversion
- * - Clean Architecture準拠（ドメイン層 Contextuseしない）
+ * - Domain layer sealed class for type-safe error representation
+ * - UI layer converts to strings.xml
+ * - Clean Architecture compliant (domain layer doesn't use Context)
  *
  * Note: Extends Exception instead of AppError to avoid package restriction
  */
 sealed class SteamSyncError : Exception() {
  /**
-  * Steamプロフィール 非公開
+  * Steam profile is private
   */
  data object PrivateProfile : SteamSyncError() {
   override val message: String
@@ -20,7 +20,7 @@ sealed class SteamSyncError : Exception() {
  }
 
  /**
-  * Steam APIAuthentication error
+  * Steam API authentication error
   */
  data object AuthFailed : SteamSyncError() {
   override val message: String
@@ -28,7 +28,7 @@ sealed class SteamSyncError : Exception() {
  }
 
  /**
-  * networkTimeout
+  * Network timeout
   */
  data object NetworkTimeout : SteamSyncError() {
   override val message: String
@@ -36,7 +36,7 @@ sealed class SteamSyncError : Exception() {
  }
 
  /**
-  * 一般的なAPIerror
+  * General API error
   */
  data class ApiError(val errorMessage: String) : SteamSyncError() {
   override val message: String

@@ -1,6 +1,6 @@
 package com.steamdeck.mobile.core.xserver.errors;
 
-import static com.winlator.xserver.XClientRequestHandler.RESPONSE_CODE_ERROR;
+import static com.steamdeck.mobile.core.xserver.XClientRequestHandler.RESPONSE_CODE_ERROR;
 
 import com.steamdeck.mobile.core.xconnector.XOutputStream;
 import com.steamdeck.mobile.core.xconnector.XStreamLock;

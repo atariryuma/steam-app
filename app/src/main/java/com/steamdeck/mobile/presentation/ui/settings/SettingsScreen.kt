@@ -82,7 +82,7 @@ import com.steamdeck.mobile.presentation.viewmodel.WineTestUiState
 import com.steamdeck.mobile.presentation.viewmodel.WineTestViewModel
 
 /**
- * Settings画面 - Simplified design without NavigationRail
+ * Settings screen - Simplified design without NavigationRail
  *
  * Navigation is handled by the Home screen's mini drawer.
  * This screen only displays the content for the selected section.
@@ -96,6 +96,7 @@ import com.steamdeck.mobile.presentation.viewmodel.WineTestViewModel
 fun SettingsScreen(
  onNavigateBack: () -> Unit,
  onNavigateToControllerSettings: () -> Unit = {},
+ onNavigateToSteamDisplay: (String) -> Unit = {},
  initialSection: Int = -1,
  viewModel: SettingsViewModel = hiltViewModel(),
  wineTestViewModel: WineTestViewModel = hiltViewModel(),
@@ -186,7 +187,7 @@ fun SettingsScreen(
      onNavigateToControllerSettings = onNavigateToControllerSettings,
      onSaveApiKey = viewModel::saveSteamApiKey,
      onInstallSteam = viewModel::installSteamClient,
-     onOpenSteam = viewModel::openSteamClient,
+     onOpenSteam = onNavigateToSteamDisplay,
      onUninstallSteam = viewModel::uninstallSteamClient,
      onNavigateBack = onNavigateBack
     )
@@ -377,7 +378,7 @@ private fun SteamAuthContent(
  enabled: Boolean = true
 ) {
  val steamLoginState by steamLoginViewModel.uiState.collectAsState()
- 
+
  // Close WebView on authentication success and trigger auto-sync
  LaunchedEffect(steamLoginState) {
   if (steamLoginState is SteamLoginUiState.Success) {
@@ -392,11 +393,11 @@ private fun SteamAuthContent(
    onHideWebView()
   }
  }
- 
+
  if (showWebView) {
   // Display WebView (full size, sidebar maintained)
   val (authUrl, _) = remember { steamLoginViewModel.startOpenIdLogin() }
-  
+
   Box(
    modifier = Modifier
     .fillMaxSize()
@@ -413,20 +414,33 @@ private fun SteamAuthContent(
     }
    )
   }
- } else if (data.isSteamConfigured) {
-  // Already logged in - Steam style design
-  SteamAuthLoggedInSection(
-   username = data.steamUsername,
-   steamId = data.steamId,
-   onRelogin = onShowWebView,
-   onLogout = onClear
-  )
  } else {
-  // Not logged in - Display OpenID login button
-  SteamOpenIdAuthSection(
-   onNavigateToLogin = onShowWebView,
-   enabled = enabled
-  )
+  Column(
+   verticalArrangement = Arrangement.spacedBy(16.dp)
+  ) {
+   if (data.isSteamConfigured) {
+    // Already logged in - Steam style design
+    SteamAuthLoggedInSection(
+     username = data.steamUsername,
+     steamId = data.steamId,
+     onRelogin = onShowWebView,
+     onLogout = onClear
+    )
+   } else {
+    // Not logged in - Display OpenID login button
+    SteamOpenIdAuthSection(
+     onNavigateToLogin = onShowWebView,
+     enabled = enabled
+    )
+   }
+
+   // API Key configuration section (always visible)
+   SteamApiKeySection(
+    apiKey = data.steamApiKey,
+    onSaveApiKey = settingsViewModel::saveSteamApiKey,
+    enabled = enabled
+   )
+  }
  }
 }
 
@@ -574,12 +588,12 @@ private fun SteamAuthLoggedInSection(
 /**
  * Steam OpenID authentication section (Steam official style design)
  *
- * Steam公式カラーパレット:
- * - #171a21: ナビバー/ダーク背景
- * - #1b2838: プライマリ背景
- * - #2a475e: セカンダリ背景
- * - #66c0f4: アクセントブルー
- * - #c7d5e0: ライトテキスト
+ * Steam official color palette:
+ * - #171a21: Navbar/dark background
+ * - #1b2838: Primary background
+ * - #2a475e: Secondary background
+ * - #66c0f4: Accent blue
+ * - #c7d5e0: Light text
  */
 @Composable
 private fun SteamOpenIdAuthSection(
@@ -1301,7 +1315,8 @@ private fun WineTestIntegratedContent(
     onCheckWine = viewModel::checkWineAvailability,
     onInitialize = viewModel::initializeEmulator,
     onCreateContainer = viewModel::testCreateContainer,
-    onListContainers = viewModel::listContainers
+    onListContainers = viewModel::listContainers,
+    onTestX11 = viewModel::testX11Client
    )
   }
 
@@ -1389,7 +1404,8 @@ private fun WineTestCompactTestButtons(
  onCheckWine: () -> Unit,
  onInitialize: () -> Unit,
  onCreateContainer: () -> Unit,
- onListContainers: () -> Unit
+ onListContainers: () -> Unit,
+ onTestX11: () -> Unit = {}
 ) {
  Column(
   modifier = Modifier.fillMaxWidth(),
@@ -1433,6 +1449,14 @@ private fun WineTestCompactTestButtons(
    ) {
     Text("4. List", style = MaterialTheme.typography.labelLarge)
    }
+  }
+
+  // Row 3: X11 Test (connection + window display)
+  Button(
+   onClick = onTestX11,
+   modifier = Modifier.fillMaxWidth()
+  ) {
+   Text("5. Test X11", style = MaterialTheme.typography.labelLarge)
   }
  }
 }
@@ -1739,6 +1763,195 @@ private fun PrerequisiteWarning(
       color = MaterialTheme.colorScheme.error
      )
     }
+   }
+  }
+ }
+}
+
+/**
+ * Steam Web API Key configuration section
+ *
+ * Best Practice (2025):
+ * - Users provide their own API keys (Steam ToS compliant)
+ * - AES-256 encrypted storage
+ * - Password-masked input
+ * - Direct link to Steam API Key registration
+ */
+@Composable
+private fun SteamApiKeySection(
+ apiKey: String?,
+ onSaveApiKey: (String) -> Unit,
+ enabled: Boolean = true,
+ modifier: Modifier = Modifier
+) {
+ val context = LocalContext.current
+ var editingApiKey by remember { mutableStateOf(apiKey ?: "") }
+ var isEditing by remember { mutableStateOf(apiKey.isNullOrBlank()) }
+ var showValidationError by remember { mutableStateOf(false) }
+
+ Card(
+  modifier = modifier.fillMaxWidth(),
+  colors = CardDefaults.cardColors(
+   containerColor = MaterialTheme.colorScheme.surfaceVariant
+  ),
+  shape = RoundedCornerShape(8.dp),
+  elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+ ) {
+  Column(
+   modifier = Modifier.padding(20.dp),
+   verticalArrangement = Arrangement.spacedBy(12.dp)
+  ) {
+   // Header
+   Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(8.dp)
+   ) {
+    Icon(
+     imageVector = Icons.Default.Security,
+     contentDescription = null,
+     tint = MaterialTheme.colorScheme.primary,
+     modifier = Modifier.size(24.dp)
+    )
+    Text(
+     "Steam Web API Key",
+     style = MaterialTheme.typography.titleMedium,
+     fontWeight = FontWeight.Bold,
+     color = MaterialTheme.colorScheme.onSurface
+    )
+   }
+
+   if (isEditing) {
+    // Editing mode
+    Column(
+     verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+     TextField(
+      value = editingApiKey,
+      onValueChange = {
+       editingApiKey = it
+       showValidationError = false
+      },
+      label = { Text("API Key") },
+      placeholder = { Text("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX") },
+      visualTransformation = PasswordVisualTransformation(),
+      singleLine = true,
+      isError = showValidationError,
+      enabled = enabled,
+      modifier = Modifier.fillMaxWidth(),
+      supportingText = if (showValidationError) {
+       { Text("API Key must be 32 characters", color = MaterialTheme.colorScheme.error) }
+      } else null
+     )
+
+     Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(8.dp)
+     ) {
+      OutlinedButton(
+       onClick = {
+        // Open Steam API Key registration page
+        val intent = android.content.Intent(
+         android.content.Intent.ACTION_VIEW,
+         android.net.Uri.parse("https://steamcommunity.com/dev/apikey")
+        )
+        context.startActivity(intent)
+       },
+       enabled = enabled,
+       modifier = Modifier.weight(1f)
+      ) {
+       Icon(
+        imageVector = Icons.Default.Info,
+        contentDescription = null,
+        modifier = Modifier.size(18.dp)
+       )
+       Spacer(Modifier.width(4.dp))
+       Text("Get API Key")
+      }
+
+      Button(
+       onClick = {
+        // Validate API Key (Steam API Keys are 32 characters)
+        if (editingApiKey.length == 32) {
+         onSaveApiKey(editingApiKey)
+         isEditing = false
+         showValidationError = false
+        } else {
+         showValidationError = true
+        }
+       },
+       enabled = enabled && editingApiKey.isNotBlank(),
+       modifier = Modifier.weight(1f)
+      ) {
+       Icon(
+        imageVector = Icons.Default.Check,
+        contentDescription = null,
+        modifier = Modifier.size(18.dp)
+       )
+       Spacer(Modifier.width(4.dp))
+       Text("Save")
+      }
+     }
+    }
+   } else {
+    // Display mode (API Key configured)
+    Row(
+     modifier = Modifier.fillMaxWidth(),
+     horizontalArrangement = Arrangement.SpaceBetween,
+     verticalAlignment = Alignment.CenterVertically
+    ) {
+     Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(8.dp)
+     ) {
+      Icon(
+       imageVector = Icons.Default.CheckCircle,
+       contentDescription = null,
+       tint = Color(0xFF4CAF50), // Green
+       modifier = Modifier.size(20.dp)
+      )
+      Column {
+       Text(
+        "API Key Configured",
+        style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface
+       )
+       Text(
+        "••••••••••••••••••••••••••••••••",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+       )
+      }
+     }
+
+     OutlinedButton(
+      onClick = { isEditing = true },
+      enabled = enabled
+     ) {
+      Text("Change")
+     }
+    }
+   }
+
+   // Info text
+   Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    verticalAlignment = Alignment.Top
+   ) {
+    Icon(
+     imageVector = Icons.Default.Info,
+     contentDescription = null,
+     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+     modifier = Modifier.size(16.dp).padding(top = 2.dp)
+    )
+    Text(
+     "Your API Key is stored locally with AES-256 encryption and never shared with third parties. Required for syncing your Steam library.",
+     style = MaterialTheme.typography.bodySmall,
+     color = MaterialTheme.colorScheme.onSurfaceVariant,
+     lineHeight = 18.sp
+    )
    }
   }
  }

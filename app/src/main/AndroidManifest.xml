@@ -8,15 +8,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- ストレージ権限: Android 13以降はScoped Storage推奨 -->
+    <!-- Storage permissions: Scoped Storage recommended for Android 13+ -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28"
         tools:ignore="ScopedStorage" />
 
-    <!-- 注意: MANAGE_EXTERNAL_STORAGEはGoogle Playポリシーで制限されています
-         MediaStore API、Storage Access Framework、Photo Pickerの使用を推奨
+    <!-- Note: MANAGE_EXTERNAL_STORAGE is restricted by Google Play policy
+         Recommended to use MediaStore API, Storage Access Framework, or Photo Picker
          https://support.google.com/googleplay/android-developer/answer/10467955 -->
     <!-- <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" /> -->
 
@@ -81,7 +81,7 @@
                 android:name="asset_statements"
                 android:resource="@string/asset_statements" />
 
-            <!-- Steam OpenID コールバック用カスタムURLスキーム -->
+            <!-- Custom URL scheme for Steam OpenID callback -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

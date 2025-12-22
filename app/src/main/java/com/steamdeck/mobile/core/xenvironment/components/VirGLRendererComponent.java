@@ -2,14 +2,14 @@ package com.steamdeck.mobile.core.xenvironment.components;
 
 import androidx.annotation.Keep;
 
-import com.steamdeck.mobile.renderer.GLRenderer;
-import com.steamdeck.mobile.renderer.Texture;
+import com.steamdeck.mobile.presentation.renderer.GLRenderer;
+import com.steamdeck.mobile.presentation.renderer.Texture;
 import com.steamdeck.mobile.core.xconnector.Client;
 import com.steamdeck.mobile.core.xconnector.ConnectionHandler;
 import com.steamdeck.mobile.core.xconnector.RequestHandler;
 import com.steamdeck.mobile.core.xconnector.UnixSocketConfig;
 import com.steamdeck.mobile.core.xconnector.XConnectorEpoll;
-import com.steamdeck.mobile.xenvironment.EnvironmentComponent;
+import com.steamdeck.mobile.core.xenvironment.EnvironmentComponent;
 import com.steamdeck.mobile.core.xserver.Drawable;
 import com.steamdeck.mobile.core.xserver.XServer;
 

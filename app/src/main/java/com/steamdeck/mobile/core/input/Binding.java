@@ -2,7 +2,7 @@ package com.steamdeck.mobile.core.input;
 
 import androidx.annotation.NonNull;
 
-import com.steamdeck.mobile.xserver.Pointer;
+import com.steamdeck.mobile.core.xserver.Pointer;
 import com.steamdeck.mobile.core.xserver.XKeycode;
 
 import java.util.ArrayList;

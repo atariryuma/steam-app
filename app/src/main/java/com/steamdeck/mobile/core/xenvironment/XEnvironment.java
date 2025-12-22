@@ -45,7 +45,11 @@ public class XEnvironment implements Iterable<EnvironmentComponent> {
     }
 
     public File getTmpDir() {
-        File tmpDir = new File(context.getFilesDir(), "tmp");
+        // CRITICAL: Use imageFs root directory for tmp (not context.filesDir)
+        // This matches Winlator's architecture where all Unix sockets and temp files
+        // are created inside the rootfs/imagefs directory structure
+        // Required for PRoot bind mount: rootfs/tmp:/tmp
+        File tmpDir = new File(imageFs.getRootDir(), "tmp");
         if (!tmpDir.isDirectory()) {
             tmpDir.mkdirs();
             FileUtils.chmod(tmpDir, 0771);
@@ -54,7 +58,10 @@ public class XEnvironment implements Iterable<EnvironmentComponent> {
     }
 
     public void startEnvironmentComponents() {
-        FileUtils.clear(getTmpDir());
+        // DO NOT clear tmp directory here - it removes .X11-unix directory
+        // that was created before startEnvironmentComponents() is called
+        // Winlator clears tmp in XServerDisplayActivity before creating XEnvironment
+        // FileUtils.clear(getTmpDir());  // REMOVED - causes ENOENT on socket bind
         for (EnvironmentComponent environmentComponent : this) environmentComponent.start();
     }
 

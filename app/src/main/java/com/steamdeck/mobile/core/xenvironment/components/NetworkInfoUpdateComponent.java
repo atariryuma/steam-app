@@ -9,7 +9,7 @@ import android.net.NetworkInfo;
 
 import com.steamdeck.mobile.core.util.FileUtils;
 import com.steamdeck.mobile.core.util.NetworkHelper;
-import com.steamdeck.mobile.xenvironment.EnvironmentComponent;
+import com.steamdeck.mobile.core.xenvironment.EnvironmentComponent;
 
 import java.io.File;
 

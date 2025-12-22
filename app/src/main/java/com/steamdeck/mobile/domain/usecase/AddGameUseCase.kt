@@ -7,7 +7,7 @@ import com.steamdeck.mobile.domain.repository.GameRepository
 import javax.inject.Inject
 
 /**
- * gameadddoUseCase
+ * Add game UseCase
  *
  * 2025 Best Practice: DataResult<T> for type-safe error handling
  */
@@ -15,25 +15,25 @@ class AddGameUseCase @Inject constructor(
  private val gameRepository: GameRepository
 ) {
  /**
-  * gameadd
-  * @return addされたgame ID
+  * Add game
+  * @return Added game ID
   */
  suspend operator fun invoke(game: Game): DataResult<Long> {
   return try {
-   // バリデーション
+   // Validation
    if (game.name.isBlank()) {
     return DataResult.Error(
-     AppError.DatabaseError("game名入力please", null)
+     AppError.DatabaseError("Please enter game name", null)
     )
    }
    if (game.executablePath.isBlank()) {
     return DataResult.Error(
-     AppError.FileError("executionfilepath入力please", null)
+     AppError.FileError("Please enter executable file path", null)
     )
    }
    if (game.installPath.isBlank()) {
     return DataResult.Error(
-     AppError.FileError("installationpath入力please", null)
+     AppError.FileError("Please enter installation path", null)
     )
    }
 

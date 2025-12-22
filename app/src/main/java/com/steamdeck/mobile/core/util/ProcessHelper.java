@@ -40,29 +40,34 @@ public abstract class ProcessHelper {
     public static int exec(String command, String[] envp, File workingDir, Callback<Integer> terminationCallback) {
         int pid = -1;
         try {
+            android.util.Log.e("ProcessHelper", "exec() called: command=" + command);
+            android.util.Log.e("ProcessHelper", "Working dir: " + (workingDir != null ? workingDir.getAbsolutePath() : "null"));
             java.lang.Process process = Runtime.getRuntime().exec(splitCommand(command), envp, workingDir);
             Field pidField = process.getClass().getDeclaredField("pid");
             pidField.setAccessible(true);
             pid = pidField.getInt(process);
             pidField.setAccessible(false);
+            android.util.Log.e("ProcessHelper", "Process started with PID: " + pid);
 
-            if (!debugCallbacks.isEmpty()) {
-                createDebugThread(process.getInputStream());
-                createDebugThread(process.getErrorStream());
-            }
+            // CRITICAL: Always capture stdout/stderr to diagnose Wine failures
+            createDebugThread(process.getInputStream(), "STDOUT");
+            createDebugThread(process.getErrorStream(), "STDERR");
 
             if (terminationCallback != null) createWaitForThread(process, terminationCallback);
         }
-        catch (Exception e) {}
+        catch (Exception e) {
+            android.util.Log.e("ProcessHelper", "exec() failed: " + e.getMessage(), e);
+        }
         return pid;
     }
 
-    private static void createDebugThread(final InputStream inputStream) {
+    private static void createDebugThread(final InputStream inputStream, final String label) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    if (PRINT_DEBUG) System.out.println(line);
+                    // CRITICAL: Always log output to diagnose Wine failures
+                    android.util.Log.e("ProcessHelper", label + ": " + line);
                     synchronized (debugCallbacks) {
                         if (!debugCallbacks.isEmpty()) {
                             for (Callback<String> callback : debugCallbacks) callback.call(line);
@@ -70,7 +75,9 @@ public abstract class ProcessHelper {
                     }
                 }
             }
-            catch (IOException e) {}
+            catch (IOException e) {
+                android.util.Log.e("ProcessHelper", label + " read error: " + e.getMessage());
+            }
         });
     }
 

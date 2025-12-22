@@ -1,0 +1,361 @@
+package com.steamdeck.mobile.presentation.viewmodel
+
+import android.content.Context
+import androidx.compose.runtime.Immutable
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.steamdeck.mobile.core.logging.AppLogger
+import com.steamdeck.mobile.core.steam.SteamLauncher
+import com.steamdeck.mobile.core.util.EnvVars
+import com.steamdeck.mobile.core.xenvironment.ImageFs
+import com.steamdeck.mobile.core.xenvironment.RootfsInstaller
+import com.steamdeck.mobile.core.xenvironment.XEnvironment
+import com.steamdeck.mobile.core.xenvironment.components.GuestProgramLauncherComponent
+import com.steamdeck.mobile.core.xenvironment.components.XServerComponent
+import com.steamdeck.mobile.core.xserver.XServer
+import com.steamdeck.mobile.core.xconnector.UnixSocketConfig
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import javax.inject.Inject
+
+/**
+ * ViewModel for Steam XServer Display Screen
+ *
+ * Manages Steam Big Picture mode launch and lifecycle
+ */
+@HiltViewModel
+class SteamDisplayViewModel @Inject constructor(
+    private val steamLauncher: SteamLauncher,
+    @ApplicationContext private val context: Context
+) : ViewModel() {
+
+    companion object {
+        private const val TAG = "SteamDisplayVM"
+        private const val SOCKET_TIMEOUT_MS = 5000L
+        private const val SOCKET_POLL_INTERVAL_MS = 100L
+    }
+
+    private val _uiState = MutableStateFlow<SteamDisplayUiState>(SteamDisplayUiState.Loading)
+    val uiState: StateFlow<SteamDisplayUiState> = _uiState.asStateFlow()
+
+    private var xEnvironment: XEnvironment? = null
+
+    /**
+     * Launch Steam Big Picture mode with XServer initialization
+     *
+     * CRITICAL FIX: Use GuestProgramLauncherComponent instead of SteamLauncher.launchSteamBigPicture()
+     * - SteamLauncher creates SEPARATE process environment via winlatorEmulator.launchExecutable()
+     * - GuestProgramLauncherComponent runs in SAME XEnvironment as XServerComponent
+     * - Both components started together via environment.startEnvironmentComponents()
+     */
+    fun launchSteam(containerId: String, xServer: XServer) {
+        android.util.Log.d(TAG, "launchSteam() called with containerId: $containerId")
+        viewModelScope.launch {
+            try {
+                AppLogger.i(TAG, "Starting Steam launch sequence: containerId=$containerId")
+
+                // Step 1: Initialize XServer environment WITH Steam launcher
+                _uiState.value = SteamDisplayUiState.InitializingXServer
+                android.util.Log.d(TAG, "Step 1: Initializing XEnvironment with GuestProgramLauncherComponent")
+
+                val initialized = initializeXEnvironment(xServer, containerId)
+                if (!initialized) {
+                    AppLogger.e(TAG, "XEnvironment initialization failed")
+                    _uiState.value = SteamDisplayUiState.Error("Failed to initialize display server")
+                    return@launch
+                }
+
+                AppLogger.i(TAG, "XServer initialized successfully")
+
+                // Step 2: Launch Steam via GuestProgramLauncherComponent (already started with XEnvironment)
+                _uiState.value = SteamDisplayUiState.Launching
+                android.util.Log.d(TAG, "Step 2: Steam Big Picture launching via GuestProgramLauncherComponent")
+                AppLogger.i(TAG, "Steam Big Picture launching: containerId=$containerId")
+
+                // GuestProgramLauncherComponent automatically launches when environment.startEnvironmentComponents() is called
+                // No need for separate steamLauncher.launchSteamBigPicture() call
+                _uiState.value = SteamDisplayUiState.Running
+                AppLogger.i(TAG, "Steam launched successfully")
+            } catch (e: Exception) {
+                val errorMessage = e.message ?: "Failed to launch Steam"
+                _uiState.value = SteamDisplayUiState.Error(errorMessage)
+                AppLogger.e(TAG, "Exception launching Steam", e)
+                android.util.Log.e(TAG, "Exception: $errorMessage", e)
+            }
+        }
+    }
+
+    /**
+     * Initialize XEnvironment and start XServer Unix socket
+     * MUST be called before launching Wine
+     *
+     * @param xServer The XServer instance for rendering
+     * @param containerId The Wine container ID to launch Steam from
+     */
+    private suspend fun initializeXEnvironment(xServer: XServer, containerId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // CRITICAL: Install rootfs from assets if needed
+            // This provides complete Ubuntu-based Linux environment for Wine/Box64
+            android.util.Log.i(TAG, "Checking rootfs installation...")
+            val rootfsInstalled = RootfsInstaller.installIfNeeded(context)
+            if (!rootfsInstalled) {
+                AppLogger.e(TAG, "Failed to install rootfs from assets")
+                return@withContext false
+            }
+            android.util.Log.i(TAG, "Rootfs is ready")
+
+            // CRITICAL: Use rootfsDir (not context.filesDir) for socket creation
+            // This ensures Wine in PRoot chroot can access the socket
+            // Wine sees /tmp/.X11-unix/X0 → PRoot maps to rootfsDir/tmp/.X11-unix/X0
+            val rootfsDir = File(context.filesDir, "winlator/rootfs")
+            if (!rootfsDir.exists()) {
+                AppLogger.e(TAG, "Rootfs directory not found after installation: ${rootfsDir.absolutePath}")
+                return@withContext false
+            }
+
+            // Create tmp directory inside rootfs (not in Android files directory)
+            val tmpDir = File(rootfsDir, "tmp")
+            if (!tmpDir.exists()) {
+                tmpDir.mkdirs()
+                AppLogger.d(TAG, "Created tmp directory in rootfs: ${tmpDir.absolutePath}")
+            }
+
+            val x11UnixDir = File(tmpDir, ".X11-unix")
+            if (!x11UnixDir.exists()) {
+                x11UnixDir.mkdirs()
+                AppLogger.d(TAG, "Created .X11-unix directory: ${x11UnixDir.absolutePath}")
+            }
+
+            // CRITICAL FIX: Create XAUTHORITY file for Wine X11 authentication
+            // Wine requires this file to connect to XServer (even for local connections)
+            val xAuthFile = File(tmpDir, ".Xauthority")
+            android.util.Log.e(TAG, "XAUTHORITY check: exists=${xAuthFile.exists()}, path=${xAuthFile.absolutePath}")
+            if (!xAuthFile.exists()) {
+                val created = xAuthFile.createNewFile()
+                xAuthFile.setReadable(true, true)
+                xAuthFile.setWritable(true, true)
+                android.util.Log.e(TAG, "Created XAUTHORITY file: created=$created, path=${xAuthFile.absolutePath}")
+                AppLogger.d(TAG, "Created XAUTHORITY file: ${xAuthFile.absolutePath}")
+            } else {
+                android.util.Log.e(TAG, "XAUTHORITY file already exists: ${xAuthFile.absolutePath}")
+            }
+
+            // Verify X11 libraries exist in rootfs (helps debug connection failures)
+            verifyX11Libraries(rootfsDir)
+
+            // Create ImageFs (required by XEnvironment)
+            val imageFs = ImageFs.find(context)
+
+            // Create XEnvironment orchestrator
+            xEnvironment = XEnvironment(context, imageFs)
+            AppLogger.d(TAG, "Created XEnvironment")
+
+            // Create Unix socket config for XServer using rootfs path
+            // Socket path: /data/.../winlator/rootfs/tmp/.X11-unix/X0 (Android filesystem)
+            // Wine will access as: /tmp/.X11-unix/X0 (via PRoot bind mount)
+            val socketConfig = UnixSocketConfig.createSocket(
+                rootfsDir.absolutePath,  // ✅ Use rootfs instead of filesDir
+                UnixSocketConfig.XSERVER_PATH  // "/tmp/.X11-unix/X0"
+            )
+            AppLogger.d(TAG, "Created socket config: ${socketConfig.path}")
+
+            // Create XServerComponent (manages Unix socket lifecycle)
+            val xServerComponent = XServerComponent(xServer, socketConfig)
+            xEnvironment?.addComponent(xServerComponent)
+            AppLogger.d(TAG, "Added XServerComponent to environment")
+
+            // CRITICAL FIX: Create GuestProgramLauncherComponent to launch Steam in SAME environment
+            // This ensures Wine process shares the same XEnvironment as XServerComponent
+            // Winlator architecture: XServerComponent + GuestProgramLauncherComponent in ONE XEnvironment
+
+            // Steam is installed in container directory (NOT rootfs)
+            // Path: /data/.../winlator/containers/{containerId}/drive_c/Program Files (x86)/Steam/Steam.exe
+            val containersDir = File(context.filesDir, "winlator/containers")
+            val containerDir = File(containersDir, containerId)
+            val steamExe = File(containerDir, "drive_c/Program Files (x86)/Steam/Steam.exe")
+
+            if (!steamExe.exists()) {
+                AppLogger.e(TAG, "Steam not found: ${steamExe.absolutePath}")
+                AppLogger.e(TAG, "Container dir: ${containerDir.absolutePath}, exists: ${containerDir.exists()}")
+                xEnvironment?.stopEnvironmentComponents()
+                return@withContext false
+            }
+
+            // Build Wine command: wine explorer /desktop=shell,1280x720 steam.exe -bigpicture
+            // This matches Winlator's XServerDisplayActivity pattern
+            val screenSize = xServer.screenInfo.toString()  // e.g., "1280x720"
+            val guestCommand = "wine explorer /desktop=shell,$screenSize \"${steamExe.absolutePath}\" -bigpicture"
+
+            AppLogger.d(TAG, "Guest command: $guestCommand")
+
+            // Configure GuestProgramLauncherComponent
+            val guestProgramLauncher = GuestProgramLauncherComponent()
+            guestProgramLauncher.setGuestExecutable(guestCommand)
+            guestProgramLauncher.setWoW64Mode(true)  // Steam requires 64-bit Wine with WoW64
+
+            // CRITICAL: Set binding paths for PRoot to mount container drives
+            // This allows Wine to access C: drive (container's drive_c directory)
+            // Format: PRoot --bind={containerDir}:/{mountpoint}
+            val bindingPaths = arrayOf(containerDir.absolutePath)
+            guestProgramLauncher.setBindingPaths(bindingPaths)
+            AppLogger.d(TAG, "Set binding paths: ${bindingPaths.joinToString()}")
+
+            // Set environment variables for Wine
+            val envVars = EnvVars()
+            // CRITICAL: Set WINEPREFIX to container path (NOT rootfs)
+            // Wine needs to know which container prefix to use
+            envVars.put("WINEPREFIX", containerDir.absolutePath)
+            envVars.put("WINEDEBUG", "-all,+err")  // Minimal logging for performance
+            envVars.put("WINEESYNC", "1")  // Enable ESYNC for better performance
+            envVars.put("MESA_GL_VERSION_OVERRIDE", "4.6")
+            envVars.put("MESA_GLSL_VERSION_OVERRIDE", "460")
+            envVars.put("MESA_DEBUG", "silent")
+            envVars.put("MESA_NO_ERROR", "1")
+            guestProgramLauncher.setEnvVars(envVars)
+
+            // Add termination callback (navigate back on exit)
+            guestProgramLauncher.setTerminationCallback { status ->
+                AppLogger.i(TAG, "Steam process terminated with status: $status")
+                viewModelScope.launch {
+                    _uiState.value = SteamDisplayUiState.Error("Steam closed (exit code: $status)")
+                }
+            }
+
+            xEnvironment?.addComponent(guestProgramLauncher)
+            AppLogger.d(TAG, "Added GuestProgramLauncherComponent to environment")
+
+            // Start environment (creates Unix socket via XConnectorEpoll AND launches Wine)
+            xEnvironment?.startEnvironmentComponents()
+            AppLogger.d(TAG, "Started environment components (XServer + Steam launcher)")
+
+            // Wait for Unix socket to be ready
+            AppLogger.d(TAG, "Waiting for socket: ${socketConfig.path}")
+            val socketReady = waitForSocket(socketConfig.path, SOCKET_TIMEOUT_MS)
+
+            if (!socketReady) {
+                // Diagnostics
+                val socketFile = File(socketConfig.path)
+                val parentDir = socketFile.parentFile
+                AppLogger.e(TAG, "Socket timeout diagnostics:")
+                AppLogger.e(TAG, "  Socket path: ${socketConfig.path}")
+                AppLogger.e(TAG, "  Socket exists: ${socketFile.exists()}")
+                AppLogger.e(TAG, "  Parent dir: ${parentDir?.absolutePath}")
+                AppLogger.e(TAG, "  Parent exists: ${parentDir?.exists()}")
+                AppLogger.e(TAG, "  Parent writable: ${parentDir?.canWrite()}")
+
+                xEnvironment?.stopEnvironmentComponents()
+                return@withContext false
+            }
+
+            AppLogger.i(TAG, "XServer socket ready: ${socketConfig.path}")
+            true
+
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "XEnvironment initialization failed", e)
+            android.util.Log.e(TAG, "XEnvironment error", e)
+            xEnvironment?.stopEnvironmentComponents()
+            false
+        }
+    }
+
+    /**
+     * Wait for Unix socket file to be created
+     */
+    private suspend fun waitForSocket(socketPath: String, timeoutMs: Long): Boolean =
+        withContext(Dispatchers.IO) {
+            val socketFile = File(socketPath)
+            val startTime = System.currentTimeMillis()
+
+            while (System.currentTimeMillis() - startTime < timeoutMs) {
+                if (socketFile.exists()) {
+                    AppLogger.i(TAG, "Socket detected: $socketPath")
+                    return@withContext true
+                }
+                delay(SOCKET_POLL_INTERVAL_MS)
+            }
+
+            AppLogger.e(TAG, "Socket timeout after ${timeoutMs}ms: $socketPath")
+            false
+        }
+
+    /**
+     * Verify X11 libraries exist in rootfs
+     * Helps debug Wine X11 connection failures
+     */
+    private fun verifyX11Libraries(rootfsDir: File) {
+        val requiredLibs = listOf(
+            "usr/lib/libX11.so.6",
+            "usr/lib/libxcb.so.1",
+            "usr/lib/libXext.so.6",
+            "usr/lib/libXfixes.so.3",
+            "usr/lib/x86_64-linux-gnu/libX11.so.6",
+            "lib/libX11.so.6"
+        )
+
+        var foundCount = 0
+        for (libPath in requiredLibs) {
+            val libFile = File(rootfsDir, libPath)
+            if (libFile.exists()) {
+                AppLogger.d(TAG, "✓ X11 library found: $libPath")
+                foundCount++
+            }
+        }
+
+        if (foundCount == 0) {
+            AppLogger.w(TAG, "⚠ No X11 libraries found in rootfs - Wine may fail to connect")
+        } else {
+            AppLogger.i(TAG, "Found $foundCount/${requiredLibs.size} X11 libraries")
+        }
+    }
+
+    /**
+     * Reset state (for cleanup/retry)
+     */
+    fun reset() {
+        _uiState.value = SteamDisplayUiState.Loading
+    }
+
+    /**
+     * Cleanup XEnvironment on ViewModel destruction
+     */
+    override fun onCleared() {
+        super.onCleared()
+
+        try {
+            xEnvironment?.stopEnvironmentComponents()
+            xEnvironment = null
+            AppLogger.i(TAG, "XEnvironment cleaned up")
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "XEnvironment cleanup failed", e)
+        }
+    }
+}
+
+/**
+ * UI State for Steam Display Screen
+ */
+@Immutable
+sealed class SteamDisplayUiState {
+    /** Initial loading state */
+    data object Loading : SteamDisplayUiState()
+
+    /** XServer is being initialized */
+    data object InitializingXServer : SteamDisplayUiState()
+
+    /** Steam is being launched */
+    data object Launching : SteamDisplayUiState()
+
+    /** Steam is running successfully */
+    data object Running : SteamDisplayUiState()
+
+    /** Error occurred during launch */
+    data class Error(val message: String) : SteamDisplayUiState()
+}

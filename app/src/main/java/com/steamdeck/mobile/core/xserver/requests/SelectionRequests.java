@@ -1,6 +1,6 @@
 package com.steamdeck.mobile.core.xserver.requests;
 
-import static com.winlator.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
+import static com.steamdeck.mobile.core.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
 
 import com.steamdeck.mobile.core.xconnector.XInputStream;
 import com.steamdeck.mobile.core.xconnector.XOutputStream;

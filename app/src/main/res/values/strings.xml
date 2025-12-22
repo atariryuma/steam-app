@@ -302,4 +302,31 @@
 
     <string name="install_complete_notification">%1$s is ready to play!</string>
     <string name="install_monitoring_notification">Monitoring installation…</string>
+
+    <!-- XServer integration -->
+    <string name="steam_display_initializing_xserver">Initializing Display Server…</string>
+    <string name="steam_display_launching_steam">Launching Steam…</string>
+    <string name="steam_display_socket_timeout">Display server initialization failed</string>
+    <string name="steam_display_error_init">Failed to initialize display server</string>
+
+    <!-- Wine Test -->
+    <string name="wine_test_title">Wine Test</string>
+    <string name="wine_test_section_availability">Wine Availability Check</string>
+    <string name="wine_test_check_availability">Check Availability</string>
+    <string name="wine_test_section_init">Emulator Initialization</string>
+    <string name="wine_test_init_emulator">Initialize Emulator</string>
+    <string name="wine_test_section_container">Container Creation Test</string>
+    <string name="wine_test_create_container">Create Test Container</string>
+    <string name="wine_test_section_list">Container Listing</string>
+    <string name="wine_test_list_containers">List All Containers</string>
+    <string name="wine_test_section_x11">X11 Client Test</string>
+    <string name="wine_test_x11_client">Test X11 Connection</string>
+    <string name="wine_test_result_title">Test Result</string>
+    <string name="wine_test_result_idle">Select a test to run</string>
+
+    <string name="copy">Copy</string>
+    <string name="stability">Stability</string>
+    <string name="compatibility">Compatibility</string>
+    <string name="intermediate">Intermediate</string>
+    <string name="performance">Performance</string>
 </resources>

@@ -175,6 +175,9 @@ fun SteamDeckNavHost(
     },
     onNavigateToControllerSettings = {
      navController.navigate(Screen.ControllerSettings.route)
+    },
+    onNavigateToSteamDisplay = { containerId ->
+     navController.navigate(Screen.SteamDisplay.createRoute(containerId))
     }
    )
   }
@@ -354,6 +357,21 @@ fun SteamDeckNavHost(
      navController.popBackStack()
     }
    }
+  }
+
+  // Steam XServer Display screen
+  composable(
+   route = Screen.SteamDisplay.route,
+   arguments = listOf(
+    navArgument("containerId") { type = NavType.StringType }
+   )
+  ) { backStackEntry ->
+   val containerId = backStackEntry.arguments?.getString("containerId") ?: "default_shared_container"
+   com.steamdeck.mobile.presentation.ui.steam.SteamDisplayScreen(
+    containerId = containerId,
+    screenSize = "1280x720",
+    onBack = { navController.popBackStack() }
+   )
   }
  }
 }

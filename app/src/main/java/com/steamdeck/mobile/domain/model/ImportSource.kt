@@ -1,17 +1,17 @@
 package com.steamdeck.mobile.domain.model
 
 /**
- * インポート元 種類
+ * Import source type
  */
 enum class ImportSource {
- USB_OTG,  // USB OTGデバイス
- SMB_CIFS, // SMB/CIFSnetwork共有
- FTP,   // FTPサーバー
- LOCAL  // ローカルストレージ (SAF)
+ USB_OTG,  // USB OTG device
+ SMB_CIFS, // SMB/CIFS network share
+ FTP,   // FTP server
+ LOCAL  // Local storage (SAF)
 }
 
 /**
- * インポート可能なfileinformation
+ * Importable file information
  */
 data class ImportableFile(
  val name: String,
@@ -22,7 +22,7 @@ data class ImportableFile(
  val lastModified: Long = 0L
 ) {
  /**
-  * fileサイズフォーマット
+  * Formatted file size
   */
  val sizeFormatted: String
   get() {
@@ -35,7 +35,7 @@ data class ImportableFile(
   }
 
  /**
-  * execution可能fileかどうか
+  * Whether the file is executable
   */
  val isExecutable: Boolean
   get() = name.endsWith(".exe", ignoreCase = true) ||
@@ -43,7 +43,7 @@ data class ImportableFile(
 }
 
 /**
- * SMB/CIFSconnectionconfiguration
+ * SMB/CIFS connection configuration
  */
 data class SmbConfig(
  val host: String,
@@ -54,7 +54,7 @@ data class SmbConfig(
  val port: Int = 445
 ) {
  /**
-  * connectionURLgenerate
+  * Generate connection URL
   */
  fun toUrl(): String {
   return buildString {
@@ -80,7 +80,7 @@ data class SmbConfig(
 }
 
 /**
- * FTPconnectionconfiguration
+ * FTP connection configuration
  */
 data class FtpConfig(
  val host: String,

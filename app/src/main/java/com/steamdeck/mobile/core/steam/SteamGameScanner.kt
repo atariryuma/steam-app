@@ -111,9 +111,9 @@ class SteamGameScanner @Inject constructor(
  }
 
  /**
-  * マニフェストファイルから installdir を取得
+  * Get installdir from manifest file
   *
-  * appmanifest_*.acf ファイルの形式:
+  * appmanifest_*.acf file format:
   * "AppState"
   * {
   *   "appid" "730"

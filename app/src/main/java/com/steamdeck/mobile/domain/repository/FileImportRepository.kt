@@ -7,79 +7,79 @@ import com.steamdeck.mobile.domain.model.SmbConfig
 import kotlinx.coroutines.flow.Flow
 
 /**
- * fileインポート リポジトリinterface
+ * File import repository interface
  */
 interface FileImportRepository {
 
  /**
-  * USB OTGデバイスfromfilelistretrieve
+  * Retrieve file list from USB OTG device
   *
-  * @param path directorypath（ルート "/"）
-  * @return filelist
+  * @param path Directory path (root is "/")
+  * @return File list
   */
  suspend fun listUsbFiles(path: String = "/"): Result<List<ImportableFile>>
 
  /**
-  * SMB/CIFS共有fromfilelistretrieve
+  * Retrieve file list from SMB/CIFS share
   *
-  * @param config SMBconnectionconfiguration
-  * @param path directorypath（共有内 相対path）
-  * @return filelist
+  * @param config SMB connection configuration
+  * @param path Directory path (relative path within share)
+  * @return File list
   */
  suspend fun listSmbFiles(config: SmbConfig, path: String = "/"): Result<List<ImportableFile>>
 
  /**
-  * FTPサーバーfromfilelistretrieve
+  * Retrieve file list from FTP server
   *
-  * @param config FTPconnectionconfiguration
-  * @param path directorypath
-  * @return filelist
+  * @param config FTP connection configuration
+  * @param path Directory path
+  * @return File list
   */
  suspend fun listFtpFiles(config: FtpConfig, path: String = "/"): Result<List<ImportableFile>>
 
  /**
-  * ローカルストレージ (SAF) fromfileretrieve
+  * Retrieve files from local storage (SAF)
   *
-  * @param uri ユーザー 選択したdirectoryURI
-  * @return filelist
+  * @param uri Directory URI selected by user
+  * @return File list
   */
  suspend fun listLocalFiles(uri: Uri): Result<List<ImportableFile>>
 
  /**
-  * fileインポート（copy）
+  * Import file (copy)
   *
-  * @param file インポート元file
-  * @param destinationPath インポート先path（内部ストレージ）
-  * @return progress状況 Flow
+  * @param file Source file to import
+  * @param destinationPath Destination path (internal storage)
+  * @return Progress status Flow
   */
  fun importFile(file: ImportableFile, destinationPath: String): Flow<ImportProgress>
 
  /**
-  * USB OTGデバイス connectionされているかconfirmation
+  * Check if USB OTG device is connected
   *
-  * @return connectionされているcasetrue
+  * @return true if device is connected
   */
  suspend fun isUsbDeviceConnected(): Boolean
 
  /**
-  * SMB/CIFSconnectionテスト
+  * Test SMB/CIFS connection
   *
-  * @param config SMBconnectionconfiguration
-  * @return connectionsuccess casetrue
+  * @param config SMB connection configuration
+  * @return true if connection succeeds
   */
  suspend fun testSmbConnection(config: SmbConfig): Result<Boolean>
 
  /**
-  * FTPconnectionテスト
+  * Test FTP connection
   *
-  * @param config FTPconnectionconfiguration
-  * @return connectionsuccess casetrue
+  * @param config FTP connection configuration
+  * @return true if connection succeeds
   */
  suspend fun testFtpConnection(config: FtpConfig): Result<Boolean>
 }
 
 /**
- * インポートprogressstate
+ * Import progress state
  */
 sealed class ImportProgress {
  object Idle : ImportProgress()

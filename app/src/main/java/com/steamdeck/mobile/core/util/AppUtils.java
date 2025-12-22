@@ -26,11 +26,6 @@ import android.widget.PopupWindow;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
-import com.google.android.material.tabs.TabLayout;
-
-import androidx.appcompat.app.AppCompatActivity;
-
-import com.google.android.material.tabs.TabLayout;
 import com.steamdeck.mobile.R;
 
 import java.lang.ref.WeakReference;
@@ -55,7 +50,7 @@ public abstract class AppUtils {
         return "armhf";
     }
 
-    public static void restartActivity(AppCompatActivity activity) {
+    public static void restartActivity(Activity activity) {
         Intent intent = activity.getIntent();
         activity.finish();
         activity.startActivity(intent);
@@ -74,7 +69,7 @@ public abstract class AppUtils {
         Runtime.getRuntime().exit(0);
     }
 
-    public static void showKeyboard(AppCompatActivity activity) {
+    public static void showKeyboard(Activity activity) {
         final InputMethodManager imm = (InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE);
         if (Build.VERSION.SDK_INT > Build.VERSION_CODES.Q) {
             activity.getWindow().getDecorView().postDelayed(() -> imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0), 500L);
@@ -276,31 +271,7 @@ public abstract class AppUtils {
         return false;
     }
 
-    public static void setupTabLayout(final View view, int tabLayoutResId, final int... tabResIds) {
-        final Callback<Integer> tabSelectedCallback = (position) -> {
-            for (int i = 0; i < tabResIds.length; i++) {
-                View tabView = view.findViewById(tabResIds[i]);
-                tabView.setVisibility(position == i ? View.VISIBLE : View.GONE);
-            }
-        };
-
-        TabLayout tabLayout = view.findViewById(tabLayoutResId);
-        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
-            @Override
-            public void onTabSelected(TabLayout.Tab tab) {
-                tabSelectedCallback.call(tab.getPosition());
-            }
-
-            @Override
-            public void onTabUnselected(TabLayout.Tab tab) {}
-
-            @Override
-            public void onTabReselected(TabLayout.Tab tab) {
-                tabSelectedCallback.call(tab.getPosition());
-            }
-        });
-        tabLayout.getTabAt(0).select();
-    }
+    // setupTabLayout removed - TabLayout not available in Compose-only app
 
     public static void findViewsWithClass(ViewGroup parent, Class viewClass, ArrayList<View> outViews) {
         for (int i = 0, childCount = parent.getChildCount(); i < childCount; i++) {

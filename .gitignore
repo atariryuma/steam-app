@@ -98,6 +98,10 @@ Desktop.ini
 *.swp
 *.bak
 
+# Python caches
+__pycache__/
+*.pyc
+
 # Gradle Wrapper
 !gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties

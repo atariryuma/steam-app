@@ -38,7 +38,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * fileインポートリポジトリ implementation
+ * File import repository implementation
  */
 @Singleton
 class FileImportRepositoryImpl @Inject constructor(
@@ -119,7 +119,7 @@ class FileImportRepositoryImpl @Inject constructor(
    }
 
    if (!smbFile.isDirectory) {
-    return@withContext Result.failure(Exception("path directory ありません: $path"))
+    return@withContext Result.failure(Exception("Path is not a directory: $path"))
    }
 
    val files = smbFile.listFiles().map { file ->
@@ -200,7 +200,7 @@ class FileImportRepositoryImpl @Inject constructor(
    ftpClient.connect(config.host, config.port)
 
    if (!ftpClient.login(config.username, config.password)) {
-    return@withContext Result.failure(Exception("FTP ログイン failuredid"))
+    return@withContext Result.failure(Exception("FTP login failed"))
    }
 
    ftpClient.setFileType(FTP.BINARY_FILE_TYPE)
@@ -290,7 +290,7 @@ class FileImportRepositoryImpl @Inject constructor(
   file: ImportableFile,
   destinationPath: String
  ): Flow<ImportProgress> = flow {
-  emit(ImportProgress.Preparing("file準備in..."))
+  emit(ImportProgress.Preparing("Preparing file..."))
 
   try {
    val destFile = File(destinationPath)

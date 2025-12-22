@@ -4,33 +4,33 @@ import com.steamdeck.mobile.data.remote.steam.model.SteamGame
 import com.steamdeck.mobile.data.remote.steam.model.SteamPlayer
 
 /**
- * Steam関連data操作 リポジトリinterface
+ * Steam data operations repository interface
  */
 interface SteamRepository {
  /**
-  * ユーザー 所有dogamelistretrieve
+  * Retrieve list of games owned by user
   *
   * @param apiKey Steam Web API Key
   * @param steamId Steam ID
-  * @return gamelist
+  * @return Game list
   */
  suspend fun getOwnedGames(apiKey: String, steamId: String): Result<List<SteamGame>>
 
  /**
-  * ユーザー プロフィールinformationretrieve
+  * Retrieve user profile information
   *
   * @param apiKey Steam Web API Key
   * @param steamId Steam ID
-  * @return プレイヤーinformation
+  * @return Player information
   */
  suspend fun getPlayerSummary(apiKey: String, steamId: String): Result<SteamPlayer>
 
  /**
-  * game画像download
+  * Download game image
   *
-  * @param url 画像URL
+  * @param url Image URL
   * @param destinationPath Destination path
-  * @return savesuccess可否
+  * @return Success or failure
   */
  suspend fun downloadGameImage(url: String, destinationPath: String): Result<Unit>
 }

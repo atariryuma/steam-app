@@ -7,8 +7,8 @@ import com.steamdeck.mobile.data.local.database.entity.GameSource
 import com.steamdeck.mobile.data.local.database.entity.SteamInstallStatus
 
 /**
- * Room用 typeconversionclass
- * Enum customclassdataベース プリミティブtype conversion
+ * Type conversion class for Room
+ * Converts Enum and custom classes to database primitive types
  */
 class Converters {
  // GameSource converters

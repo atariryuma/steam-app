@@ -4,10 +4,10 @@ import android.os.Environment;
 
 import com.steamdeck.mobile.box86_64.Box86_64Preset;
 import com.steamdeck.mobile.core.util.EnvVars;
-import com.steamdeck.mobile.core.FileUtils;
-import com.steamdeck.mobile.core.KeyValueSet;
-import com.steamdeck.mobile.core.WineInfo;
-import com.steamdeck.mobile.core.WineThemeManager;
+import com.steamdeck.mobile.core.util.FileUtils;
+import com.steamdeck.mobile.core.util.KeyValueSet;
+import com.steamdeck.mobile.core.util.WineInfo;
+import com.steamdeck.mobile.core.util.WineThemeManager;
 import com.steamdeck.mobile.core.xenvironment.ImageFs;
 
 import org.json.JSONException;

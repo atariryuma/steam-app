@@ -5,10 +5,10 @@ import android.os.Handler;
 
 import com.steamdeck.mobile.R;
 import com.steamdeck.mobile.core.util.Callback;
-import com.steamdeck.mobile.core.FileUtils;
-import com.steamdeck.mobile.core.OnExtractFileListener;
-import com.steamdeck.mobile.core.TarCompressorUtils;
-import com.steamdeck.mobile.core.WineInfo;
+import com.steamdeck.mobile.core.util.FileUtils;
+import com.steamdeck.mobile.core.util.OnExtractFileListener;
+import com.steamdeck.mobile.core.util.TarCompressorUtils;
+import com.steamdeck.mobile.core.util.WineInfo;
 import com.steamdeck.mobile.core.xenvironment.ImageFs;
 
 import org.json.JSONArray;

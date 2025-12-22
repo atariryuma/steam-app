@@ -22,21 +22,21 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.steamdeck.mobile.presentation.theme.SteamColorPalette
 
 /**
- * Steam OpenIDauthentication画面（公式規約準拠）
+ * Steam OpenID authentication screen (official ToS compliant)
  *
- * Valve公式 OpenID 2.0authenticationuse
- * - QRコードauthentication 異なり、規約準拠 安全な方法
- * - WebView steamcommunity.com 公式ログインページ表示
- * - コールバックURL SteamID64retrieve
+ * Uses Valve official OpenID 2.0 authentication
+ * - Unlike QR code auth, this is ToS compliant and secure
+ * - Displays official Steam login page via WebView
+ * - Retrieves SteamID64 from callback URL
  *
- * 公式ドキュメント:
+ * Official documentation:
  * - https://partner.steamgames.com/doc/features/auth
  * - https://steamcommunity.com/dev
  *
  * Best Practice:
- * - JavaScript有効化（Steamログインフォーム動作 必要）
- * - DOM Storage有効化（セッション管理）
- * - リダイレクトインターセプトしてコールバック処理
+ * - JavaScript enabled (required for Steam login form)
+ * - DOM Storage enabled (session management)
+ * - Intercept redirect for callback processing
  */
 @Composable
 fun SteamOpenIdLoginScreen(
@@ -53,13 +53,13 @@ fun SteamOpenIdLoginScreen(
    .fillMaxSize()
    .background(SteamColorPalette.Dark) // Steam dark blue
  ) {
-  // WebView（フルスクリーン）
+  // WebView (fullscreen)
   AndroidView(
    factory = { context ->
     WebView(context).apply {
      settings.apply {
-      javaScriptEnabled = true // Steamログインフォーム 必要
-      domStorageEnabled = true // セッション管理
+      javaScriptEnabled = true // Required for Steam login form
+      domStorageEnabled = true // Session management
       setSupportMultipleWindows(false)
       loadWithOverviewMode = true
       useWideViewPort = true
@@ -73,7 +73,7 @@ fun SteamOpenIdLoginScreen(
        val url = request?.url.toString()
        AppLogger.d("SteamOpenIdLogin", "URL redirect: $url")
 
-       // コールバックURL 検出 (localhost/127.0.0.1 callback interception)
+       // Detect callback URL (localhost/127.0.0.1 callback interception)
        // Check both localhost and 127.0.0.1 for compatibility
        if (url.contains("127.0.0.1:8080/auth/callback") ||
            url.contains("localhost:8080/auth/callback")) {
@@ -97,18 +97,18 @@ fun SteamOpenIdLoginScreen(
        failingUrl: String?
       ) {
        super.onReceivedError(view, errorCode, description, failingUrl)
-       onError("ページ読み込みエラー: $description")
+       onError("Page load error: $description")
       }
      }
 
-     // authenticationURL読み込み
+     // Load authentication URL
      loadUrl(authUrl)
     }
    },
    modifier = Modifier.fillMaxSize()
   )
 
-  // プログレスバー（上部 表示）
+  // Progress bar (displayed at top)
   if (isLoading) {
    LinearProgressIndicator(
     progress = { loadProgress / 100f },
@@ -119,7 +119,7 @@ fun SteamOpenIdLoginScreen(
    )
   }
 
-  // ローディングオーバーレイ（初回読み込み時 み）
+  // Loading overlay (only on initial load)
   if (isLoading) {
    Box(
     modifier = Modifier

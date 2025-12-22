@@ -31,7 +31,7 @@ data class Controller(
 /**
  * Controller type classification.
  *
- * Best Practice: displayNamepropertyaddしてProGuard/R8難読化回避
+ * Best Practice: Add displayName property to avoid ProGuard/R8 obfuscation
  * Reference: https://medium.com/codex/common-progaurd-rules-you-must-know-for-android-189205301453
  */
 enum class ControllerType {

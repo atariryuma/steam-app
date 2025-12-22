@@ -9,10 +9,10 @@ import android.graphics.Rect;
 
 import androidx.core.graphics.ColorUtils;
 
-import com.steamdeck.mobile.core.CubicBezierInterpolator;
+import com.steamdeck.mobile.core.util.CubicBezierInterpolator;
 import com.steamdeck.mobile.core.math.Mathf;
-import com.steamdeck.mobile.widget.InputControlsView;
-import com.steamdeck.mobile.widget.TouchpadView;
+import com.steamdeck.mobile.presentation.widget.InputControlsView;
+import com.steamdeck.mobile.presentation.widget.TouchpadView;
 
 import org.json.JSONArray;
 import org.json.JSONException;

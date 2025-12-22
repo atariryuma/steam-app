@@ -10,17 +10,20 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-// Read API Key from local.properties (development only)
-val localProperties = Properties()
-val localPropertiesFile = rootProject.file("local.properties")
-if (localPropertiesFile.exists()) {
-    FileInputStream(localPropertiesFile).use { localProperties.load(it) }
+// Development API Key Configuration
+// Load from local.properties (not committed to git)
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        FileInputStream(localPropertiesFile).use { load(it) }
+    }
 }
-val steamApiKey = localProperties.getProperty("STEAM_API_KEY") ?: ""
+val devSteamApiKey = localProperties.getProperty("STEAM_API_KEY", "")
 
 android {
     namespace = "com.steamdeck.mobile"
     compileSdk = 35
+    ndkVersion = "22.1.7171670"
 
     defaultConfig {
         applicationId = "com.steamdeck.mobile"
@@ -38,38 +41,43 @@ android {
             abiFilters += listOf("arm64-v8a")
         }
 
-        // Development-only Steam Web API Key from local.properties
-        // Production: Users provide their own API keys in-app
-        // This is ONLY for development/testing convenience
-        buildConfigField("String", "DEV_STEAM_API_KEY", "\"$steamApiKey\"")
+        externalNativeBuild {
+            cmake {
+                cppFlags += ""
+                arguments += listOf("-DANDROID_STL=c++_shared")
+            }
+        }
     }
 
     buildTypes {
         release {
-            // R8コード最適化とリソース削減
+            // R8 code optimization and resource shrinking
             isMinifyEnabled = true
             isShrinkResources = true
 
-            // R8フルモード（AGP 8.0+でデフォルト有効）
+            // R8 full mode (enabled by default in AGP 8.0+)
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
 
-            // デバッグ情報削除でAPKサイズ削減
+            // Remove debug info to reduce APK size
             isDebuggable = false
             isJniDebuggable = false
 
-            // ネイティブライブラリの最適化
+            // Native library optimization
             ndk {
                 debugSymbolLevel = "NONE"
             }
         }
 
         debug {
-            // Debug用設定（最適化なし）
+            // Debug settings (no optimization)
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+
+            // Development API Key (ONLY in debug builds, loaded from local.properties)
+            buildConfigField("String", "DEV_STEAM_API_KEY", "\"$devSteamApiKey\"")
         }
     }
 
@@ -87,9 +95,16 @@ android {
         buildConfig = true
     }
 
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
     packaging {
         resources {
-            // 不要なMETA-INFファイルを除外してAPKサイズ削減
+            // Exclude unnecessary META-INF files to reduce APK size
             excludes += setOf(
                 "/META-INF/{AL2.0,LGPL2.1}",
                 "/META-INF/LICENSE*",
@@ -103,19 +118,21 @@ android {
                 "DebugProbesKt.bin"
             )
 
-            // 重複リソースのマージ
+            // Merge duplicate resources (pick first)
             pickFirsts += setOf(
                 "META-INF/INDEX.LIST",
                 "META-INF/io.netty.versions.properties",
-                // zstd-jniのネイティブライブラリ（最初に見つかったものを使用）
+                // zstd-jni native library (use first found)
                 "lib/arm64-v8a/libzstd-jni.so"
             )
         }
 
-        // JNIライブラリの最適化
+        // JNI library optimization
         jniLibs {
-            useLegacyPackaging = false
-            // zstd-jniのネイティブライブラリを除外しない
+            // CRITICAL: Must extract native libraries for libproot.so to be executable
+            // libproot.so is built as executable (add_executable in CMake) and needs filesystem access
+            useLegacyPackaging = true
+            // Keep zstd-jni native library debug symbols
             keepDebugSymbols += listOf("**/libzstd-jni*.so")
         }
     }

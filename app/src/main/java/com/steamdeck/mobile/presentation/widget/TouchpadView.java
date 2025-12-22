@@ -14,8 +14,8 @@ import com.steamdeck.mobile.core.util.AppUtils;
 import com.steamdeck.mobile.core.math.Mathf;
 import com.steamdeck.mobile.core.math.XForm;
 import com.steamdeck.mobile.presentation.renderer.ViewTransformation;
-import com.steamdeck.mobile.winhandler.MouseEventFlags;
-import com.steamdeck.mobile.winhandler.WinHandler;
+import com.steamdeck.mobile.core.winhandler.MouseEventFlags;
+import com.steamdeck.mobile.core.winhandler.WinHandler;
 import com.steamdeck.mobile.core.xserver.Pointer;
 import com.steamdeck.mobile.core.xserver.XServer;
 

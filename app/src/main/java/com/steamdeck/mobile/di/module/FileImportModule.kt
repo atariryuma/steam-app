@@ -9,7 +9,7 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * fileインポート関連 依存性注入module
+ * File import related dependency injection module
  */
 @Module
 @InstallIn(SingletonComponent::class)

@@ -6,91 +6,91 @@ import com.steamdeck.mobile.data.local.database.entity.DownloadStatus
 import kotlinx.coroutines.flow.Flow
 
 /**
- * download履歴to dataアクセスobject
+ * Download history data access object
  */
 @Dao
 interface DownloadDao {
  /**
-  * all downloadretrieve
+  * Get all downloads
   */
  @Query("SELECT * FROM downloads ORDER BY startedTimestamp DESC")
  fun getAllDownloads(): Flow<List<DownloadEntity>>
 
  /**
-  * アクティブなdownload（downloadin・waiting）retrieve
+  * Get active downloads (downloading/pending)
   */
  @Query("SELECT * FROM downloads WHERE status IN (:statuses) ORDER BY startedTimestamp ASC")
  fun getActiveDownloads(statuses: List<DownloadStatus> = listOf(DownloadStatus.DOWNLOADING, DownloadStatus.PENDING)): Flow<List<DownloadEntity>>
 
  /**
-  * gameID 関連dodownloadretrieve
+  * Get downloads related to game ID
   */
  @Query("SELECT * FROM downloads WHERE gameId = :gameId ORDER BY startedTimestamp DESC")
  fun getDownloadsByGameId(gameId: Long): Flow<List<DownloadEntity>>
 
  /**
-  * downloadID downloadretrieve（Flow版）
+  * Get download by download ID (Flow version)
   */
  @Query("SELECT * FROM downloads WHERE id = :downloadId")
  fun getDownloadById(downloadId: Long): Flow<DownloadEntity?>
 
  /**
-  * downloadID downloadretrieve（directlyretrieve）
+  * Get download by download ID (direct retrieval)
   */
  @Query("SELECT * FROM downloads WHERE id = :downloadId")
  suspend fun getDownloadByIdDirect(downloadId: Long): DownloadEntity?
 
  /**
-  * download挿入
+  * Insert download
   */
  @Insert(onConflict = OnConflictStrategy.REPLACE)
  suspend fun insertDownload(download: DownloadEntity): Long
 
  /**
-  * downloadupdate
+  * Update download
   */
  @Update
  suspend fun updateDownload(download: DownloadEntity)
 
  /**
-  * downloadID downloaddelete
+  * Delete download by download ID
   */
  @Query("DELETE FROM downloads WHERE id = :downloadId")
  suspend fun deleteDownload(downloadId: Long)
 
 
  /**
-  * downloadcompleted時刻configuration
+  * Mark download as completed
   */
  @Query("UPDATE downloads SET status = :status, completedTimestamp = :completedTimestamp WHERE id = :downloadId")
  suspend fun markDownloadCompleted(downloadId: Long, status: DownloadStatus, completedTimestamp: Long)
 
  /**
-  * downloaderror記録
+  * Record download error
   */
  @Query("UPDATE downloads SET status = :status, errorMessage = :errorMessage WHERE id = :downloadId")
  suspend fun markDownloadError(downloadId: Long, status: DownloadStatus, errorMessage: String)
 
  /**
-  * completedしたdownloaddelete
+  * Delete completed downloads
   */
  @Query("DELETE FROM downloads WHERE status = :status")
  suspend fun deleteCompletedDownloads(status: DownloadStatus = DownloadStatus.COMPLETED)
 
  /**
-  * all downloaddelete
+  * Delete all downloads
   */
  @Query("DELETE FROM downloads")
  suspend fun deleteAllDownloads()
 
  /**
-  * downloadステータスupdate
+  * Update download status
   */
  @Query("UPDATE downloads SET status = :status, updatedAt = :updatedAt WHERE id = :downloadId")
  suspend fun updateDownloadStatus(downloadId: Long, status: DownloadStatus, updatedAt: Long = System.currentTimeMillis())
 
  /**
-  * download合計バイト数update
+  * Update download total bytes
   */
  @Query("UPDATE downloads SET totalBytes = :totalBytes, updatedAt = :updatedAt WHERE id = :downloadId")
  suspend fun updateDownloadTotalBytes(downloadId: Long, totalBytes: Long, updatedAt: Long)

@@ -1,15 +1,29 @@
 package com.steamdeck.mobile.presentation.viewmodel
 
+import android.content.Context
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.steamdeck.mobile.core.logging.AppLogger
+import com.steamdeck.mobile.core.test.SimpleX11Client
+import com.steamdeck.mobile.core.xconnector.UnixSocketConfig
+import com.steamdeck.mobile.core.xenvironment.ImageFs
+import com.steamdeck.mobile.core.xenvironment.XEnvironment
+import com.steamdeck.mobile.core.xenvironment.components.XServerComponent
+import com.steamdeck.mobile.core.xserver.ScreenInfo
+import com.steamdeck.mobile.core.xserver.XServer
 import com.steamdeck.mobile.domain.emulator.EmulatorContainerConfig
 import com.steamdeck.mobile.domain.emulator.WindowsEmulator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -20,6 +34,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class WineTestViewModel @Inject constructor(
+ @ApplicationContext private val context: Context,
  private val emulator: WindowsEmulator
 ) : ViewModel() {
 
@@ -191,6 +206,94 @@ class WineTestViewModel @Inject constructor(
      )
     }
    )
+  }
+ }
+
+ /**
+  * Test X11 client connectivity and window display.
+  * Best practice: Start XServer temporarily, test connection + window display, then stop.
+  */
+ fun testX11Client() {
+  viewModelScope.launch {
+   _uiState.value = WineTestUiState.Testing("Starting XServer for test...")
+
+   var xEnvironment: XEnvironment? = null
+
+   withContext(Dispatchers.IO) {
+    try {
+     // Step 1: Initialize XServer environment
+     val rootfsDir = File(context.filesDir, "winlator/rootfs")
+     if (!rootfsDir.exists()) {
+      throw Exception("Winlator not initialized. Run '2. Initialize' first.")
+     }
+
+     // Create required directories
+     val tmpDir = File(rootfsDir, "tmp")
+     tmpDir.mkdirs()
+     val x11UnixDir = File(tmpDir, ".X11-unix")
+     x11UnixDir.mkdirs()
+
+     // Create XServer
+     val screenInfo = ScreenInfo(1280, 720)
+     val xServer = XServer(screenInfo)
+
+     // Create XEnvironment
+     val imageFs = ImageFs.find(context)
+     xEnvironment = XEnvironment(context, imageFs)
+
+     // Create and add XServerComponent
+     val socketConfig = UnixSocketConfig.createSocket(
+      rootfsDir.absolutePath,
+      UnixSocketConfig.XSERVER_PATH
+     )
+     val xServerComponent = XServerComponent(xServer, socketConfig)
+     xEnvironment.addComponent(xServerComponent)
+
+     // Step 2: Start XServer
+     withContext(Dispatchers.Main) {
+      _uiState.value = WineTestUiState.Testing("XServer starting...")
+     }
+     xEnvironment.startEnvironmentComponents()
+     AppLogger.d("WineTest", "XServer started")
+
+     // Wait for socket to be created
+     delay(500)
+
+     // Step 3: Test connection
+     withContext(Dispatchers.Main) {
+      _uiState.value = WineTestUiState.Testing("Testing connection...")
+     }
+     val client = SimpleX11Client(context)
+     val connectionResult = client.testConnection()
+
+     // Step 4: Test window display
+     withContext(Dispatchers.Main) {
+      _uiState.value = WineTestUiState.Testing("Testing window display (3 seconds)...")
+     }
+     val windowResult = client.testWindowDisplay()
+
+     // Success - combine results
+     withContext(Dispatchers.Main) {
+      _uiState.value = WineTestUiState.Success(
+       "✓ X11 Tests Complete!\n\n" +
+       "Connection Test:\n$connectionResult\n\n" +
+       "Window Display Test:\n$windowResult"
+      )
+     }
+
+    } catch (e: Exception) {
+     AppLogger.e("WineTest", "X11 test failed", e)
+     withContext(Dispatchers.Main) {
+      _uiState.value = WineTestUiState.Error(
+       e.message ?: "Unknown error occurred"
+      )
+     }
+    } finally {
+     // Step 5: Stop XServer
+     xEnvironment?.stopEnvironmentComponents()
+     AppLogger.d("WineTest", "XServer stopped")
+    }
+   }
   }
  }
 }

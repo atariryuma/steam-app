@@ -6,7 +6,7 @@ import com.steamdeck.mobile.domain.model.Box64Preset as DomainBox64Preset
 import com.steamdeck.mobile.data.local.database.entity.Box64Preset as EntityBox64Preset
 
 /**
- * WinlatorContainerEntity <-> WinlatorContainer マッパー
+ * WinlatorContainerEntity <-> WinlatorContainer mapper
  */
 object WinlatorContainerMapper {
  /**

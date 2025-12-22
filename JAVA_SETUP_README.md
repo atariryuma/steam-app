@@ -1,31 +1,30 @@
-# Java環境変数セットアップガイド
+# Java Environment Variables Setup Guide
 
-## 概要
-このプロジェクトのビルドにはJava 21が必要です。JAVA_HOMEとPATHを永続的に設定するスクリプトを提供します。
+## Overview
+This project requires Java 21 for building. This guide provides scripts to permanently configure JAVA_HOME and PATH.
 
-## 前提条件
-- Java 21 (Eclipse Adoptium) が以下のパスにインストールされていること:
+## Prerequisites
+- Java 21 (Eclipse Adoptium) must be installed at the following path:
   ```
   C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot
   ```
 
-## セットアップ方法
+## Setup Methods
 
-### 方法1: PowerShell (推奨) - 管理者権限不要
+### Method 1: PowerShell (Recommended) - No Admin Rights Required
 
-1. PowerShellを開く (通常の権限でOK)
-2. 以下のコマンドを実行:
+1. Open PowerShell (normal user privileges)
+2. Execute the following commands:
    ```powershell
    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
    .\setup-java-env.ps1
    ```
 
-### 方法2: バッチファイル - 管理者権限必要
+### Method 2: Batch File - Admin Rights Required
 
-1. `setup-java-env.bat` を**管理者として実行**
-   - ファイルを右クリック → 「管理者として実行」
+1. Right-click `setup-java-env.bat` and select **Run as administrator**
 
-## 設定される環境変数
+## Environment Variables Set
 
 ### JAVA_HOME
 ```
@@ -33,16 +32,16 @@ C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot
 ```
 
 ### PATH
-既存のPATHに以下が追加されます:
+The following is added to existing PATH:
 ```
 %JAVA_HOME%\bin
 ```
 
-## 確認方法
+## Verification
 
-**重要**: スクリプト実行後、**必ずターミナル/IDEを再起動**してください。
+**Important**: After running the script, **restart your terminal/IDE**.
 
-新しいターミナルで以下を実行:
+Execute the following in a new terminal:
 
 ### PowerShell
 ```powershell
@@ -50,49 +49,49 @@ java -version
 echo $env:JAVA_HOME
 ```
 
-### コマンドプロンプト
+### Command Prompt
 ```cmd
 java -version
 echo %JAVA_HOME%
 ```
 
-### 期待される出力
+### Expected Output
 ```
 openjdk version "21.0.5" 2024-10-15
 OpenJDK Runtime Environment Temurin-21.0.5+11 (build 21.0.5+11)
 OpenJDK 64-Bit Server VM Temurin-21.0.5+11 (build 21.0.5+11, mixed mode, sharing)
 ```
 
-## ビルド実行
+## Building
 
-環境変数設定後、以下のコマンドでビルド可能になります:
+After setting environment variables, you can build with:
 
 ```cmd
 gradlew.bat assembleDebug
 ```
 
-## トラブルシューティング
+## Troubleshooting
 
-### "java: command not found" エラーが出る
-- ターミナル/IDEを再起動しましたか?
-- 環境変数が正しく設定されているか確認:
+### "java: command not found" error
+- Did you restart your terminal/IDE?
+- Verify environment variables are set correctly:
   ```powershell
   [System.Environment]::GetEnvironmentVariable("JAVA_HOME", "User")
   [System.Environment]::GetEnvironmentVariable("Path", "User")
   ```
 
-### PowerShellスクリプトが実行できない
-実行ポリシーを変更:
+### Cannot execute PowerShell script
+Change execution policy:
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 
-### 管理者権限がない
-- PowerShell版 (setup-java-env.ps1) を使用してください
-- ユーザー環境変数として設定されます (システム全体ではなく現在のユーザーのみ)
+### No admin rights
+- Use the PowerShell version (setup-java-env.ps1)
+- Sets user environment variables (current user only, not system-wide)
 
-## 参考情報
+## References
 
 - [Eclipse Adoptium](https://adoptium.net/)
 - [Gradle Documentation](https://docs.gradle.org/)
-- プロジェクト構成: [CLAUDE.md](./CLAUDE.md)
+- Project configuration: [CLAUDE.md](./CLAUDE.md)

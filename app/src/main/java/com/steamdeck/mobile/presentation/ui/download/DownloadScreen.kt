@@ -233,11 +233,11 @@ private fun DownloadItem(
      )
     }
 
-    // ステータスアイコン
+    // Status icon
     DownloadStatusIcon(download.status)
    }
 
-   // プログレスバー
+   // Progress bar
    when (download.status) {
     DownloadStatus.DOWNLOADING, DownloadStatus.PAUSED -> {
      // Steam downloads don't provide totalBytes - use progress field directly

@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * download画面 ViewModel
+ * Download screen ViewModel
  *
  * Best Practices:
  * - StateFlow for UI state management
@@ -30,7 +30,7 @@ class DownloadViewModel @Inject constructor(
 ) : ViewModel() {
 
  /**
-  * 全downloadlist（リアルタイムUpdate）
+  * All downloads list (real-time updates)
   */
  val downloads: StateFlow<List<DownloadEntity>> = downloadDao.getAllDownloads()
   .stateIn(
@@ -40,7 +40,7 @@ class DownloadViewModel @Inject constructor(
   )
 
  /**
-  * 進行indownload数
+  * Number of active downloads
   */
  val activeDownloads: StateFlow<Int> = downloads
   .map { list ->
@@ -56,7 +56,7 @@ class DownloadViewModel @Inject constructor(
   )
 
  /**
-  * download一時stop
+  * Pause download
   */
  fun pauseDownload(downloadId: Long) {
   viewModelScope.launch {
@@ -65,7 +65,7 @@ class DownloadViewModel @Inject constructor(
  }
 
  /**
-  * downloadResume
+  * Resume download
   */
  fun resumeDownload(downloadId: Long) {
   viewModelScope.launch {
@@ -74,7 +74,7 @@ class DownloadViewModel @Inject constructor(
  }
 
  /**
-  * downloadcancel
+  * Cancel download
   */
  fun cancelDownload(downloadId: Long) {
   viewModelScope.launch {
@@ -83,7 +83,7 @@ class DownloadViewModel @Inject constructor(
  }
 
  /**
-  * downloadretry
+  * Retry download
   */
  fun retryDownload(downloadId: Long) {
   viewModelScope.launch {
@@ -93,7 +93,7 @@ class DownloadViewModel @Inject constructor(
  }
 
  /**
-  * Complete済みdownloadクリア
+  * Clear completed downloads
   */
  fun clearCompleted() {
   viewModelScope.launch {
@@ -105,7 +105,7 @@ class DownloadViewModel @Inject constructor(
  }
 
  /**
-  * downloadstart（外部 from 呼び出し用）
+  * Start download (for external calls)
   */
  fun startDownload(
   url: String,

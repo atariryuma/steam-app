@@ -16,9 +16,9 @@ import java.lang.reflect.Type
  * Retrofit CallAdapter for automatic DataResult wrapping
  *
  * Best Practice (2025):
- * - 全APIコール 統一的なerrorハンドリング
- * - HTTP status codefrom適切なAppErrorgenerate
- * - Coroutines suspend 対応
+ * - Unified error handling for all API calls
+ * - Generate appropriate AppError from HTTP status code
+ * - Coroutines suspend support
  *
  * Reference:
  * - https://proandroiddev.com/retrofit-with-kotlin-coroutines-and-result-sealed-class-80cc68e12869

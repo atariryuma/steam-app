@@ -2,7 +2,7 @@ package com.steamdeck.mobile.core.input;
 
 import android.graphics.Rect;
 
-import com.steamdeck.mobile.widget.InputControlsView;
+import com.steamdeck.mobile.presentation.widget.InputControlsView;
 import com.steamdeck.mobile.presentation.widget.TouchpadView;
 
 import java.util.Timer;

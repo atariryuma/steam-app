@@ -9,7 +9,7 @@
 -allowaccessmodification
 -repackageclasses ''
 
-# Kotlinリフレクション保護
+# Kotlin reflection protection
 -keep class kotlin.Metadata { *; }
 -keep class kotlin.reflect.** { *; }
 -dontwarn kotlin.reflect.**
@@ -66,7 +66,7 @@
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
 
-# Jetpack Compose (最適化版)
+# Jetpack Compose (optimized)
 -dontwarn androidx.compose.**
 -keep class androidx.compose.runtime.** { *; }
 -keepclassmembers class androidx.compose.** {
@@ -108,7 +108,7 @@
 -dontwarn com.google.crypto.tink.**
 -keep class com.google.crypto.tink.** { *; }
 
-# デバッグ情報削除（本番環境では、デバッグ・詳細・情報ログを削除、警告・エラーは保持）
+# Remove debug information (for production: remove debug/verbose/info logs, keep warnings/errors)
 -assumenosideeffects class android.util.Log {
     public static *** d(...);
     public static *** v(...);

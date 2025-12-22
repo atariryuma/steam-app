@@ -88,7 +88,7 @@ fun ContainerScreen(
    )
   }
  ) { paddingValues ->
-  // コンテンツエリア
+  // Content area
   when (val state = uiState) {
    is ContainerUiState.Loading -> {
     Box(
@@ -182,7 +182,7 @@ fun ContainerScreen(
        tint = MaterialTheme.colorScheme.error
       )
       Text(
-       text = "Error 発生しました",
+       text = "An error occurred",
        style = MaterialTheme.typography.titleLarge,
        fontWeight = FontWeight.Bold,
        color = MaterialTheme.colorScheme.error

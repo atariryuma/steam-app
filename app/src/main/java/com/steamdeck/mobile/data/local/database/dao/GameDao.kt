@@ -6,84 +6,84 @@ import com.steamdeck.mobile.data.local.database.entity.GameSource
 import kotlinx.coroutines.flow.Flow
 
 /**
- * gameinformationto dataアクセスobject
+ * Game information data access object
  */
 @Dao
 interface GameDao {
  /**
-  * all gameretrieve（最終プレイdate and time降順）
+  * Get all games (sorted by last played date/time descending)
   */
  @Query("SELECT * FROM games ORDER BY lastPlayedTimestamp DESC")
  fun getAllGames(): Flow<List<GameEntity>>
 
  /**
-  * favoritegameretrieve
+  * Get favorite games
   */
  @Query("SELECT * FROM games WHERE isFavorite = 1 ORDER BY name ASC")
  fun getFavoriteGames(): Flow<List<GameEntity>>
 
  /**
-  * gameID gameretrieve
+  * Get game by game ID
   */
  @Query("SELECT * FROM games WHERE id = :gameId")
  suspend fun getGameById(gameId: Long): GameEntity?
 
  /**
-  * Steam App ID gameretrieve
+  * Get game by Steam App ID
   */
  @Query("SELECT * FROM games WHERE steamAppId = :steamAppId")
  suspend fun getGameBySteamAppId(steamAppId: Long): GameEntity?
 
  /**
-  * game名 検索
+  * Search games by name
   */
  @Query("SELECT * FROM games WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
  fun searchGames(query: String): Flow<List<GameEntity>>
 
  /**
-  * ソース別 gameretrieve
+  * Get games by source
   */
  @Query("SELECT * FROM games WHERE source = :source ORDER BY addedTimestamp DESC")
  fun getGamesBySource(source: GameSource): Flow<List<GameEntity>>
 
  /**
-  * game挿入
+  * Insert game
   */
  @Insert(onConflict = OnConflictStrategy.REPLACE)
  suspend fun insertGame(game: GameEntity): Long
 
  /**
-  * 複数 game挿入
+  * Insert multiple games
   */
  @Insert(onConflict = OnConflictStrategy.REPLACE)
  suspend fun insertGames(games: List<GameEntity>)
 
  /**
-  * gameupdate
+  * Update game
   */
  @Update
  suspend fun updateGame(game: GameEntity)
 
  /**
-  * gamedelete
+  * Delete game
   */
  @Delete
  suspend fun deleteGame(game: GameEntity)
 
  /**
-  * play timeupdate
+  * Update play time
   */
  @Query("UPDATE games SET playTimeMinutes = playTimeMinutes + :additionalMinutes, lastPlayedTimestamp = :timestamp WHERE id = :gameId")
  suspend fun updatePlayTime(gameId: Long, additionalMinutes: Long, timestamp: Long)
 
  /**
-  * favoritestate切り替え
+  * Update favorite status
   */
  @Query("UPDATE games SET isFavorite = :isFavorite WHERE id = :gameId")
  suspend fun updateFavoriteStatus(gameId: Long, isFavorite: Boolean)
 
  /**
-  * all gamedelete
+  * Delete all games
   */
  @Query("DELETE FROM games")
  suspend fun deleteAllGames()

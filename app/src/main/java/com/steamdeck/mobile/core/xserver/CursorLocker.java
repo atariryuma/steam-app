@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.core.xserver;
 
 import com.steamdeck.mobile.core.math.Mathf;
-import com.steamdeck.mobile.xserver.XServer;
+import com.steamdeck.mobile.core.xserver.XServer;
 
 import java.util.Timer;
 import java.util.TimerTask;

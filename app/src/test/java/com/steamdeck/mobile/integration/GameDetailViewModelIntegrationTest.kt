@@ -30,17 +30,17 @@ import org.junit.Test
 import java.io.File
 
 /**
- * GameDetailViewModelとWinlatorEmulatorの統合テスト
+ * GameDetailViewModel and WinlatorEmulator integration test
  *
- * テスト対象:
- * - ViewModel → UseCase → WinlatorEngine → WinlatorEmulator の完全なフロー
- * - エラーハンドリングの伝播
- * - プロセス起動とメトリクス監視の統合
+ * Test targets:
+ * - Complete flow from ViewModel → UseCase → WinlatorEngine → WinlatorEmulator
+ * - Error handling propagation
+ * - Process launch and metrics monitoring integration
  *
  * Best Practices:
- * - 実際のWinlatorEmulator実装を使用（Mock不可避な部分のみMock）
- * - Turbineでの状態遷移検証
- * - 非同期処理の適切なテスト
+ * - Use actual WinlatorEmulator implementation (Mock only unavoidable parts)
+ * - State transition verification with Turbine
+ * - Proper async processing tests
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GameDetailViewModelIntegrationTest {
@@ -78,29 +78,29 @@ class GameDetailViewModelIntegrationTest {
 
     @Before
     fun setup() {
-        // Repository層のモック
+        // Mock repository layer
         gameRepository = mockk(relaxed = true)
         containerRepository = mockk(relaxed = true)
 
-        // Steam関連のモック（このテストでは不要だが必須）
+        // Mock Steam-related components (required but not needed for this test)
         steamDownloadManager = mockk(relaxed = true)
         steamLauncher = mockk(relaxed = true)
         steamSetupManager = mockk(relaxed = true)
 
-        // WinlatorEmulatorはモック（実機では実装を使用するが、テスト環境ではモック）
+        // WinlatorEmulator is mocked (use implementation on real device, mock in test environment)
         winlatorEmulator = mockk(relaxed = true)
 
-        // UseCase層（実装を使用）
+        // UseCase layer (use implementation)
         val getGameByIdUseCase = GetGameByIdUseCase(gameRepository)
         val toggleFavoriteUseCase = ToggleFavoriteUseCase(gameRepository)
         val deleteGameUseCase = DeleteGameUseCase(gameRepository)
 
-        // WinlatorEngineのモック
+        // Mock WinlatorEngine
         val winlatorEngine = mockk<WinlatorEngine>(relaxed = true)
 
         launchGameUseCase = LaunchGameUseCase(gameRepository, containerRepository, winlatorEngine)
 
-        // ViewModel（実装を使用）
+        // ViewModel (use implementation)
         viewModel = GameDetailViewModel(
             getGameByIdUseCase = getGameByIdUseCase,
             launchGameUseCase = launchGameUseCase,
@@ -111,14 +111,14 @@ class GameDetailViewModelIntegrationTest {
             steamSetupManager = steamSetupManager
         )
 
-        // デフォルトのモック設定
+        // Default mock settings
         coEvery { gameRepository.getGameById(mockGame.id) } returns mockGame
         coEvery { containerRepository.getContainerById(mockContainer.id) } returns mockContainer
         coEvery { steamSetupManager.isSteamInstalled() } returns false
     }
 
     /**
-     * 正常系: ゲーム起動が成功するフローのテスト
+     * Happy path: Test successful game launch flow
      */
     @Test
     fun `integration test - successful game launch flow`() = runTest {
@@ -140,16 +140,16 @@ class GameDetailViewModelIntegrationTest {
 
         // When
         vm.launchState.test {
-            // 初期状態を確認
+            // Verify initial state
             assertEquals(LaunchState.Idle, awaitItem())
 
-            // ゲーム起動を実行
+            // Execute game launch
             vm.launchGame(mockGame.id)
 
-            // Launching状態を確認
+            // Verify Launching state
             assertEquals(LaunchState.Launching, awaitItem())
 
-            // Running状態を確認
+            // Verify Running state
             val runningState = awaitItem() as LaunchState.Running
             assertEquals(processId, runningState.processId)
 
@@ -164,7 +164,7 @@ class GameDetailViewModelIntegrationTest {
     }
 
     /**
-     * 異常系: ゲームが見つからない場合のエラーフロー
+     * Error case: Error flow when game is not found
      */
     @Test
     fun `integration test - game not found error flow`() = runTest {
@@ -193,7 +193,7 @@ class GameDetailViewModelIntegrationTest {
             assertEquals(LaunchState.Launching, awaitItem())
 
             val errorState = awaitItem() as LaunchState.Error
-            assertTrue(errorState.message.contains("ゲームが見つかりません"))
+            assertTrue(errorState.message.contains("Game not found"))
 
             cancelAndIgnoreRemainingEvents()
         }
@@ -203,7 +203,7 @@ class GameDetailViewModelIntegrationTest {
     }
 
     /**
-     * 異常系: Box64が初期化されていない場合のエラーフロー
+     * Error case: Error flow when Box64 is not initialized
      */
     @Test
     fun `integration test - Box64 not initialized error flow`() = runTest {
@@ -244,7 +244,7 @@ class GameDetailViewModelIntegrationTest {
     }
 
     /**
-     * 異常系: Wine prefix初期化失敗のエラーフロー
+     * Error case: Wine prefix initialization error flow
      */
     @Test
     fun `integration test - Wine prefix initialization error flow`() = runTest {
@@ -282,7 +282,7 @@ class GameDetailViewModelIntegrationTest {
     }
 
     /**
-     * 統合テスト: コンテナなしでのゲーム起動
+     * Integration test: Launch game without container
      */
     @Test
     fun `integration test - launch game without container`() = runTest {
@@ -325,7 +325,7 @@ class GameDetailViewModelIntegrationTest {
     }
 
     /**
-     * 統合テスト: リポジトリ例外のハンドリング
+     * Integration test: Repository exception handling
      */
     @Test
     fun `integration test - repository exception handling`() = runTest {
@@ -361,7 +361,7 @@ class GameDetailViewModelIntegrationTest {
     }
 
     /**
-     * 統合テスト: ゲーム詳細読み込みと起動の連携
+     * Integration test: Load game and launch sequence coordination
      */
     @Test
     fun `integration test - load game and launch sequence`() = runTest {
@@ -381,7 +381,7 @@ class GameDetailViewModelIntegrationTest {
             steamSetupManager = steamSetupManager
         )
 
-        // When - ゲーム詳細を読み込み
+        // When - Load game details
         vm.uiState.test {
             assertEquals(GameDetailUiState.Loading, awaitItem())
 
@@ -393,7 +393,7 @@ class GameDetailViewModelIntegrationTest {
             cancelAndIgnoreRemainingEvents()
         }
 
-        // Then - ゲーム起動
+        // Then - Launch game
         vm.launchState.test {
             assertEquals(LaunchState.Idle, awaitItem())
 
@@ -413,7 +413,7 @@ class GameDetailViewModelIntegrationTest {
     }
 
     /**
-     * 統合テスト: プレイ時間記録の確認
+     * Integration test: Verify play time recording
      */
     @Test
     fun `integration test - play time recording on launch`() = runTest {

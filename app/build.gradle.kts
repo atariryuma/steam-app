@@ -177,9 +177,6 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
-    // Kotlin Retry (Exponential backoff for network calls)
-    implementation(libs.kotlin.retry)
-
     // Lifecycle
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)

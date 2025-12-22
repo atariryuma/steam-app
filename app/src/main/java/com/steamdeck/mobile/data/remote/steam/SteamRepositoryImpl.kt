@@ -1,11 +1,6 @@
 package com.steamdeck.mobile.data.remote.steam
 
 import android.content.Context
-import com.github.michaelbull.retry.policy.RetryPolicy
-import com.github.michaelbull.retry.policy.binaryExponentialBackoff
-import com.github.michaelbull.retry.policy.limitAttempts
-import com.github.michaelbull.retry.policy.plus
-import com.github.michaelbull.retry.retry
 import com.steamdeck.mobile.core.error.AppError
 import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.result.DataResult
@@ -13,6 +8,7 @@ import com.steamdeck.mobile.data.remote.steam.model.SteamGame
 import com.steamdeck.mobile.data.remote.steam.model.SteamPlayer
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -30,9 +26,9 @@ import javax.inject.Singleton
  * - Use AppError.from() for generic exceptions (type-safe error handling)
  * - Benefits: Retryability determination, consistent error messages, UI-friendly errors
  *
- * OPTIMIZATIONS (2025): kotlin-retry integration
+ * OPTIMIZATIONS (2025): Custom retry with exponential backoff
  * - Automatic exponential backoff for retryable errors
- * - Max 3 attempts with 1s initial delay, 2x multiplier, 30s max delay
+ * - Max 3 attempts with 1s initial delay, 2x multiplier
  * - Only retries network errors (IOException) and 5xx HTTP errors
  */
 @Singleton
@@ -44,40 +40,35 @@ class SteamRepositoryImpl @Inject constructor(
 
  companion object {
   private const val TAG = "SteamRepository"
+  private const val MAX_RETRIES = 3
+  private const val INITIAL_DELAY_MS = 1000L
 
   /**
-   * Retry policy: exponential backoff
-   * - Initial delay: 1000ms
-   * - Multiplier: 2x (1s → 2s → 4s)
-   * - Max attempts: 3
-   * - Only retry on retryable errors (network issues, 5xx errors)
+   * Retry with exponential backoff
    */
-  private val retryPolicy: RetryPolicy<Throwable> = limitAttempts(3) + binaryExponentialBackoff(
-   min = 1000L,
-   max = 30000L
-  )
-
-  /**
-   * Determines if an error should be retried
-   */
-  private fun shouldRetry(error: Throwable): Boolean {
-   return when (error) {
-    is IOException -> true // Network errors
-    is Exception -> {
-     // Check if wrapped AppError is retryable
-     val appError = AppError.from(error)
-     appError.isRetryable()
+  private suspend fun <T> retryWithBackoff(
+   maxRetries: Int = MAX_RETRIES,
+   initialDelay: Long = INITIAL_DELAY_MS,
+   block: suspend () -> T
+  ): T {
+   var currentDelay = initialDelay
+   repeat(maxRetries - 1) { attempt ->
+    try {
+     return block()
+    } catch (e: IOException) {
+     AppLogger.w(TAG, "Retry attempt ${attempt + 1}/$maxRetries after ${currentDelay}ms")
+     delay(currentDelay)
+     currentDelay *= 2 // Exponential backoff
     }
-    else -> false
    }
+   return block() // Last attempt
   }
  }
 
  override suspend fun getOwnedGames(apiKey: String, steamId: String): DataResult<List<SteamGame>> {
   return withContext(Dispatchers.IO) {
    try {
-    // Retry with exponential backoff for network errors
-    retry(retryPolicy) {
+    retryWithBackoff {
      val response = steamApiService.getOwnedGames(
       key = apiKey,
       steamId = steamId,
@@ -88,22 +79,21 @@ class SteamRepositoryImpl @Inject constructor(
      if (response.isSuccessful) {
       val games = response.body()?.response?.games ?: emptyList()
       AppLogger.d(TAG, "Successfully fetched ${games.size} games from Steam")
-      return@retry DataResult.Success(games)
+      DataResult.Success(games)
      } else {
-      // Use AppError.fromHttpCode() for proper error classification
       val error = AppError.fromHttpCode(response.code(), response.message())
-      AppLogger.w(TAG, "Steam API error: ${error.message}")
+      AppLogger.e(TAG, "Steam API error: ${error.message}")
 
-      // Throw exception to trigger retry if retryable
+      // Throw for retryable errors, return error for non-retryable
       if (error.isRetryable()) {
        throw IOException("Retryable error: ${error.message}")
       } else {
-       return@retry DataResult.Error(error)
+       DataResult.Error(error)
       }
      }
     }
    } catch (e: Exception) {
-    AppLogger.e(TAG, "Failed to fetch owned games after retries", e)
+    AppLogger.e(TAG, "Failed to fetch owned games", e)
     DataResult.Error(AppError.from(e))
    }
   }

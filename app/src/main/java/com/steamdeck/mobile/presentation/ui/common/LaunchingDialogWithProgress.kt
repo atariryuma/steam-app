@@ -46,21 +46,13 @@ fun LaunchingDialogWithProgress(
 
     Spacer(modifier = Modifier.height(8.dp))
 
-    Text(
-     text = "$elapsedSeconds / $timeoutSeconds seconds",
-     style = MaterialTheme.typography.bodySmall,
-     color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-
     if (elapsedSeconds < 60) {
-     Spacer(modifier = Modifier.height(8.dp))
      Text(
-      text = "First launch may take 30-60 seconds to initialize Winlator.",
+      text = "Initializing Winlator environment...",
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant
      )
     } else {
-     Spacer(modifier = Modifier.height(8.dp))
      Text(
       text = "Still initializing... This is taking longer than expected.",
       style = MaterialTheme.typography.bodySmall,

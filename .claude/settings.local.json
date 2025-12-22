@@ -173,28 +173,7 @@
       "Bash(./adb.exe pull:*)",
       "Bash(while true)",
       "Bash(call gradlew.bat assembleDebug --console=plain)",
-      "Bash(/c/Android/sdk/platform-tools/adb.exe push:*)",
-      "Bash(taskkill:*)",
-      "Bash(./adb.exe kill-server:*)",
-      "Bash(./adb.exe start-server:*)",
-      "Bash(./adb.exe push:*)",
-      "Bash(__NEW_LINE__ cd 'C:/Projects/winlator-10.1.0/app/src/main/java')",
-      "Bash(__NEW_LINE__ ls -la 'C:/Projects/steam-app/app/src/main/java/com/steamdeck/mobile/presentation/widget/XServerView.java')",
-      "Bash(__NEW_LINE__ ls 'C:/Projects/steam-app/app/src/main/java/com/steamdeck/mobile/core/xserver/XKeycode.java')",
-      "Bash(__NEW_LINE__ grep \"androidx.appcompat\" 'C:/Projects/steam-app/app/build.gradle.kts')",
-      "Bash(for class in ArrayUtils Callback CPUStatus ElfHelper EnvVars GPUInformation ImageUtils MSBitmap MSLink MSLogFont NetworkHelper ProcessHelper StreamUtils StringUtils TarCompressorUtils UnitUtils WineRegistryEditor WineStartMenuCreator WineUtils)",
-      "Bash(do:*)",
-      "Bash(for f in *.java)",
-      "Bash(C:/Projects/steam-app/gradlew.bat clean --no-configuration-cache)",
-      "Bash(C:/Projects/steam-app/gradlew.bat --stop)",
-      "Bash(C:/Projects/steam-app/gradlew.bat clean)",
-      "Bash(C:/Projects/steam-app/quick-build.bat)",
-      "Bash(C:/Projects/steam-app/gradlew.bat clean assembleDebug --no-configuration-cache)",
-      "Bash(git apply:*)",
-      "Bash(git mv:*)",
-      "Bash(C:/Projects/steam-app/gradlew.bat assembleDebug --console=plain)",
-      "Bash(adb shell:*)",
-      "Bash(C:/Projects/steam-app/gradlew.bat assembleDebug)"
+      "Bash(git merge:*)"
     ]
   }
 }

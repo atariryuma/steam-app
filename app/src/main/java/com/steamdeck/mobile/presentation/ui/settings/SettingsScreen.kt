@@ -867,7 +867,7 @@ private fun SteamClientContent(
         )
        }
        Text(
-        text = "• Download size: ~100MB\n• Install time: 2-3 minutes\n• First time requires Box64/Wine setup",
+        text = "• Download size: ~100MB\n• First time requires Box64/Wine setup",
         style = MaterialTheme.typography.bodySmall,
         color = SteamColorPalette.Gray,
         lineHeight = 20.sp
@@ -1653,13 +1653,13 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
     Text(
      text = when {
       state.progress < 0.20f -> {
-       "Extracting Box64/Wine binaries (first time only).\nThis may take 2-3 minutes."
+       "Extracting Box64/Wine binaries (first time only).\nPlease wait..."
       }
       state.progress < 0.60f -> {
        "Creating Wine container with Windows 10 compatibility.\nPlease wait..."
       }
       state.progress < 0.75f -> {
-       "Extracting Steam Client files from NSIS installer.\nThis will only take a few seconds."
+       "Extracting Steam Client files from NSIS installer.\nPlease wait..."
       }
       else -> {
        "Initializing Steam directories and configuration.\nAlmost done!"

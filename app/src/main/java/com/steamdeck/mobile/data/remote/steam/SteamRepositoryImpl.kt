@@ -102,26 +102,33 @@ class SteamRepositoryImpl @Inject constructor(
  override suspend fun getPlayerSummary(apiKey: String, steamId: String): DataResult<SteamPlayer> {
   return withContext(Dispatchers.IO) {
    try {
-    val response = steamApiService.getPlayerSummaries(
-     key = apiKey,
-     steamIds = steamId
-    )
+    retryWithBackoff {
+     val response = steamApiService.getPlayerSummaries(
+      key = apiKey,
+      steamIds = steamId
+     )
 
-    if (response.isSuccessful) {
-     val player = response.body()?.response?.players?.firstOrNull()
-     if (player != null) {
-      AppLogger.d(TAG, "Successfully fetched player: ${player.personaName}")
-      DataResult.Success(player)
+     if (response.isSuccessful) {
+      val player = response.body()?.response?.players?.firstOrNull()
+      if (player != null) {
+       AppLogger.d(TAG, "Successfully fetched player: ${player.personaName}")
+       DataResult.Success(player)
+      } else {
+       val error = AppError.NetworkError(404, Exception("Player not found"), retryable = false)
+       AppLogger.w(TAG, "Player information not found")
+       DataResult.Error(error)
+      }
      } else {
-      val error = AppError.NetworkError(404, Exception("Player not found"), retryable = false)
-      AppLogger.w(TAG, "Player information not found")
-      DataResult.Error(error)
+      val error = AppError.fromHttpCode(response.code(), response.message())
+      AppLogger.e(TAG, "Steam API error: ${error.message}")
+
+      // Throw for retryable errors, return error for non-retryable
+      if (error.isRetryable()) {
+       throw IOException("Retryable error: ${error.message}")
+      } else {
+       DataResult.Error(error)
+      }
      }
-    } else {
-     // Use AppError.fromHttpCode() for proper error classification
-     val error = AppError.fromHttpCode(response.code(), response.message())
-     AppLogger.e(TAG, "Steam API error: ${error.message}")
-     DataResult.Error(error)
     }
    } catch (e: Exception) {
     AppLogger.e(TAG, "Failed to fetch player summary", e)
@@ -133,29 +140,36 @@ class SteamRepositoryImpl @Inject constructor(
  override suspend fun downloadGameImage(url: String, destinationPath: String): DataResult<Unit> {
   return withContext(Dispatchers.IO) {
    try {
-    val request = Request.Builder()
-     .url(url)
-     .build()
+    retryWithBackoff {
+     val request = Request.Builder()
+      .url(url)
+      .build()
 
-    okHttpClient.newCall(request).execute().use { response ->
-     if (!response.isSuccessful) {
-      // Use AppError.fromHttpCode() for HTTP errors
-      val error = AppError.fromHttpCode(response.code, "Image download failed")
-      AppLogger.e(TAG, "Image download failed: ${error.message}")
-      return@withContext DataResult.Error(error)
-     }
+     okHttpClient.newCall(request).execute().use { response ->
+      if (!response.isSuccessful) {
+       val error = AppError.fromHttpCode(response.code, "Image download failed")
+       AppLogger.e(TAG, "Image download failed: ${error.message}")
 
-     val file = File(destinationPath)
-     file.parentFile?.mkdirs()
-
-     response.body?.byteStream()?.use { inputStream ->
-      FileOutputStream(file).use { outputStream ->
-       inputStream.copyTo(outputStream)
+       // Throw for retryable errors, return error for non-retryable
+       if (error.isRetryable()) {
+        throw IOException("Retryable error: ${error.message}")
+       } else {
+        return@retryWithBackoff DataResult.Error(error)
+       }
       }
-     }
 
-     AppLogger.d(TAG, "Successfully downloaded image to: $destinationPath")
-     DataResult.Success(Unit)
+      val file = File(destinationPath)
+      file.parentFile?.mkdirs()
+
+      response.body?.byteStream()?.use { inputStream ->
+       FileOutputStream(file).use { outputStream ->
+        inputStream.copyTo(outputStream)
+       }
+      }
+
+      AppLogger.d(TAG, "Successfully downloaded image to: $destinationPath")
+      DataResult.Success(Unit)
+     }
     }
    } catch (e: Exception) {
     AppLogger.e(TAG, "Failed to download image from $url", e)

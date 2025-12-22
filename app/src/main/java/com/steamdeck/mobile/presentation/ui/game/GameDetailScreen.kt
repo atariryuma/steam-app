@@ -188,7 +188,7 @@ fun GameDetailScreen(
     ) {
      LaunchingDialogWithProgress(
      message = if (launchElapsedSeconds < 60) {
-      "Initializing Winlator environment...\nThis may take 30-60 seconds on first launch."
+      "Initializing Winlator environment..."
      } else {
       "Still launching... Please wait."
      },
@@ -650,7 +650,7 @@ fun LaunchingDialog() {
   title = { Text("gamelaunchin...") },
   text = {
    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    Text("Winlator initialization may take 2-3 minutes on first launch.")
+    Text("Initializing Winlator environment...")
     Text("Please wait...", style = MaterialTheme.typography.bodySmall)
    }
   },

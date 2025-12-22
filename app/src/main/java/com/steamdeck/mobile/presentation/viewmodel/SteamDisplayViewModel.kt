@@ -246,10 +246,12 @@ class SteamDisplayViewModel @Inject constructor(
             // Configure WineProgramLauncherComponent
             val guestProgramLauncher = WineProgramLauncherComponent()
             guestProgramLauncher.setGuestExecutable(guestCommand)
-            // EXPERIMENT (2025-12-22): Try pure 32-bit mode instead of WoW64
-            // Steam.exe is 32-bit → should run directly with Box86 (no WoW64 layer needed)
-            guestProgramLauncher.setWoW64Mode(false)
-            AppLogger.i(TAG, "Configured pure 32-bit mode for Steam.exe (Box86 only, no WoW64)")
+            // CRITICAL (2025-12-22): WoW64 mode REQUIRED for Steam.exe
+            // Steam.exe is 32-bit but Wine needs WoW64 layer to load ntdll.so properly
+            // Research confirmed: wine explorer + WoW64 is the standard Wine/Steam approach
+            // Sources: WineHQ Explorer Wiki, Steam Community Wine Guide
+            guestProgramLauncher.setWoW64Mode(true)
+            AppLogger.i(TAG, "Configured WoW64 mode for Steam.exe (32-bit app on 64-bit Wine)")
 
             // CRITICAL: Use STABILITY preset for maximum reliability
             // Both Box86 and Box64 presets for WoW64 mode (32-bit Steam + 64-bit Wine)

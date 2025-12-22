@@ -120,7 +120,7 @@ fun ContainerScreen(
        color = MaterialTheme.colorScheme.onSurface
       )
       Text(
-       text = "This may take 30-60 seconds...",
+       text = "Please wait...",
        style = MaterialTheme.typography.bodySmall,
        color = MaterialTheme.colorScheme.onSurfaceVariant
       )

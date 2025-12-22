@@ -1,26 +1,20 @@
 package com.steamdeck.mobile.di.module
 
-import android.content.Context
-import com.steamdeck.mobile.core.input.GameControllerManager
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import javax.inject.Singleton
 
 /**
  * Input (controller) related DI module
+ *
+ * All input-related classes use @Inject constructor, so no manual bindings needed:
+ * - GameControllerManager @Inject constructor
+ * - ControllerEventBus @Inject constructor
+ * - ControllerInputRouter @Inject constructor
+ * - NativeUInputBridge @Inject constructor
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object InputModule {
-
- @Provides
- @Singleton
- fun provideGameControllerManager(
-  @ApplicationContext context: Context
- ): GameControllerManager {
-  return GameControllerManager(context)
- }
+ // No manual providers needed - all classes use @Inject constructor
 }

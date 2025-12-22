@@ -133,40 +133,50 @@ object SteamOpenIdAuthenticator {
   * @return true if signature is valid
   */
  private suspend fun verifyOpenIdSignature(params: Map<String, String>): Boolean = withContext(Dispatchers.IO) {
-  try {
-   // Build OpenID verification request parameters
-   val formBodyBuilder = FormBody.Builder()
+  // Retry logic for network failures
+  var lastException: Exception? = null
+  repeat(3) { attempt ->
+   try {
+    // Build OpenID verification request parameters
+    val formBodyBuilder = FormBody.Builder()
 
-   // Change mode to check_authentication
-   params.forEach { (key, value) ->
-    if (key == "openid.mode") {
-     formBodyBuilder.add(key, "check_authentication")
-    } else if (key.startsWith("openid.")) {
-     formBodyBuilder.add(key, value)
-    }
-   }
-
-   val request = Request.Builder()
-    .url(STEAM_OPENID_URL)
-    .post(formBodyBuilder.build())
-    .build()
-
-   httpClient.newCall(request).execute().use { response ->
-    if (!response.isSuccessful) {
-     AppLogger.e("SteamOpenIdAuth", "Verification request failed: ${response.code}")
-     return@withContext false
+    // Change mode to check_authentication
+    params.forEach { (key, value) ->
+     if (key == "openid.mode") {
+      formBodyBuilder.add(key, "check_authentication")
+     } else if (key.startsWith("openid.")) {
+      formBodyBuilder.add(key, value)
+     }
     }
 
-    val responseBody = response.body?.string() ?: ""
-    AppLogger.d("SteamOpenIdAuth", "Verification response: $responseBody")
+    val request = Request.Builder()
+     .url(STEAM_OPENID_URL)
+     .post(formBodyBuilder.build())
+     .build()
 
-    // Steam returns "is_valid:true" if signature is valid
-    return@withContext responseBody.contains("is_valid:true")
+    httpClient.newCall(request).execute().use { response ->
+     if (!response.isSuccessful) {
+      AppLogger.e("SteamOpenIdAuth", "Verification request failed: ${response.code}")
+      return@withContext false
+     }
+
+     val responseBody = response.body?.string() ?: ""
+     AppLogger.d("SteamOpenIdAuth", "Verification response: $responseBody")
+
+     // Steam returns "is_valid:true" if signature is valid
+     return@withContext responseBody.contains("is_valid:true")
+    }
+   } catch (e: Exception) {
+    lastException = e
+    if (attempt < 2) {
+     AppLogger.w("SteamOpenIdAuth", "Verification attempt ${attempt + 1}/3 failed, retrying...", e)
+     kotlinx.coroutines.delay(1000L * (attempt + 1)) // Exponential backoff: 1s, 2s
+    }
    }
-  } catch (e: Exception) {
-   AppLogger.e("SteamOpenIdAuth", "Signature verification failed", e)
-   return@withContext false
   }
+
+  AppLogger.e("SteamOpenIdAuth", "Signature verification failed after 3 attempts", lastException)
+  return@withContext false
  }
 
  /**

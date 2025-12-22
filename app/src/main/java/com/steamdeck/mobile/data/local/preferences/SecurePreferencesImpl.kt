@@ -67,6 +67,7 @@ class SecurePreferencesImpl @Inject constructor(
   private const val KEY_STEAM_USERNAME = "steam_username"
   private const val KEY_STEAM_API_KEY = "steam_api_key"
   private const val KEY_LAST_SYNC_TIMESTAMP = "last_sync_timestamp"
+  private const val KEY_STEAM_BIG_PICTURE_MODE = "steam_big_picture_mode"
  }
 
  private suspend fun ensureInitialized() {
@@ -157,5 +158,16 @@ class SecurePreferencesImpl @Inject constructor(
 
   // Either API key auth or token auth is configured
   (!apiKey.isNullOrBlank() && !steamId.isNullOrBlank()) || !accessToken.isNullOrBlank()
+ }
+
+ override suspend fun getSteamBigPictureMode(): Boolean = withContext(Dispatchers.IO) {
+  // Default to true (Big Picture Mode is ideal for mobile/landscape devices)
+  encryptedPreferences.getBoolean(KEY_STEAM_BIG_PICTURE_MODE, true)
+ }
+
+ override suspend fun saveSteamBigPictureMode(enabled: Boolean) = withContext(Dispatchers.IO) {
+  encryptedPreferences.edit()
+   .putBoolean(KEY_STEAM_BIG_PICTURE_MODE, enabled)
+   .apply()
  }
 }

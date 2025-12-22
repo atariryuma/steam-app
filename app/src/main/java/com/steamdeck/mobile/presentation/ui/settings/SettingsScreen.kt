@@ -52,6 +52,8 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -284,6 +286,7 @@ private fun SettingsContent(
       SteamClientContent(
        steamInstallState = steamInstallState,
        defaultContainerId = "default_shared_container",
+       viewModel = settingsViewModel,
        onInstall = onInstallSteam,
        onOpen = onOpenSteam,
        onUninstall = onUninstallSteam
@@ -739,6 +742,7 @@ private fun SteamOpenIdAuthSection(
 private fun SteamClientContent(
  steamInstallState: SteamInstallState,
  defaultContainerId: String,
+ viewModel: SettingsViewModel,
  onInstall: (String) -> Unit,
  onOpen: (String) -> Unit,
  onUninstall: (String) -> Unit
@@ -867,7 +871,7 @@ private fun SteamClientContent(
         )
        }
        Text(
-        text = "• Download size: ~100MB\n• Install time: 2-3 minutes\n• First time requires Box64/Wine setup",
+        text = "• Download size: ~100MB\n• First time requires Box64/Wine setup",
         style = MaterialTheme.typography.bodySmall,
         color = SteamColorPalette.Gray,
         lineHeight = 20.sp
@@ -1030,6 +1034,48 @@ private fun SteamClientContent(
        }
       }
      }
+
+     // Big Picture Mode Toggle
+     Spacer(modifier = Modifier.height(16.dp))
+     Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically
+     ) {
+      Column(modifier = Modifier.weight(1f)) {
+       Text(
+        text = stringResource(R.string.setting_steam_big_picture_mode_title),
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurface
+       )
+       Text(
+        text = stringResource(R.string.setting_steam_big_picture_mode_description),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+       )
+      }
+
+      var bigPictureModeEnabled by remember { mutableStateOf(true) }
+
+      // Load current preference on first composition
+      LaunchedEffect(Unit) {
+       bigPictureModeEnabled = viewModel.getSteamBigPictureMode()
+      }
+
+      Switch(
+       checked = bigPictureModeEnabled,
+       onCheckedChange = { enabled ->
+        bigPictureModeEnabled = enabled
+        viewModel.setSteamBigPictureMode(enabled)
+       },
+       colors = SwitchDefaults.colors(
+        checkedThumbColor = SteamColorPalette.BrightBlue,
+        checkedTrackColor = SteamColorPalette.BrightBlue.copy(alpha = 0.5f)
+       )
+      )
+     }
+
+     Spacer(modifier = Modifier.height(16.dp))
 
      // Uninstall button
      OutlinedButton(
@@ -1653,13 +1699,13 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
     Text(
      text = when {
       state.progress < 0.20f -> {
-       "Extracting Box64/Wine binaries (first time only).\nThis may take 2-3 minutes."
+       "Extracting Box64/Wine binaries (first time only).\nPlease wait..."
       }
       state.progress < 0.60f -> {
        "Creating Wine container with Windows 10 compatibility.\nPlease wait..."
       }
       state.progress < 0.75f -> {
-       "Extracting Steam Client files from NSIS installer.\nThis will only take a few seconds."
+       "Extracting Steam Client files from NSIS installer.\nPlease wait..."
       }
       else -> {
        "Initializing Steam directories and configuration.\nAlmost done!"

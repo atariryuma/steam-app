@@ -120,8 +120,8 @@ class SteamSetupManager @Inject constructor(
    }
    AppLogger.i(TAG, "Installer downloaded: ${installerFile.absolutePath}")
 
-   // progress: 0.15 ~ 0.60 (45%) - Container creation takes 10-20 seconds
-   progressCallback?.invoke(0.15f, "Creating Wine container (this may take 10-20 seconds)...", null)
+   // progress: 0.15 ~ 0.60 (45%) - Container creation
+   progressCallback?.invoke(0.15f, "Creating Wine container...", null)
 
    // 2. Get or create container
    val containerResult = getOrCreateContainer(containerId)
@@ -215,8 +215,8 @@ class SteamSetupManager @Inject constructor(
     progressCallback?.invoke(0.75f, "Wine installer execution completed", null)
    }
 
-   // progress: 0.75 ~ 0.95 (20%) - Steam initialization takes 30 seconds
-   progressCallback?.invoke(0.75f, "Initializing Steam client (this may take 30 seconds)...", null)
+   // progress: 0.75 ~ 0.95 (20%) - Steam initialization
+   progressCallback?.invoke(0.75f, "Initializing Steam client...", null)
 
    // 5. Initialize Steam client in background (creates steamapps/, config.vdf, etc.)
    val initResult = initializeSteamClient(container)

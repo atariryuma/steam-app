@@ -171,7 +171,10 @@ public class WineProgramLauncherComponent extends EnvironmentComponent {
         envVars.put("LC_ALL", "en_US.utf8");
         envVars.put("DISPLAY", ":0");
         envVars.put("PATH", imageFs.getWinePath()+"/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-        envVars.put("LD_LIBRARY_PATH", "/usr/lib/aarch64-linux-gnu:/usr/lib/arm-linux-gnueabihf");
+        // CRITICAL FIX (2025-12-22): Add /rootfs prefix to LD_LIBRARY_PATH for Box64
+        // Box64 executable needs to find libc.so.6 from rootfs
+        // PRoot binds rootDir to /rootfs (line 195), so libraries are at /rootfs/usr/lib/...
+        envVars.put("LD_LIBRARY_PATH", "/rootfs/usr/lib/aarch64-linux-gnu:/rootfs/usr/lib/arm-linux-gnueabihf:/rootfs/lib:/rootfs/usr/lib:/usr/lib/aarch64-linux-gnu:/usr/lib/arm-linux-gnueabihf");
         envVars.put("ANDROID_SYSVSHM_SERVER", UnixSocketConfig.SYSVSHM_SERVER_PATH);
 
         if ((new File(imageFs.getLib64Dir(), "libandroid-sysvshm.so")).exists() ||
@@ -190,6 +193,13 @@ public class WineProgramLauncherComponent extends EnvironmentComponent {
         // --rootfs puts PRoot in chroot mode, which blocks Android filesystem paths
         // Instead, use bind mounts only (matches WinlatorEmulator.kt line 797)
         // This allows box64 to run from Android path while accessing rootfs files via binds
+        // FIXED (2025-12-22): Bind to /rootfs instead of hardcoded Winlator path
+        // This ensures Wine DLL path resolution works correctly in our app
+        command += " -b " + rootDir.getAbsolutePath() + ":/rootfs";
+
+        // ADDITIONAL FIX (2025-12-22): Bind rootfs to Winlator's hardcoded path
+        // Wineserver has hardcoded reference to /data/data/com.winlator/files/rootfs
+        // This bind mount allows Wineserver to work with both paths
         command += " -b " + rootDir.getAbsolutePath() + ":/data/data/com.winlator/files/rootfs";
 
         // Bind /tmp to rootfs/tmp for XServer socket access
@@ -287,12 +297,12 @@ public class WineProgramLauncherComponent extends EnvironmentComponent {
             android.util.Log.e("WineProgramLauncher", "Failed to copy box64", e);
         }
 
-        // CRITICAL FIX: Execute box64 using original Android filesystem path (NOT rootfs copy)
-        // Using rootfs copy causes ELF version mismatch with rootfs libc.so.6
-        // Using Android original (box64Binary) avoids version conflicts
-        // This matches WinlatorEmulator.kt's successful approach (line 806: box64ToUse.absolutePath)
-        // Environment variables are passed via ProcessHelper.exec's envp parameter
-        // PRoot will inherit these variables and make them available to box64/wine
+        // CRITICAL FIX (2025-12-22): Execute box64 from Android path (Android linker requirement)
+        // Android linker needs real filesystem path to load box64 executable
+        // BUT box64 needs to find libc.so.6 - this is solved by LD_LIBRARY_PATH in PRoot environment
+        // PRoot provides library path translation via bind mounts
+        // Command: proot [binds] {androidPath}/box64 wine ...
+        // Inside PRoot, box64 will see /rootfs/lib via LD_LIBRARY_PATH environment variable
         command += " " + box64Binary.getAbsolutePath() + " " + guestExecutable;
 
         // Prepend PROOT_TMP_DIR to environment variables
@@ -372,13 +382,14 @@ public class WineProgramLauncherComponent extends EnvironmentComponent {
 
         // CRITICAL: Set Box64 library search paths for Wine DLLs
         // Without these, Wine cannot load ntdll.so and other core libraries
-        // Matches WinlatorEmulator.kt line 2093-2095
+        // FIXED (2025-12-22): Use /rootfs prefix to match PRoot bind mount
+        // PRoot binds rootDir to /rootfs, so paths must reference /rootfs instead of absolute Android paths
         Context context = environment.getContext();
         ImageFs imageFs = environment.getImageFs();
-        File rootfsDir = imageFs.getRootDir();
-        String rootfsLibPath = rootfsDir.getAbsolutePath() + "/usr/lib:" + rootfsDir.getAbsolutePath() + "/lib";
+        // Use /rootfs paths that match our PRoot bind mount (line 195)
+        String rootfsLibPath = "/rootfs/usr/lib:/rootfs/lib";
         String wineLibPath = imageFs.getWinePath() + "/lib/wine/x86_64-unix";
-        String x86_64LibPath = rootfsDir.getAbsolutePath() + "/usr/lib/x86_64-linux-gnu";
+        String x86_64LibPath = "/rootfs/usr/lib/x86_64-linux-gnu";
         envVars.put("BOX64_LD_LIBRARY_PATH", rootfsLibPath + ":" + x86_64LibPath + ":" + wineLibPath);
         envVars.put("BOX64_PATH", imageFs.getWinePath() + "/bin");
     }

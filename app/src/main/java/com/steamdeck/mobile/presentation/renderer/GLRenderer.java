@@ -308,44 +308,82 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         if (!window.attributes.isMapped()) return;
         if (window != xServer.windowManager.rootWindow) {
             boolean viewable = true;
+            String wmClass = window.getClassName();
 
-            if (unviewableWMClasses != null) {
-                String wmClass = window.getClassName();
+            // DEBUG: Log window class names to diagnose fullscreen issues
+            if (wmClass != null && !wmClass.isEmpty()) {
+                android.util.Log.d("GLRenderer", "collectRenderableWindows: wmClass=" + wmClass +
+                    ", size=" + window.getWidth() + "x" + window.getHeight());
+            }
+
+            // ENHANCED WINDOW FILTERING (2025-12-23):
+            // Auto-hide Wine desktop taskbar (explorer.exe with height ~20-30px)
+            // This provides seamless fullscreen experience in wine /desktop mode
+            short width = window.getWidth();
+            short height = window.getHeight();
+            boolean isTaskbar = wmClass.contains("explorer.exe") && height >= 15 && height <= 40 && width > 800;
+
+            if (isTaskbar) {
+                if (window.attributes.isEnabled()) window.disableAllDescendants();
+                viewable = false;
+                android.util.Log.d("GLRenderer", "Auto-hiding Wine taskbar: " + wmClass +
+                                   " (" + width + "x" + height + ")");
+            }
+            else if (unviewableWMClasses != null) {
                 for (String unviewableWMClass : unviewableWMClasses) {
                     if (wmClass.contains(unviewableWMClass)) {
                         if (window.attributes.isEnabled()) window.disableAllDescendants();
                         viewable = false;
+                        android.util.Log.d("GLRenderer", "Window hidden by filter: " + wmClass);
                         break;
                     }
                 }
             }
 
             if (viewable) {
-                if (forceFullscreenWMClass != null) {
-                    short width = window.getWidth();
-                    short height = window.getHeight();
-                    boolean forceFullscreen= false;
+                // width and height already declared above for taskbar detection
+                boolean forceFullscreen = false;
 
-                    if (width >= 320 && height >= 200 && width < xServer.screenInfo.width && height < xServer.screenInfo.height) {
-                        Window parent = window.getParent();
-                        boolean parentHasWMClass = parent.getClassName().contains(forceFullscreenWMClass);
-                        boolean hasWMClass = window.getClassName().contains(forceFullscreenWMClass);
-                        if (hasWMClass) {
-                            forceFullscreen = !parentHasWMClass && window.getChildCount() == 0;
-                        }
-                        else {
-                            short borderX = (short)(parent.getWidth() - width);
-                            short borderY = (short)(parent.getHeight() - height);
-                            if (parent.getChildCount() == 1 && borderX > 0 && borderY > 0 && borderX <= 12) {
-                                forceFullscreen = true;
-                                removeRenderableWindow(parent);
-                            }
+                // ENHANCED FULLSCREEN LOGIC (2025-12-23):
+                // Auto-detect Wine desktop mode (wine explorer /desktop=shell,1280x720)
+                // - Wine desktop creates explorer.exe window at exact desktop size (e.g., 1280x720)
+                // - Force fullscreen for desktop-sized windows to hide Wine virtual desktop chrome
+                // - Also support legacy forceFullscreenWMClass for non-desktop mode
+
+                // Method 1: Detect Wine desktop window by size (PRIORITY)
+                // Wine desktop dimensions: 1280x720, 1920x1080, etc.
+                // Common desktop sizes: 1024x768, 1280x720, 1600x900, 1920x1080
+                boolean isWineDesktopWindow = (width == 1280 && height == 720) ||
+                                              (width == 1920 && height == 1080) ||
+                                              (width == 1600 && height == 900) ||
+                                              (width == 1024 && height == 768);
+
+                if (isWineDesktopWindow && wmClass.contains("explorer.exe")) {
+                    forceFullscreen = true;
+                    android.util.Log.d("GLRenderer", "Auto-detected Wine desktop window, forcing fullscreen: " +
+                                       wmClass + " (" + width + "x" + height + ")");
+                }
+                // Method 2: Legacy WM_CLASS-based detection (FALLBACK)
+                else if (forceFullscreenWMClass != null && width >= 320 && height >= 200 &&
+                         width < xServer.screenInfo.width && height < xServer.screenInfo.height) {
+                    Window parent = window.getParent();
+                    boolean parentHasWMClass = parent.getClassName().contains(forceFullscreenWMClass);
+                    boolean hasWMClass = wmClass.contains(forceFullscreenWMClass);
+                    if (hasWMClass) {
+                        forceFullscreen = !parentHasWMClass && window.getChildCount() == 0;
+                        android.util.Log.d("GLRenderer", "Forcing fullscreen by WM_CLASS: " + wmClass);
+                    }
+                    else {
+                        short borderX = (short)(parent.getWidth() - width);
+                        short borderY = (short)(parent.getHeight() - height);
+                        if (parent.getChildCount() == 1 && borderX > 0 && borderY > 0 && borderX <= 12) {
+                            forceFullscreen = true;
+                            removeRenderableWindow(parent);
                         }
                     }
-
-                    renderableWindows.add(new RenderableWindow(window.getContent(), x, y, forceFullscreen));
                 }
-                else renderableWindows.add(new RenderableWindow(window.getContent(), x, y));
+
+                renderableWindows.add(new RenderableWindow(window.getContent(), x, y, forceFullscreen));
             }
         }
 

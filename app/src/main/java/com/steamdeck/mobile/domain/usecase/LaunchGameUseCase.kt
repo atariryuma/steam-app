@@ -37,7 +37,8 @@ class LaunchGameUseCase @Inject constructor(
  private val containerRepository: WinlatorContainerRepository,
  private val winlatorEngine: WinlatorEngine,
  private val windowsEmulator: WindowsEmulator,
- private val validateGameInstallationUseCase: ValidateGameInstallationUseCase
+ private val validateGameInstallationUseCase: ValidateGameInstallationUseCase,
+ private val controllerInputRouter: com.steamdeck.mobile.core.input.ControllerInputRouter
 ) {
  /**
   * Launch game and return launch info with monitoring Flow
@@ -96,6 +97,10 @@ class LaunchGameUseCase @Inject constructor(
     )
    }
 
+   // NEW: Start controller input routing before game launch
+   AppLogger.i(TAG, "Starting controller input routing")
+   controllerInputRouter.startRouting(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO))
+
    // Launch game
    when (val result = winlatorEngine.launchGame(gameToLaunch, container)) {
     is LaunchResult.Success -> {
@@ -123,6 +128,8 @@ class LaunchGameUseCase @Inject constructor(
     }
     is LaunchResult.Error -> {
      AppLogger.e(TAG, "Game launch failed: ${result.message}", result.cause)
+     // Stop routing on launch failure
+     controllerInputRouter.stopRouting()
      DataResult.Error(
       AppError.Unknown(Exception(result.message, result.cause))
      )
@@ -130,6 +137,8 @@ class LaunchGameUseCase @Inject constructor(
    }
   } catch (e: Exception) {
    AppLogger.e(TAG, "Exception during game launch", e)
+   // Stop routing on exception
+   controllerInputRouter.stopRouting()
    DataResult.Error(AppError.from(e))
   }
  }

@@ -111,6 +111,34 @@ class SettingsViewModel @Inject constructor(
  }
 
  /**
+  * Get Steam Big Picture Mode preference
+  * @return True if Big Picture Mode is enabled, false otherwise
+  */
+ suspend fun getSteamBigPictureMode(): Boolean {
+  return securePreferences.getSteamBigPictureMode()
+ }
+
+ /**
+  * Toggle Steam Big Picture Mode
+  * @param enabled True to enable Big Picture Mode, false for normal mode
+  */
+ fun setSteamBigPictureMode(enabled: Boolean) {
+  viewModelScope.launch {
+   try {
+    securePreferences.saveSteamBigPictureMode(enabled)
+    AppLogger.i(TAG, "Steam Big Picture Mode: ${if (enabled) "ENABLED" else "DISABLED"}")
+
+    _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
+     successMessage = "Steam launch mode updated"
+    ) ?: SettingsUiState.Loading
+   } catch (e: Exception) {
+    AppLogger.e(TAG, "Failed to save Big Picture Mode preference", e)
+    _uiState.value = SettingsUiState.Error("Failed to save preference: ${e.message}")
+   }
+  }
+ }
+
+ /**
   * Load settings data
   *
   * Note: Users must register their own Steam Web API Key

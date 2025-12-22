@@ -101,6 +101,13 @@
     native <methods>;
 }
 
+# Native uinput Controller Bridge (JNI)
+-keep class com.steamdeck.mobile.core.input.NativeUInputBridge {
+    native <methods>;
+}
+-keep class com.steamdeck.mobile.core.input.XboxButtonCodes { *; }
+-keep class com.steamdeck.mobile.core.input.EvdevAxisCodes { *; }
+
 # Google Error Prone Annotations (used by Tink)
 -dontwarn com.google.errorprone.annotations.**
 

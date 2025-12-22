@@ -41,6 +41,7 @@ class NsisExtractor(private val nsisFile: File) {
     ): Result<Int> = withContext(Dispatchers.IO) {
         var archive: IInArchive? = null
         var randomAccessFile: RandomAccessFile? = null
+        val openStreams = mutableListOf<FileOutputStream>()
 
         try {
             AppLogger.i(TAG, "Extracting NSIS using 7-Zip-JBinding library (ARM64 compatible)")
@@ -102,9 +103,12 @@ class NsisExtractor(private val nsisFile: File) {
 
                     // Return output stream for file data
                     val fileOutputStream = FileOutputStream(outputFile)
+                    openStreams.add(fileOutputStream)
                     return object : ISequentialOutStream {
                         override fun write(data: ByteArray): Int {
                             fileOutputStream.write(data)
+                            // Note: Stream will be closed after extraction completes
+                            // (tracked in openStreams list and closed in finally block)
                             return data.size
                         }
                     }
@@ -142,6 +146,13 @@ class NsisExtractor(private val nsisFile: File) {
             Result.failure(e)
         } finally {
             // Close archive and file handle
+            openStreams.forEach { stream ->
+                try {
+                    stream.close()
+                } catch (e: Exception) {
+                    AppLogger.w(TAG, "Error closing output stream", e)
+                }
+            }
             try {
                 archive?.close()
             } catch (e: Exception) {

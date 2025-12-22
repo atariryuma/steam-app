@@ -5,15 +5,18 @@ project(SteamDeckMobile)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wno-unused-function -Wimplicit-function-declaration")
 
 # Minimal XServer components for Steam display
-# Include drawable.c and xconnector_epoll.c for XServer functionality
+# Include drawable.c, xconnector_epoll.c, and gpu_image.c for XServer functionality
 add_library(winlator SHARED
             winlator/drawable.c
-            winlator/xconnector_epoll.c)
+            winlator/xconnector_epoll.c
+            winlator/gpu_image.c)
 
 target_link_libraries(winlator
                       log
                       android
-                      jnigraphics)
+                      jnigraphics
+                      EGL
+                      GLESv2)
 
 # PRoot - Linux chroot environment for Wine/Box64
 # Built as executable (libproot.so) not library, following Winlator approach

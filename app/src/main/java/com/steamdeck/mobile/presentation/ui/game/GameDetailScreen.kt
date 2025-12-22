@@ -31,6 +31,13 @@ import com.steamdeck.mobile.presentation.viewmodel.GameDetailUiState
 import com.steamdeck.mobile.presentation.viewmodel.GameDetailViewModel
 import com.steamdeck.mobile.presentation.viewmodel.LaunchState
 import com.steamdeck.mobile.presentation.viewmodel.SteamLaunchState
+import com.steamdeck.mobile.presentation.ui.common.LaunchingDialogWithProgress
+import kotlinx.coroutines.delay
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
+import com.steamdeck.mobile.presentation.widget.XServerView
+import com.steamdeck.mobile.core.xserver.XServer
+import com.steamdeck.mobile.core.xserver.ScreenInfo
 
 /**
  * Game Details Screen - BackboneOne style design
@@ -53,6 +60,7 @@ fun GameDetailScreen(
  onNavigateToSettings: () -> Unit = {},
  viewModel: GameDetailViewModel = hiltViewModel()
 ) {
+ val context = LocalContext.current
  val uiState by viewModel.uiState.collectAsState()
  val launchState by viewModel.launchState.collectAsState()
  val steamLaunchState by viewModel.steamLaunchState.collectAsState()
@@ -65,10 +73,42 @@ fun GameDetailScreen(
  var launchErrorMessage by remember { mutableStateOf("") }
  var steamLaunchErrorMessage by remember { mutableStateOf("") }
  var validationErrors by remember { mutableStateOf<List<String>>(emptyList()) }
+ var launchElapsedSeconds by remember { mutableStateOf(0) }
+
+ // Create XServer instance for game display (stable across recompositions)
+ val screenWidth = remember { context.resources.displayMetrics.widthPixels }
+ val screenHeight = remember { context.resources.displayMetrics.heightPixels }
+ val actualScreenSize = remember(screenWidth, screenHeight) { "${screenWidth}x${screenHeight}" }
+
+ val xServer = remember(actualScreenSize) {
+  XServer(ScreenInfo(actualScreenSize))
+ }
+ val xServerView = remember(xServer) {
+  XServerView(context, xServer)
+ }
 
  // Load game details
  LaunchedEffect(gameId) {
   viewModel.loadGame(gameId)
+ }
+
+ // Timer for launch timeout
+ LaunchedEffect(launchState is LaunchState.Launching) {
+  if (launchState is LaunchState.Launching) {
+   launchElapsedSeconds = 0
+   while (launchState is LaunchState.Launching) {
+    delay(1000)
+    launchElapsedSeconds++
+
+    // 90 second timeout
+    if (launchElapsedSeconds >= 90) {
+     viewModel.cancelLaunch()
+     launchErrorMessage = context.getString(R.string.error_launch_timeout)
+     showLaunchErrorDialog = true
+     break
+    }
+   }
+  }
  }
 
  // Navigate back when delete is complete
@@ -112,7 +152,7 @@ fun GameDetailScreen(
      isSteamInstalled = isSteamInstalled,
      isScanning = isScanning,
      steamLaunchState = steamLaunchState,
-     onLaunchGame = { viewModel.launchGame(gameId) },
+     onLaunchGame = { viewModel.launchGame(gameId, xServer) },
      onLaunchViaSteam = { viewModel.launchGameViaSteam(gameId) },
      onOpenSteamClient = { viewModel.openSteamClient(gameId) },
      onOpenSteamInstallPage = { viewModel.triggerGameDownload(gameId) },
@@ -145,7 +185,14 @@ fun GameDetailScreen(
      enter = AnimationDefaults.DialogEnter,
      exit = AnimationDefaults.DialogExit
     ) {
-     LaunchingDialog()
+     LaunchingDialogWithProgress(
+     message = if (launchElapsedSeconds < 60) {
+      "Initializing Winlator environment...\nThis may take 30-60 seconds on first launch."
+     } else {
+      "Still launching... Please wait."
+     },
+     elapsedSeconds = launchElapsedSeconds
+    )
     }
 
     // Launch error dialog
@@ -210,6 +257,50 @@ fun GameDetailScreen(
    }
    is GameDetailUiState.Deleted -> {
     // After delete completes, LaunchedEffect navigates back
+   }
+  }
+
+  // XServerView overlay for running game
+  if (launchState is LaunchState.Running) {
+   Box(modifier = Modifier.fillMaxSize()) {
+    // Full-screen game display
+    AndroidView(
+     modifier = Modifier.fillMaxSize(),
+     factory = {
+      xServerView.apply {
+       onResume() // Call once during initialization
+      }
+     },
+     update = { view ->
+      // No-op: lifecycle managed by DisposableEffect
+     }
+    )
+
+    // Lifecycle management for XServerView
+    DisposableEffect(Unit) {
+     onDispose {
+      xServerView.onPause()
+     }
+    }
+
+    // Close button overlay
+    IconButton(
+     onClick = {
+      viewModel.stopGame() // Stop the game process
+     },
+     modifier = Modifier
+      .align(Alignment.TopEnd)
+      .padding(16.dp)
+    ) {
+     Icon(
+      imageVector = Icons.Default.Close,
+      contentDescription = "Close game",
+      tint = Color.White,
+      modifier = Modifier
+       .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+       .padding(8.dp)
+     )
+    }
    }
   }
  }

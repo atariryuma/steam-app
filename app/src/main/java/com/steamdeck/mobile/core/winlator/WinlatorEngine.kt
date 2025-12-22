@@ -29,6 +29,12 @@ interface WinlatorEngine {
  suspend fun stopGame(): Result<Unit>
 
  /**
+  * Clean up engine resources
+  * Should be called when engine is no longer needed (e.g., ViewModel.onCleared())
+  */
+ fun cleanup()
+
+ /**
   * Create container
   * @param container Container configuration
   * @return Creation result
@@ -59,7 +65,10 @@ interface WinlatorEngine {
  */
 sealed class LaunchResult {
  /** Launch success */
- data class Success(val processId: Int) : LaunchResult()
+ data class Success(
+  val pid: Int,
+  val processId: String
+ ) : LaunchResult()
 
  /** Launch failure */
  data class Error(val message: String, val cause: Throwable? = null) : LaunchResult()

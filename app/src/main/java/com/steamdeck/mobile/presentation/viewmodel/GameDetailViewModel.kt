@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.steamdeck.mobile.core.winlator.WinlatorEngine
+import com.steamdeck.mobile.core.xserver.XServer
 import javax.inject.Inject
 
 /**
@@ -47,7 +49,8 @@ class GameDetailViewModel @Inject constructor(
  private val steamSetupManager: SteamSetupManager,
  private val scanInstalledGamesUseCase: ScanInstalledGamesUseCase,
  private val triggerGameDownloadUseCase: TriggerGameDownloadUseCase,
- private val gameRepository: GameRepository
+ private val gameRepository: GameRepository,
+ private val winlatorEngine: WinlatorEngine
 ) : ViewModel() {
 
  companion object {
@@ -70,6 +73,10 @@ class GameDetailViewModel @Inject constructor(
  val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
  // FIXED: Track process monitoring job to prevent memory leaks
+ // XServer instance for game display
+ private var xServer: XServer? = null
+ val gameXServer: XServer?
+  get() = xServer
  private var processMonitoringJob: Job? = null
 
  init {
@@ -78,9 +85,18 @@ class GameDetailViewModel @Inject constructor(
 
  override fun onCleared() {
   super.onCleared()
+
   // Cancel process monitoring when ViewModel is cleared
   processMonitoringJob?.cancel()
-  AppLogger.d(TAG, "ViewModel cleared, process monitoring cancelled")
+  processMonitoringJob = null
+
+  // Clean up XServer resources
+  xServer = null
+
+  // Clean up WinlatorEngine resources
+  winlatorEngine.cleanup()
+
+  AppLogger.d(TAG, "ViewModel cleared: process monitoring, XServer, and WinlatorEngine resources cleaned up")
  }
 
  /**
@@ -103,15 +119,24 @@ class GameDetailViewModel @Inject constructor(
 
  /**
   * Launch game (FIXED: Flow-based monitoring prevents memory leaks)
+  * @param gameId Game ID to launch
+  * @param xServer XServer instance for graphics rendering
   */
- fun launchGame(gameId: Long) {
+ fun launchGame(gameId: Long, xServer: XServer) {
   viewModelScope.launch {
+   AppLogger.i(TAG, ">>> ViewModel: Starting game launch for gameId=$gameId")
+
+   // Store XServer reference for game display
+   this@GameDetailViewModel.xServer = xServer
+
    _launchState.value = LaunchState.Launching
+   AppLogger.d(TAG, ">>> ViewModel: State changed to Launching")
+
    when (val result = launchGameUseCase(gameId)) {
     is DataResult.Success -> {
      val launchInfo = result.data
      _launchState.value = LaunchState.Running(launchInfo.processId)
-     AppLogger.i(TAG, "Game launched: PID ${launchInfo.processId}")
+     AppLogger.i(TAG, ">>> ViewModel: Launch SUCCESS, PID=${launchInfo.processId}")
 
      // FIXED: Start monitoring in viewModelScope (auto-cancelled on ViewModel clear)
      processMonitoringJob?.cancel() // Cancel previous monitoring if exists
@@ -125,11 +150,36 @@ class GameDetailViewModel @Inject constructor(
     is DataResult.Error -> {
      val errorMessage = result.error.toUserMessage(context)
      _launchState.value = LaunchState.Error(errorMessage)
-     AppLogger.e(TAG, "Launch failed: $errorMessage")
+     AppLogger.e(TAG, ">>> ViewModel: Launch FAILED - $errorMessage")
     }
     is DataResult.Loading -> {
      // Loading handled by Launching state
     }
+   }
+  }
+ }
+
+ /**
+  * Cancel game launch (timeout or user cancellation)
+  */
+ fun cancelLaunch() {
+  AppLogger.w(TAG, ">>> Launch cancelled by user or timeout")
+  _launchState.value = LaunchState.Error("Launch timeout after 90 seconds")
+ }
+
+ /**
+  * Stop currently running game
+  */
+ fun stopGame() {
+  viewModelScope.launch {
+   AppLogger.i(TAG, ">>> Stopping game...")
+   val result = winlatorEngine.stopGame()
+   if (result.isSuccess) {
+    _launchState.value = LaunchState.Idle
+    AppLogger.i(TAG, ">>> Game stopped successfully")
+   } else {
+    AppLogger.e(TAG, ">>> Failed to stop game: ${result.exceptionOrNull()?.message}")
+    _launchState.value = LaunchState.Error("Failed to stop game")
    }
   }
  }

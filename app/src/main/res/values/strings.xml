@@ -329,4 +329,26 @@
     <string name="compatibility">Compatibility</string>
     <string name="intermediate">Intermediate</string>
     <string name="performance">Performance</string>
+    <!-- Launch error messages (Phase 3) -->
+    <string name="error_launch_timeout">Launch timeout after 90 seconds.
+
+Possible causes:
+• Insufficient storage (500MB+ required)
+• Device performance limitations
+
+Try:
+1. Restart the app
+2. Free up storage space
+3. Restart your device</string>
+
+    <string name="error_launch_init_failed">Failed to initialize Winlator.
+
+Check:
+• Storage space (500MB required)
+• App permissions
+
+Try:
+1. Clear app cache
+2. Reinstall the app</string>
+
 </resources>

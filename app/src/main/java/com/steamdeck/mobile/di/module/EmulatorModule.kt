@@ -1,65 +1,39 @@
 package com.steamdeck.mobile.di.module
 
-import android.content.Context
-import com.steamdeck.mobile.core.wine.WineMonoInstaller
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
-import com.steamdeck.mobile.core.winlator.ZstdDecompressor
 import com.steamdeck.mobile.domain.emulator.WindowsEmulator
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
  * Dependency injection module for Windows emulator.
  *
- * This module uses Strategy Pattern to allow switching between
- * different emulator backends (Winlator, Proton+FEX, etc.)
- * by changing a single @Provides method.
+ * CRITICAL FIX (2025-12-22): Use @Binds instead of @Provides to ensure single instance
+ * Previous implementation created multiple WinlatorEmulator instances:
+ * - One from @Inject constructor (used by WinlatorEngineImpl)
+ * - One from provideWindowsEmulator (used by LaunchGameUseCase)
+ * This caused activeProcesses map to be different across instances.
  *
- * Future migration example:
- * ```kotlin
- * @Provides
- * @Singleton
- * fun provideWindowsEmulator(
- *  @ApplicationContext context: Context,
- *  zstdDecompressor: ZstdDecompressor,
- *  preferences: AppPreferences
- * ): WindowsEmulator {
- *  return when (preferences.emulatorBackend) {
- *   EmulatorBackend.WINLATOR -> WinlatorEmulator(context, zstdDecompressor)
- *   EmulatorBackend.PROTON_FEX -> ProtonEmulator(context, zstdDecompressor)
- *   else -> WinlatorEmulator(context, zstdDecompressor) // Default
- *  }
- * }
- * ```
+ * @Binds ensures Hilt uses the same @Singleton instance everywhere.
  */
 @Module
 @InstallIn(SingletonComponent::class)
-object EmulatorModule {
+abstract class EmulatorModule {
 
  /**
-  * Provides Windows emulator instance.
+  * Bind WindowsEmulator interface to WinlatorEmulator implementation.
   *
-  * Currently: Winlator
-  * Future: Configurable (Winlator/Proton/Mobox)
+  * CRITICAL: Using @Binds ensures only ONE instance is created.
+  * WinlatorEmulator is @Singleton, so this binding will reuse that instance.
   */
- @Provides
+ @Binds
  @Singleton
- fun provideProcessMonitor(): com.steamdeck.mobile.core.winlator.ProcessMonitor {
-  return com.steamdeck.mobile.core.winlator.ProcessMonitor()
- }
+ abstract fun bindWindowsEmulator(
+  winlatorEmulator: WinlatorEmulator
+ ): WindowsEmulator
 
- @Provides
- @Singleton
- fun provideWindowsEmulator(
-  @ApplicationContext context: Context,
-  zstdDecompressor: ZstdDecompressor,
-  processMonitor: com.steamdeck.mobile.core.winlator.ProcessMonitor,
-  wineMonoInstaller: WineMonoInstaller
- ): WindowsEmulator {
-  return WinlatorEmulator(context, zstdDecompressor, processMonitor, wineMonoInstaller)
- }
 }

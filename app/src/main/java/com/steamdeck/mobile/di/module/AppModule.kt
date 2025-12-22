@@ -5,6 +5,7 @@ import coil.ImageLoader
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.steamdeck.mobile.core.wine.WineMonoInstaller
+import com.steamdeck.mobile.core.wine.WineGeckoInstaller
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -71,6 +72,21 @@ object AppModule {
   okHttpClient: OkHttpClient
  ): WineMonoInstaller {
   return WineMonoInstaller(context, okHttpClient)
+ }
+
+ /**
+  * Wine Gecko Auto-Installer
+  *
+  * Provides Wine Gecko installer for HTML/Web rendering compatibility (MSHTML replacement).
+  * Downloads and installs Wine Gecko (60MB) to enable Steam login dialogs and web UI components.
+  */
+ @Provides
+ @Singleton
+ fun provideWineGeckoInstaller(
+  @ApplicationContext context: Context,
+  okHttpClient: OkHttpClient
+ ): WineGeckoInstaller {
+  return WineGeckoInstaller(context, okHttpClient)
  }
 
 }

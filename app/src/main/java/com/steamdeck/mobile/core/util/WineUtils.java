@@ -6,7 +6,7 @@ import android.net.Uri;
 import com.steamdeck.mobile.core.container.Container;
 import com.steamdeck.mobile.core.xenvironment.ImageFs;
 import com.steamdeck.mobile.core.xenvironment.XEnvironment;
-import com.steamdeck.mobile.core.xenvironment.components.GuestProgramLauncherComponent;
+import com.steamdeck.mobile.core.xenvironment.components.WineProgramLauncherComponent;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -123,13 +123,13 @@ public abstract class WineUtils {
         FileUtils.symlink(wineDir, linkFile);
 
         XEnvironment environment = new XEnvironment(context, imageFs);
-        GuestProgramLauncherComponent guestProgramLauncherComponent = new GuestProgramLauncherComponent();
-        guestProgramLauncherComponent.setGuestExecutable(wineBinRelPath+" --version");
-        guestProgramLauncherComponent.setTerminationCallback((status) -> {
+        WineProgramLauncherComponent wineProgramLauncherComponent = new WineProgramLauncherComponent();
+        wineProgramLauncherComponent.setGuestExecutable(wineBinRelPath+" --version");
+        wineProgramLauncherComponent.setTerminationCallback((status) -> {
             callback.call(wineInfoRef.get());
             ProcessHelper.removeDebugCallback(debugCallback);
         });
-        environment.addComponent(guestProgramLauncherComponent);
+        environment.addComponent(wineProgramLauncherComponent);
         environment.startEnvironmentComponents();
     }
 
@@ -280,14 +280,14 @@ public abstract class WineUtils {
         envVars.put("WINEDLLOVERRIDES", "mscoree,mshtml=d");
 
         XEnvironment environment = new XEnvironment(context, imageFs);
-        GuestProgramLauncherComponent guestProgramLauncherComponent = new GuestProgramLauncherComponent();
-        guestProgramLauncherComponent.setEnvVars(envVars);
-        guestProgramLauncherComponent.setGuestExecutable(WineInfo.MAIN_WINE_VERSION.getExecutable(context, true)+" wineboot -u");
-        guestProgramLauncherComponent.setTerminationCallback((status) -> {
+        WineProgramLauncherComponent wineProgramLauncherComponent = new WineProgramLauncherComponent();
+        wineProgramLauncherComponent.setEnvVars(envVars);
+        wineProgramLauncherComponent.setGuestExecutable(WineInfo.MAIN_WINE_VERSION.getExecutable(context, true)+" wineboot -u");
+        wineProgramLauncherComponent.setTerminationCallback((status) -> {
             FileUtils.writeString(new File(rootDir, ImageFs.WINEPREFIX+"/.update-timestamp"), "disable\n");
             if (terminationCallback != null) terminationCallback.call(status);
         });
-        environment.addComponent(guestProgramLauncherComponent);
+        environment.addComponent(wineProgramLauncherComponent);
         environment.startEnvironmentComponents();
     }
 

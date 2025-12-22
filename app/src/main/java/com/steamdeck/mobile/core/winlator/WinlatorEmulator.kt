@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -40,7 +39,8 @@ class WinlatorEmulator @Inject constructor(
  @ApplicationContext private val context: Context,
  private val zstdDecompressor: ZstdDecompressor,
  private val processMonitor: ProcessMonitor,
- private val wineMonoInstaller: WineMonoInstaller
+ private val wineMonoInstaller: WineMonoInstaller,
+ private val wineGeckoInstaller: com.steamdeck.mobile.core.wine.WineGeckoInstaller
 ) : WindowsEmulator {
 
  override val name: String = "Winlator"
@@ -663,6 +663,20 @@ class WinlatorEmulator @Inject constructor(
     AppLogger.w(TAG, "Wine Mono installation error (non-fatal)", e)
    }
 
+   // NEW: Install Wine Gecko for HTML/Web rendering compatibility
+   // Required for Steam login dialogs and web-based UI components
+   try {
+    AppLogger.i(TAG, "Installing Wine Gecko for web component support...")
+    val geckoInstallResult = installWineGeckoIfNeeded(containerDir)
+    if (geckoInstallResult.isFailure) {
+     AppLogger.w(TAG, "Wine Gecko installation failed (non-fatal): ${geckoInstallResult.exceptionOrNull()?.message}")
+    } else {
+     AppLogger.i(TAG, "Wine Gecko installation completed successfully")
+    }
+   } catch (e: Exception) {
+    AppLogger.w(TAG, "Wine Gecko installation error (non-fatal)", e)
+   }
+
    val container = EmulatorContainer(
     id = containerId,
     name = config.name,
@@ -887,6 +901,9 @@ class WinlatorEmulator @Inject constructor(
     startTime = System.currentTimeMillis()
    )
 
+   // DEBUG: Check if process is still alive immediately after registration
+   AppLogger.d(TAG, ">>> Process registered in activeProcesses: isAlive=${process.isAlive}, ProcessId=$processId, activeProcesses@${System.identityHashCode(activeProcesses)}, size=${activeProcesses.size}")
+
    Result.success(emulatorProcess)
   } catch (e: Exception) {
    AppLogger.e(TAG, "Failed to launch executable", e)
@@ -905,6 +922,7 @@ class WinlatorEmulator @Inject constructor(
 
  override suspend fun getProcessStatus(processId: String): Result<EmulatorProcessStatus> = withContext(Dispatchers.IO) {
   try {
+   AppLogger.d(TAG, ">>> getProcessStatus called: ProcessId=$processId, activeProcesses@${System.identityHashCode(activeProcesses)}, size=${activeProcesses.size}, keys=${activeProcesses.keys.joinToString()}")
    val processInfo = activeProcesses[processId]
     ?: return@withContext Result.failure(
      ProcessNotFoundException(processId)
@@ -2030,30 +2048,8 @@ REGEDIT4
     }
    }
 
-   // Box64 performance configuration
-   when (config.performancePreset) {
-    PerformancePreset.MAXIMUM_PERFORMANCE -> {
-     put("BOX64_DYNAREC_BIGBLOCK", "3")
-     put("BOX64_DYNAREC_STRONGMEM", "0")
-     put("BOX64_DYNAREC_FASTNAN", "1")
-     put("BOX64_DYNAREC_FASTROUND", "1")
-    }
-    PerformancePreset.BALANCED -> {
-     put("BOX64_DYNAREC_BIGBLOCK", "2")
-     put("BOX64_DYNAREC_STRONGMEM", "1")
-     put("BOX64_DYNAREC_FASTNAN", "1")
-    }
-    PerformancePreset.MAXIMUM_STABILITY -> {
-     put("BOX64_DYNAREC_BIGBLOCK", "1")
-     put("BOX64_DYNAREC_STRONGMEM", "2")
-     put("BOX64_DYNAREC_FASTNAN", "0")
-     put("BOX64_DYNAREC_FASTROUND", "0")
-    }
-   }
-
-   // Box64 log configuration
-   put("BOX64_LOG", "2") // DEBUG: Enable Box64 logging (0=none, 1=info, 2=debug, 3=verbose)
-   put("BOX64_NOBANNER", "0") // DEBUG: Show Box64 banner
+   // Box64/Box86 settings are now managed by ViewModel (single source of truth)
+   // Removed preset-based overrides to ensure customEnvVars takes final priority
 
    // Display configuration
    put("DISPLAY", ":0")
@@ -2077,15 +2073,7 @@ REGEDIT4
     }
    }
 
-   // Custom environment variables from config
-   putAll(config.customEnvVars)
-
-   // CRITICAL: WINEARCH must be set AFTER customEnvVars to ensure it's never overridden
-   // Wine 9.2+ WoW64 mode requires win64 architecture (32-bit apps run via WoW64 layer)
-   // DO NOT allow customEnvVars to override this - it would break WoW64 mode
-   put("WINEARCH", "win64")
-
-   // Add system paths
+   // Add system paths (before customEnvVars to allow override if needed)
    val existingPath = System.getenv("PATH") ?: ""
    put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:$existingPath")
 
@@ -2111,6 +2099,14 @@ REGEDIT4
    // This bypasses Android SELinux restrictions on dlopen from app_data_file
    put("BOX64_EMULATED_LIBS", "libc.so.6:libpthread.so.0:libdl.so.2:librt.so.1:libm.so.6")
    put("BOX64_ALLOWMISSINGLIBS", "1")
+
+   // Custom environment variables from config (takes final priority for most settings)
+   putAll(config.customEnvVars)
+
+   // CRITICAL: WINEARCH must be set AFTER customEnvVars to ensure it's never overridden
+   // Wine 9.2+ WoW64 mode requires win64 architecture (32-bit apps run via WoW64 layer)
+   // DO NOT allow customEnvVars to override this - it would break WoW64 mode
+   put("WINEARCH", "win64")
   }
  }
 
@@ -2507,6 +2503,51 @@ REGEDIT4
 
   } catch (e: Exception) {
    AppLogger.e(TAG, "Failed to install Wine Mono", e)
+   Result.failure(e)
+  }
+ }
+
+ /**
+  * Install Wine Gecko to Wine container if needed
+  *
+  * Wine Gecko provides HTML/Web rendering compatibility (MSHTML replacement),
+  * which is required for Steam login dialogs and other web-based UI components.
+  *
+  * @param containerDir Wine container directory
+  * @return Installation result (non-fatal if fails)
+  */
+ private suspend fun installWineGeckoIfNeeded(
+  containerDir: File
+ ): Result<Unit> = withContext(Dispatchers.IO) {
+  try {
+   // Check if Wine Gecko is already installed
+   val geckoDir = File(containerDir, "drive_c/windows/system32/gecko")
+   if (geckoDir.exists() && geckoDir.listFiles()?.isNotEmpty() == true) {
+    AppLogger.i(TAG, "Wine Gecko already installed, skipping")
+    return@withContext Result.success(Unit)
+   }
+
+   // Download Wine Gecko MSI
+   val downloadResult = wineGeckoInstaller.downloadWineGecko()
+   if (downloadResult.isFailure) {
+    return@withContext downloadResult.map { }
+   }
+
+   val msiFile = downloadResult.getOrThrow()
+
+   // Install Wine Gecko using msiexec
+   val installResult = wineGeckoInstaller.installWineGecko(
+    msiFile = msiFile,
+    containerDir = containerDir,
+    executeCommand = { executable, arguments ->
+     executeWineCommand(containerDir, executable, arguments)
+    }
+   )
+
+   installResult
+
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Failed to install Wine Gecko", e)
    Result.failure(e)
   }
  }

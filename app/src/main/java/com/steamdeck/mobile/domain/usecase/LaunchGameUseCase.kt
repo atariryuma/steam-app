@@ -61,9 +61,11 @@ class LaunchGameUseCase @Inject constructor(
 
    // If executable is a content URI, copy it to internal storage first
    val gameToLaunch = if (game.executablePath.startsWith("content://")) {
-    AppLogger.d(TAG, "Copying executable from content URI to internal storage")
+    AppLogger.d(TAG, ">>> Converting content:// URI to file path")
+    AppLogger.d(TAG, ">>> Source URI: ${game.executablePath}")
     val copiedPath = copyContentUriToFile(game.executablePath, game.name)
     if (copiedPath.isFailure) {
+     AppLogger.e(TAG, ">>> URI conversion FAILED: ${copiedPath.exceptionOrNull()?.message}")
      return DataResult.Error(
       AppError.FileError(
        "Failed to copy game file: ${copiedPath.exceptionOrNull()?.message}",
@@ -74,9 +76,10 @@ class LaunchGameUseCase @Inject constructor(
     // Update game in database with new path
     val newPath = copiedPath.getOrThrow()
     gameRepository.updateGameExecutablePath(gameId, newPath)
-    AppLogger.i(TAG, "Copied executable to: $newPath")
+    AppLogger.i(TAG, ">>> URI converted successfully: $newPath")
     game.copy(executablePath = newPath)
    } else {
+    AppLogger.d(TAG, ">>> Using direct file path: ${game.executablePath}")
     game
    }
 
@@ -107,12 +110,13 @@ class LaunchGameUseCase @Inject constructor(
 
      // FIXED (2025): Return Flow for ViewModel to collect
      // No background scope - prevents memory leaks
+     // FIXED (2025-12-22): Use processId string instead of integer PID for process monitoring
      val monitoringFlow = createProcessMonitoringFlow(gameId, result.processId, startTime)
 
-     AppLogger.i(TAG, "Game launched successfully: ${game.name} (PID: ${result.processId})")
+     AppLogger.i(TAG, "Game launched successfully: ${game.name} (PID: ${result.pid}, ProcessId: ${result.processId})")
      DataResult.Success(
       LaunchInfo(
-       processId = result.processId,
+       processId = result.pid,
        monitoringFlow = monitoringFlow
       )
      )
@@ -173,42 +177,52 @@ class LaunchGameUseCase @Inject constructor(
  /**
   * Create process monitoring Flow (FIXED: No background scope)
   * ViewModel collects this Flow in viewModelScope
+  *
+  * @param processId Full process ID string (e.g., "1766386680416_30819")
   */
  private fun createProcessMonitoringFlow(
   gameId: Long,
-  processId: Int,
+  processId: String,
   startTime: Long
  ): Flow<Unit> {
-  AppLogger.i(TAG, "Creating process monitoring flow for game $gameId (PID: $processId)")
+  AppLogger.i(TAG, "Creating process monitoring flow for game $gameId (ProcessId: $processId)")
 
   // Track last checkpoint to avoid duplicate saves
   var lastCheckpointMinute = 0
 
-  return windowsEmulator.monitorProcess(processId.toString())
+  return windowsEmulator.monitorProcess(processId)
    .onCompletion { cause ->
-    if (cause == null) {
-     // Normal termination - calculate play time
-     val endTime = System.currentTimeMillis()
-     val durationMinutes = ((endTime - startTime) / 60000).toInt()
+    // Always calculate and save play time on completion
+    val endTime = System.currentTimeMillis()
+    val durationMinutes = ((endTime - startTime) / 60000).toInt()
 
-     AppLogger.i(TAG, "Game $gameId finished. Play time: $durationMinutes minutes")
-
-     try {
-      gameRepository.updatePlayTime(gameId, durationMinutes.toLong(), endTime)
-      AppLogger.d(TAG, "Play time saved successfully")
-     } catch (e: Exception) {
-      AppLogger.e(TAG, "Failed to save play time", e)
-      // TODO: Queue for retry later
+    when (cause) {
+     null -> {
+      // Normal completion
+      AppLogger.i(TAG, "Game $gameId finished normally. Play time: $durationMinutes minutes")
      }
-    } else {
-     AppLogger.w(TAG, "Process monitoring error: ${cause.message}", cause)
+     is kotlinx.coroutines.CancellationException -> {
+      // ViewModel cancelled - save partial play time
+      AppLogger.i(TAG, "Game $gameId monitoring cancelled. Partial play time: $durationMinutes minutes")
+      throw cause // Re-throw to propagate cancellation
+     }
+     else -> {
+      // Error - save partial play time
+      AppLogger.e(TAG, "Game $gameId monitoring error: ${cause.message}. Partial play time: $durationMinutes minutes", cause)
+     }
+    }
+
+    // Save play time in all cases (normal, cancelled, error)
+    try {
+     gameRepository.updatePlayTime(gameId, durationMinutes.toLong(), endTime)
+     AppLogger.d(TAG, "Play time saved successfully: $durationMinutes minutes")
+    } catch (e: Exception) {
+     AppLogger.e(TAG, "Failed to save play time", e)
+     // Non-fatal: continue completion
     }
 
     // Note: WinlatorEngine cleanup is handled automatically by the engine implementation
     // No manual cleanup needed as the engine manages its own resources
-   }
-   .catch { e ->
-    AppLogger.e(TAG, "Process monitoring exception", e)
    }
    .map { status ->
     if (status.isRunning) {

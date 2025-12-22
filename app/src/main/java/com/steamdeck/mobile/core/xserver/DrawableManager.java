@@ -32,9 +32,17 @@ public class DrawableManager extends XResourceManager implements XResourceManage
 
     public void removeDrawable(int id) {
         Drawable drawable = drawables.get(id);
+        if (drawable == null) return;
 
         final Texture texture = drawable.getTexture();
-        if (texture != null) xServer.getRenderer().xServerView.queueEvent(texture::destroy);
+        if (texture != null) {
+            // CRITICAL: Check if renderer is still available (app may be shutting down)
+            // Prevents NPE when XServerView/GLRenderer is already destroyed
+            com.steamdeck.mobile.presentation.renderer.GLRenderer renderer = xServer.getRenderer();
+            if (renderer != null && renderer.xServerView != null) {
+                renderer.xServerView.queueEvent(texture::destroy);
+            }
+        }
 
         Callback<Drawable> onDestroyListener = drawable.getOnDestroyListener();
         if (onDestroyListener != null) onDestroyListener.call(drawable);

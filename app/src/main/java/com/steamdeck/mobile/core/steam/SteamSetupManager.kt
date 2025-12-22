@@ -76,10 +76,10 @@ class SteamSetupManager @Inject constructor(
     AppLogger.w(TAG, "Winlator not initialized - starting initialization (this may take 2-3 minutes)...")
 
     // Winlator initialization (Box64/Wine binary extraction)
-    // progress: 0.0 ~ 0.1 (10%) - Typically skipped on 2nd run
+    // progress: 0.0 ~ 0.2 (20%) - First time only, 2-3 minutes
     val initResult = winlatorEmulator.initialize { progress, message ->
-     // Map 0.0-1.0 progress to 0.0-0.1 range
-     progressCallback?.invoke(progress * 0.1f, message, null)
+     // Map 0.0-1.0 progress to 0.0-0.2 range
+     progressCallback?.invoke(progress * 0.2f, message, null)
     }
 
     if (initResult.isFailure) {
@@ -102,7 +102,7 @@ class SteamSetupManager @Inject constructor(
     AppLogger.i(TAG, "Winlator already initialized, skipping initialization")
    }
 
-   // progress: 0.0 ~ 0.1 (10%)
+   // progress: 0.0 ~ 0.15 (15%) - Download installer
    progressCallback?.invoke(0.0f, "Downloading Steam installer...", null)
 
    // 1. Download SteamSetup.exe (32-bit NSIS installer)
@@ -120,8 +120,8 @@ class SteamSetupManager @Inject constructor(
    }
    AppLogger.i(TAG, "Installer downloaded: ${installerFile.absolutePath}")
 
-   // progress: 0.1 ~ 0.5 (40%) - Container creation takes 10-20 seconds
-   progressCallback?.invoke(0.1f, "Creating Wine container (this may take 10-20 seconds)...", null)
+   // progress: 0.15 ~ 0.60 (45%) - Container creation takes 10-20 seconds
+   progressCallback?.invoke(0.15f, "Creating Wine container (this may take 10-20 seconds)...", null)
 
    // 2. Get or create container
    val containerResult = getOrCreateContainer(containerId)
@@ -147,8 +147,8 @@ class SteamSetupManager @Inject constructor(
     AppLogger.w(TAG, "Expected location: ${monoDir.absolutePath}")
    }
 
-   // progress: 0.5 ~ 0.55 (5%) - NSIS extraction is very fast (0.1 seconds for 40 files)
-   progressCallback?.invoke(0.5f, "Extracting Steam from NSIS installer...", null)
+   // progress: 0.60 ~ 0.75 (15%) - NSIS extraction
+   progressCallback?.invoke(0.60f, "Extracting Steam from NSIS installer...", null)
 
    // METHOD 1 (PRIORITY): Extract Steam Client directly from NSIS installer
    // This bypasses the WoW64 requirement by extracting files with 7-Zip
@@ -159,9 +159,9 @@ class SteamSetupManager @Inject constructor(
     installerFile,
     steamDir,
     onProgress = { filesExtracted, totalFiles ->
-     // Map file progress to overall progress (0.50 ~ 0.55 range - only 5% for fast NSIS extraction)
+     // Map file progress to overall progress (0.60 ~ 0.75 range)
      val fileProgress = filesExtracted.toFloat() / totalFiles.toFloat()
-     val overallProgress = 0.50f + (fileProgress * 0.05f)
+     val overallProgress = 0.60f + (fileProgress * 0.15f)
      val detail = "File $filesExtracted/$totalFiles"
      progressCallback?.invoke(overallProgress, "Extracting Steam files", detail)
     }
@@ -169,14 +169,14 @@ class SteamSetupManager @Inject constructor(
 
    if (extractResult.isSuccess) {
     AppLogger.i(TAG, "Steam Client installed successfully via NSIS extraction")
-    progressCallback?.invoke(0.55f, "NSIS extraction completed successfully", null)
+    progressCallback?.invoke(0.75f, "NSIS extraction completed successfully", null)
    } else {
     AppLogger.w(TAG, "NSIS extraction failed: ${extractResult.exceptionOrNull()?.message}")
     AppLogger.i(TAG, "Falling back to Wine installer execution (Method 2 - Requires WoW64)...")
 
     // METHOD 2 (FALLBACK): Run SteamSetup.exe via Wine
     // WARNING: This requires WoW64 support and may fail on 64-bit only Wine builds
-    progressCallback?.invoke(0.5f, "Copying installer to container...", null)
+    progressCallback?.invoke(0.60f, "Copying installer to container...", null)
 
     // 3. Copy installer to container
     val copyResult = copyInstallerToContainer(container, installerFile)
@@ -193,16 +193,16 @@ class SteamSetupManager @Inject constructor(
     }
     AppLogger.i(TAG, "Installer copied to container: ${containerInstaller.absolutePath}")
 
-    // progress: 0.5 ~ 0.55 (5%)
-    progressCallback?.invoke(0.5f, "Running Steam installer via Wine (WoW64 mode)...", null)
+    // progress: 0.60 ~ 0.75 (15%)
+    progressCallback?.invoke(0.62f, "Running Steam installer via Wine (WoW64 mode)...", null)
 
     // 4. Run installer via Wine with DEBUG logging enabled
     val installResult = runSteamInstaller(
      container = container,
      installerFile = containerInstaller,
      progressCallback = { progress ->
-      // Map installer progress (0.0-1.0) to overall progress (0.5-0.55)
-      val mappedProgress = 0.5f + (progress * 0.05f)
+      // Map installer progress (0.0-1.0) to overall progress (0.62-0.75)
+      val mappedProgress = 0.62f + (progress * 0.13f)
       progressCallback?.invoke(mappedProgress, "Installing Steam...", null)
      }
     )
@@ -212,11 +212,11 @@ class SteamSetupManager @Inject constructor(
      )
     }
 
-    progressCallback?.invoke(0.55f, "Wine installer execution completed", null)
+    progressCallback?.invoke(0.75f, "Wine installer execution completed", null)
    }
 
-   // progress: 0.55 ~ 0.95 (40%) - Steam initialization takes 30 seconds (timeout waiting)
-   progressCallback?.invoke(0.55f, "Initializing Steam client (this may take 30 seconds)...", null)
+   // progress: 0.75 ~ 0.95 (20%) - Steam initialization takes 30 seconds
+   progressCallback?.invoke(0.75f, "Initializing Steam client (this may take 30 seconds)...", null)
 
    // 5. Initialize Steam client in background (creates steamapps/, config.vdf, etc.)
    val initResult = initializeSteamClient(container)
@@ -316,9 +316,10 @@ class SteamSetupManager @Inject constructor(
      }
 
      // If container doesn't exist, create new one
+     // At this point containerEntity is guaranteed to be non-null (created in L274-291 block)
      AppLogger.i(TAG, "Container not found, creating new container for ID: $containerId")
      val config = com.steamdeck.mobile.domain.emulator.EmulatorContainerConfig(
-      name = containerEntity!!.name,
+      name = containerEntity.name,
       performancePreset = when (containerEntity.box64Preset) {
        com.steamdeck.mobile.data.local.database.entity.Box64Preset.PERFORMANCE ->
         com.steamdeck.mobile.domain.emulator.PerformancePreset.MAXIMUM_PERFORMANCE

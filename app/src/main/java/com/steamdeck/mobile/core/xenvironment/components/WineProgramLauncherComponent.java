@@ -20,7 +20,7 @@ import com.steamdeck.mobile.core.xenvironment.ImageFs;
 
 import java.io.File;
 
-public class GuestProgramLauncherComponent extends EnvironmentComponent {
+public class WineProgramLauncherComponent extends EnvironmentComponent {
     private String guestExecutable;
     private static int pid = -1;
     private String[] bindingPaths;
@@ -33,14 +33,14 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
     @Override
     public void start() {
-        android.util.Log.e("GuestProgramLauncher", "start() called");
+        android.util.Log.e("WineProgramLauncher", "start() called");
         synchronized (lock) {
             stop();
-            android.util.Log.e("GuestProgramLauncher", "Extracting Box86/64 files");
+            android.util.Log.e("WineProgramLauncher", "Extracting Box86/64 files");
             extractBox86_64Files();
-            android.util.Log.e("GuestProgramLauncher", "Executing guest program: " + guestExecutable);
+            android.util.Log.e("WineProgramLauncher", "Executing guest program: " + guestExecutable);
             pid = execGuestProgram();
-            android.util.Log.e("GuestProgramLauncher", "Guest program PID: " + pid);
+            android.util.Log.e("WineProgramLauncher", "Guest program PID: " + pid);
         }
     }
 
@@ -131,20 +131,20 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         for (String path : possiblePaths) {
             File candidate = new File(path);
-            android.util.Log.e("GuestProgramLauncher", "Trying path: " + path);
+            android.util.Log.e("WineProgramLauncher", "Trying path: " + path);
             if (candidate.exists()) {
                 prootBinary = candidate;
                 prootPath = path;
-                android.util.Log.e("GuestProgramLauncher", "Found proot at: " + prootPath);
+                android.util.Log.e("WineProgramLauncher", "Found proot at: " + prootPath);
                 break;
             }
         }
 
         if (prootBinary == null || !prootBinary.exists()) {
-            android.util.Log.e("GuestProgramLauncher", "PRoot library not found in any of the expected paths");
-            android.util.Log.e("GuestProgramLauncher", "Searched paths:");
+            android.util.Log.e("WineProgramLauncher", "PRoot library not found in any of the expected paths");
+            android.util.Log.e("WineProgramLauncher", "Searched paths:");
             for (String path : possiblePaths) {
-                android.util.Log.e("GuestProgramLauncher", "  - " + path);
+                android.util.Log.e("WineProgramLauncher", "  - " + path);
             }
             return -1;
         }
@@ -152,7 +152,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         // CRITICAL: Bind mount box64 binary into rootfs
         File box64Binary = new File(context.getFilesDir(), "winlator/box64/box64");
         if (!box64Binary.exists()) {
-            android.util.Log.e("GuestProgramLauncher", "Box64 binary not found: " + box64Binary.getAbsolutePath());
+            android.util.Log.e("WineProgramLauncher", "Box64 binary not found: " + box64Binary.getAbsolutePath());
             return -1;
         }
 
@@ -231,13 +231,13 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         // CRITICAL: Delete existing symlink/file first to force fresh copy
         // Previous iterations may have created symlinks that don't work in PRoot
         if (box64InRootfs.exists()) {
-            android.util.Log.e("GuestProgramLauncher", "Deleting existing box64 (symlink or outdated file): " + box64InRootfs.getAbsolutePath());
+            android.util.Log.e("WineProgramLauncher", "Deleting existing box64 (symlink or outdated file): " + box64InRootfs.getAbsolutePath());
             box64InRootfs.delete();
         }
 
         // Copy box64 using Java file I/O (more reliable than shell commands)
         try {
-            android.util.Log.e("GuestProgramLauncher", "Copying box64: " + box64Binary.getAbsolutePath() + " -> " + box64InRootfs.getAbsolutePath());
+            android.util.Log.e("WineProgramLauncher", "Copying box64: " + box64Binary.getAbsolutePath() + " -> " + box64InRootfs.getAbsolutePath());
 
             // Use Java streams for reliable file copying
             java.io.FileInputStream fis = new java.io.FileInputStream(box64Binary);
@@ -253,7 +253,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             // Make executable using chmod
             Runtime.getRuntime().exec(new String[]{"chmod", "755", box64InRootfs.getAbsolutePath()}).waitFor();
 
-            android.util.Log.e("GuestProgramLauncher", "Box64 copy successful, size: " + box64InRootfs.length() + " bytes");
+            android.util.Log.e("WineProgramLauncher", "Box64 copy successful, size: " + box64InRootfs.length() + " bytes");
 
             // CRITICAL: Patch box64's ELF interpreter path to use Android linker
             // box64 binary references /lib/ld-linux-aarch64.so.1 (standard Linux path)
@@ -266,15 +266,15 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 String interpreterPath = "/system/bin/linker64";
                 boolean patchSuccess = ElfPatcher.patchInterpreterPathJava(box64InRootfs, interpreterPath);
                 if (patchSuccess) {
-                    android.util.Log.e("GuestProgramLauncher", "Successfully patched box64 interpreter to: " + interpreterPath);
+                    android.util.Log.e("WineProgramLauncher", "Successfully patched box64 interpreter to: " + interpreterPath);
                 } else {
-                    android.util.Log.e("GuestProgramLauncher", "Failed to patch box64 interpreter (check ElfPatcher logs for details)");
+                    android.util.Log.e("WineProgramLauncher", "Failed to patch box64 interpreter (check ElfPatcher logs for details)");
                 }
             } else {
-                android.util.Log.e("GuestProgramLauncher", "Android linker not found: " + androidLinker.getAbsolutePath());
+                android.util.Log.e("WineProgramLauncher", "Android linker not found: " + androidLinker.getAbsolutePath());
             }
         } catch (Exception e) {
-            android.util.Log.e("GuestProgramLauncher", "Failed to copy box64", e);
+            android.util.Log.e("WineProgramLauncher", "Failed to copy box64", e);
         }
 
         // CRITICAL FIX: Execute box64 using original Android filesystem path (NOT rootfs copy)

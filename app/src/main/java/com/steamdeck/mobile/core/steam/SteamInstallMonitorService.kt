@@ -103,8 +103,14 @@ class SteamInstallMonitorService : Service() {
 
             AppLogger.i(TAG, "Service started: containerId=$containerId, steamAppId=$steamAppId, gameId=$gameId, downloadId=$downloadId")
 
-            if (containerId != null && steamAppId != null && steamAppId != -1L && gameId != null && gameId != -1L && downloadId != null && downloadId != -1L) {
-                startMonitoring(containerId!!, steamAppId!!, gameId!!, downloadId!!)
+            // Copy mutable properties to local variables for smart cast
+            val localContainerId = containerId
+            val localSteamAppId = steamAppId
+            val localGameId = gameId
+            val localDownloadId = downloadId
+
+            if (localContainerId != null && localSteamAppId != null && localSteamAppId != -1L && localGameId != null && localGameId != -1L && localDownloadId != null && localDownloadId != -1L) {
+                startMonitoring(localContainerId, localSteamAppId, localGameId, localDownloadId)
             } else {
                 AppLogger.e(TAG, "Invalid parameters: containerId=$containerId, steamAppId=$steamAppId, gameId=$gameId, downloadId=$downloadId")
                 stopSelf()

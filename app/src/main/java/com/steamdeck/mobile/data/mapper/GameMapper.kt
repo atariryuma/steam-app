@@ -1,5 +1,6 @@
 package com.steamdeck.mobile.data.mapper
 
+import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.data.local.database.entity.GameEntity
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.model.InstallationStatus
@@ -28,7 +29,12 @@ object GameMapper {
    bannerPath = entity.bannerPath,
    addedTimestamp = entity.addedTimestamp,
    isFavorite = entity.isFavorite,
-   installationStatus = InstallationStatus.valueOf(entity.installationStatus),
+   installationStatus = try {
+    InstallationStatus.valueOf(entity.installationStatus)
+   } catch (e: IllegalArgumentException) {
+    AppLogger.w("GameMapper", "Invalid installation status '${entity.installationStatus}', defaulting to NOT_INSTALLED")
+    InstallationStatus.NOT_INSTALLED
+   },
    installProgress = entity.installProgress,
    statusUpdatedTimestamp = entity.statusUpdatedTimestamp
   )

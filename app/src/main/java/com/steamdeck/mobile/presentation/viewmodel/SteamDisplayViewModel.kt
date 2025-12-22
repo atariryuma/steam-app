@@ -10,7 +10,7 @@ import com.steamdeck.mobile.core.util.EnvVars
 import com.steamdeck.mobile.core.xenvironment.ImageFs
 import com.steamdeck.mobile.core.xenvironment.RootfsInstaller
 import com.steamdeck.mobile.core.xenvironment.XEnvironment
-import com.steamdeck.mobile.core.xenvironment.components.GuestProgramLauncherComponent
+import com.steamdeck.mobile.core.xenvironment.components.WineProgramLauncherComponent
 import com.steamdeck.mobile.core.xenvironment.components.XServerComponent
 import com.steamdeck.mobile.core.xserver.XServer
 import com.steamdeck.mobile.core.xconnector.UnixSocketConfig
@@ -51,9 +51,9 @@ class SteamDisplayViewModel @Inject constructor(
     /**
      * Launch Steam Big Picture mode with XServer initialization
      *
-     * CRITICAL FIX: Use GuestProgramLauncherComponent instead of SteamLauncher.launchSteamBigPicture()
+     * CRITICAL FIX: Use WineProgramLauncherComponent instead of SteamLauncher.launchSteamBigPicture()
      * - SteamLauncher creates SEPARATE process environment via winlatorEmulator.launchExecutable()
-     * - GuestProgramLauncherComponent runs in SAME XEnvironment as XServerComponent
+     * - WineProgramLauncherComponent runs in SAME XEnvironment as XServerComponent
      * - Both components started together via environment.startEnvironmentComponents()
      */
     fun launchSteam(containerId: String, xServer: XServer) {
@@ -64,7 +64,7 @@ class SteamDisplayViewModel @Inject constructor(
 
                 // Step 1: Initialize XServer environment WITH Steam launcher
                 _uiState.value = SteamDisplayUiState.InitializingXServer
-                android.util.Log.d(TAG, "Step 1: Initializing XEnvironment with GuestProgramLauncherComponent")
+                android.util.Log.d(TAG, "Step 1: Initializing XEnvironment with WineProgramLauncherComponent")
 
                 val initialized = initializeXEnvironment(xServer, containerId)
                 if (!initialized) {
@@ -75,12 +75,12 @@ class SteamDisplayViewModel @Inject constructor(
 
                 AppLogger.i(TAG, "XServer initialized successfully")
 
-                // Step 2: Launch Steam via GuestProgramLauncherComponent (already started with XEnvironment)
+                // Step 2: Launch Steam via WineProgramLauncherComponent (already started with XEnvironment)
                 _uiState.value = SteamDisplayUiState.Launching
-                android.util.Log.d(TAG, "Step 2: Steam Big Picture launching via GuestProgramLauncherComponent")
+                android.util.Log.d(TAG, "Step 2: Steam Big Picture launching via WineProgramLauncherComponent")
                 AppLogger.i(TAG, "Steam Big Picture launching: containerId=$containerId")
 
-                // GuestProgramLauncherComponent automatically launches when environment.startEnvironmentComponents() is called
+                // WineProgramLauncherComponent automatically launches when environment.startEnvironmentComponents() is called
                 // No need for separate steamLauncher.launchSteamBigPicture() call
                 _uiState.value = SteamDisplayUiState.Running
                 AppLogger.i(TAG, "Steam launched successfully")
@@ -172,9 +172,9 @@ class SteamDisplayViewModel @Inject constructor(
             xEnvironment?.addComponent(xServerComponent)
             AppLogger.d(TAG, "Added XServerComponent to environment")
 
-            // CRITICAL FIX: Create GuestProgramLauncherComponent to launch Steam in SAME environment
+            // CRITICAL FIX: Create WineProgramLauncherComponent to launch Steam in SAME environment
             // This ensures Wine process shares the same XEnvironment as XServerComponent
-            // Winlator architecture: XServerComponent + GuestProgramLauncherComponent in ONE XEnvironment
+            // Winlator architecture: XServerComponent + WineProgramLauncherComponent in ONE XEnvironment
 
             // Steam is installed in container directory (NOT rootfs)
             // Path: /data/.../winlator/containers/{containerId}/drive_c/Program Files (x86)/Steam/Steam.exe
@@ -196,10 +196,17 @@ class SteamDisplayViewModel @Inject constructor(
 
             AppLogger.d(TAG, "Guest command: $guestCommand")
 
-            // Configure GuestProgramLauncherComponent
-            val guestProgramLauncher = GuestProgramLauncherComponent()
+            // Configure WineProgramLauncherComponent
+            val guestProgramLauncher = WineProgramLauncherComponent()
             guestProgramLauncher.setGuestExecutable(guestCommand)
             guestProgramLauncher.setWoW64Mode(true)  // Steam requires 64-bit Wine with WoW64
+
+            // CRITICAL: Use STABILITY preset for maximum reliability
+            // STABILITY includes BOX64_DYNAREC_WAIT=0 (interpreter fallback)
+            // which is essential for Steam's 32-bit code stability in WoW64 mode
+            guestProgramLauncher.setBox86Preset(com.steamdeck.mobile.box86_64.Box86_64Preset.STABILITY)
+            guestProgramLauncher.setBox64Preset(com.steamdeck.mobile.box86_64.Box86_64Preset.STABILITY)
+            AppLogger.i(TAG, "Applied STABILITY preset (STRONGMEM=2, WAIT=0, CALLRET=0)")
 
             // CRITICAL: Set binding paths for PRoot to mount container drives
             // This allows Wine to access C: drive (container's drive_c directory)
@@ -230,7 +237,7 @@ class SteamDisplayViewModel @Inject constructor(
             }
 
             xEnvironment?.addComponent(guestProgramLauncher)
-            AppLogger.d(TAG, "Added GuestProgramLauncherComponent to environment")
+            AppLogger.d(TAG, "Added WineProgramLauncherComponent to environment")
 
             // Start environment (creates Unix socket via XConnectorEpoll AND launches Wine)
             xEnvironment?.startEnvironmentComponents()

@@ -1636,7 +1636,12 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
       modifier = Modifier.size(20.dp)
      )
      Text(
-      text = if (state.progress < 0.4f) "Initializing Winlator" else "Installing",
+      text = when {
+       state.progress < 0.20f -> "Initializing Winlator"
+       state.progress < 0.60f -> "Preparing Environment"
+       state.progress < 0.75f -> "Extracting Steam"
+       else -> "Finalizing"
+      },
       style = MaterialTheme.typography.titleSmall.copy(
        fontWeight = FontWeight.Bold
       ),
@@ -1645,10 +1650,19 @@ private fun SteamInstallProgressContent(state: SteamInstallState.Installing) {
     }
 
     Text(
-     text = if (state.progress < 0.4f) {
-      "Extracting Box64/Wine binaries (first time only).\nThis may take 2-3 minutes."
-     } else {
-      "Running Steam installer.\nPlease wait for completion."
+     text = when {
+      state.progress < 0.20f -> {
+       "Extracting Box64/Wine binaries (first time only).\nThis may take 2-3 minutes."
+      }
+      state.progress < 0.60f -> {
+       "Creating Wine container with Windows 10 compatibility.\nPlease wait..."
+      }
+      state.progress < 0.75f -> {
+       "Extracting Steam Client files from NSIS installer.\nThis will only take a few seconds."
+      }
+      else -> {
+       "Initializing Steam directories and configuration.\nAlmost done!"
+      }
      },
      style = MaterialTheme.typography.bodySmall,
      color = SteamColorPalette.Gray,

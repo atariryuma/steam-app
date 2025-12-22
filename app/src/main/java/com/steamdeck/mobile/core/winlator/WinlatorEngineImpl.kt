@@ -41,7 +41,7 @@ class WinlatorEngineImpl @Inject constructor(
   * - Clear process references to null to enable GC
   * - Recommended to call when app exits or game terminates
   */
- fun cleanup() {
+ override fun cleanup() {
   AppLogger.d(TAG, "Cleaning up WinlatorEngine resources")
   currentProcessId = null
   currentEmulatorProcess = null
@@ -50,7 +50,8 @@ class WinlatorEngineImpl @Inject constructor(
 
  override suspend fun launchGame(game: Game, container: WinlatorContainer?): LaunchResult {
   return try {
-   AppLogger.d(TAG, "Launching game: ${game.name}")
+   AppLogger.d(TAG, "=== GAME LAUNCH START ===")
+   AppLogger.d(TAG, "Game: ${game.name}, ID: ${game.id}")
    AppLogger.d(TAG, "Executable: ${game.executablePath}")
    AppLogger.d(TAG, "Container: ${container?.name ?: "Default"}")
    AppLogger.d(TAG, "Source: ${game.source}, SteamAppId: ${game.steamAppId}")
@@ -68,24 +69,28 @@ class WinlatorEngineImpl @Inject constructor(
 
    // 1. Check Winlator initialization and auto-initialize if needed
    val available = winlatorEmulator.isAvailable().getOrNull() ?: false
+   AppLogger.d(TAG, "Winlator available: $available")
+
    if (!available) {
-    AppLogger.i(TAG, "Winlator not initialized, starting automatic initialization...")
+    AppLogger.i(TAG, ">>> Starting Winlator initialization (30-60s expected)...")
     val initResult = winlatorEmulator.initialize { progress, status ->
-     AppLogger.d(TAG, "Initialization progress: ${(progress * 100).toInt()}% - $status")
+     // CRITICAL: 初期化進捗を必ずログ出力
+     AppLogger.i(TAG, ">>> Init: ${(progress * 100).toInt()}% - $status")
     }
     if (initResult.isFailure) {
      val error = initResult.exceptionOrNull()
-     AppLogger.e(TAG, "Winlator initialization failed", error)
+     AppLogger.e(TAG, ">>> Initialization FAILED", error)
      return LaunchResult.Error(
       "Failed to initialize Winlator environment.\n\n" +
       "Error: ${error?.message}\n\n" +
+      "Details: ${error?.stackTraceToString()?.take(500)}\n\n" +
       "Try the following:\n" +
       "• Check free storage space (minimum 500MB required)\n" +
       "• Restart the app\n" +
       "• Restart your device"
      )
     }
-    AppLogger.i(TAG, "Winlator initialization completed successfully")
+    AppLogger.i(TAG, ">>> Initialization SUCCESS")
    }
 
    // 2. Check executable file exists
@@ -123,7 +128,10 @@ class WinlatorEngineImpl @Inject constructor(
      currentProcessId = emulatorProcess.id
      currentEmulatorProcess = emulatorProcess
      AppLogger.i(TAG, "Game launched successfully: ProcessId=${emulatorProcess.id}, PID=${emulatorProcess.pid}")
-     LaunchResult.Success(emulatorProcess.pid ?: -1)
+     LaunchResult.Success(
+      pid = emulatorProcess.pid ?: -1,
+      processId = emulatorProcess.id
+     )
     }
     launchResult.isFailure -> {
      val error = launchResult.exceptionOrNull()
@@ -184,6 +192,10 @@ class WinlatorEngineImpl @Inject constructor(
   return try {
    AppLogger.d(TAG, "Creating container: ${container.name}")
    // TODO: Create Winlator container
+
+   // Invalidate cache when new container is created
+   cachedDefaultContainer.set(null)
+
    Result.success(container)
   } catch (e: Exception) {
    AppLogger.e(TAG, "Failed to create container", e)
@@ -195,6 +207,10 @@ class WinlatorEngineImpl @Inject constructor(
   return try {
    AppLogger.d(TAG, "Deleting container: $containerId")
    // TODO: Delete Winlator container
+
+   // Invalidate cache when container is deleted
+   cachedDefaultContainer.set(null)
+
    Result.success(Unit)
   } catch (e: Exception) {
    AppLogger.e(TAG, "Failed to delete container", e)

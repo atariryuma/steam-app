@@ -40,7 +40,13 @@ public abstract class DesktopHelper {
         if (window.isApplicationWindow()) {
             boolean parentIsRoot = window.getParent() == xServer.windowManager.rootWindow;
             xServer.windowManager.setFocus(window, parentIsRoot ? WindowManager.FocusRevertTo.POINTER_ROOT : WindowManager.FocusRevertTo.PARENT);
-            xServer.getWinHandler().bringToFront(window.getClassName(), window.getHandle());
+
+            // CRITICAL: WinHandler is optional (null in Steam Deck Mobile app)
+            // Only call bringToFront if WinHandler is initialized (Winlator's multi-window system)
+            com.steamdeck.mobile.core.winhandler.WinHandler winHandler = xServer.getWinHandler();
+            if (winHandler != null) {
+                winHandler.bringToFront(window.getClassName(), window.getHandle());
+            }
         }
     }
 

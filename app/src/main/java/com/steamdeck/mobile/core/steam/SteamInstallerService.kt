@@ -111,7 +111,7 @@ class SteamInstallerService @Inject constructor(
   */
  suspend fun extractSteamClient(zipFile: File, targetDir: File): Result<Unit> = withContext(Dispatchers.IO) {
   try {
-   if (!targetDir.parentFile?.exists()!!) {
+   if (targetDir.parentFile?.exists() != true) {
     targetDir.parentFile?.mkdirs()
    }
 

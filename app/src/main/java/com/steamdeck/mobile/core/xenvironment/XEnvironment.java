@@ -3,7 +3,7 @@ package com.steamdeck.mobile.core.xenvironment;
 import android.content.Context;
 
 import com.steamdeck.mobile.core.util.FileUtils;
-import com.steamdeck.mobile.core.xenvironment.components.GuestProgramLauncherComponent;
+import com.steamdeck.mobile.core.xenvironment.components.WineProgramLauncherComponent;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -70,12 +70,12 @@ public class XEnvironment implements Iterable<EnvironmentComponent> {
     }
 
     public void onPause() {
-        GuestProgramLauncherComponent guestProgramLauncherComponent = getComponent(GuestProgramLauncherComponent.class);
-        if (guestProgramLauncherComponent != null) guestProgramLauncherComponent.suspendProcess();
+        WineProgramLauncherComponent wineProgramLauncherComponent = getComponent(WineProgramLauncherComponent.class);
+        if (wineProgramLauncherComponent != null) wineProgramLauncherComponent.suspendProcess();
     }
 
     public void onResume() {
-        GuestProgramLauncherComponent guestProgramLauncherComponent = getComponent(GuestProgramLauncherComponent.class);
-        if (guestProgramLauncherComponent != null) guestProgramLauncherComponent.resumeProcess();
+        WineProgramLauncherComponent wineProgramLauncherComponent = getComponent(WineProgramLauncherComponent.class);
+        if (wineProgramLauncherComponent != null) wineProgramLauncherComponent.resumeProcess();
     }
 }

@@ -61,13 +61,18 @@ fun SteamDisplayScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
-    // DEBUG: Log screen composition
-    android.util.Log.e("SteamDisplayScreen", "=== COMPOSABLE CALLED === containerId=$containerId, screenSize=$screenSize")
+    // CRITICAL: Use device's actual screen resolution for proper scaling
+    // Get display metrics to create fullscreen Big Picture mode
+    val displayMetrics = context.resources.displayMetrics
+    val actualScreenSize = "${displayMetrics.widthPixels}x${displayMetrics.heightPixels}"
 
-    // Create XServer instance (X11 protocol server)
+    // DEBUG: Log screen composition
+    android.util.Log.e("SteamDisplayScreen", "=== COMPOSABLE CALLED === containerId=$containerId, actualScreenSize=$actualScreenSize")
+
+    // Create XServer instance (X11 protocol server) with actual screen resolution
     val xServer = remember {
-        android.util.Log.e("SteamDisplayScreen", "Creating XServer instance")
-        XServer(ScreenInfo(screenSize))
+        android.util.Log.e("SteamDisplayScreen", "Creating XServer with resolution: $actualScreenSize")
+        XServer(ScreenInfo(actualScreenSize))
     }
 
     // Launch Steam Big Picture when screen is displayed
@@ -105,6 +110,8 @@ fun SteamDisplayScreen(
                     CircularProgressIndicator()
                 }
             }
+            // REMOVED: InstallingSteam state (not defined in SteamDisplayUiState)
+            // is SteamDisplayUiState.InstallingSteam -> { ... }
             is SteamDisplayUiState.InitializingXServer -> {
                 Box(
                     modifier = Modifier.fillMaxSize(),

@@ -1,8 +1,6 @@
 package com.steamdeck.mobile.data.remote.steam
 
 import android.content.Context
-import com.github.michaelbull.retry.ContinueRetrying
-import com.github.michaelbull.retry.StopRetrying
 import com.github.michaelbull.retry.policy.RetryPolicy
 import com.github.michaelbull.retry.policy.binaryExponentialBackoff
 import com.github.michaelbull.retry.policy.limitAttempts
@@ -55,7 +53,7 @@ class SteamRepositoryImpl @Inject constructor(
    * - Only retry on retryable errors (network issues, 5xx errors)
    */
   private val retryPolicy: RetryPolicy<Throwable> = limitAttempts(3) + binaryExponentialBackoff(
-   base = 1000L,
+   min = 1000L,
    max = 30000L
   )
 
@@ -94,7 +92,7 @@ class SteamRepositoryImpl @Inject constructor(
      } else {
       // Use AppError.fromHttpCode() for proper error classification
       val error = AppError.fromHttpCode(response.code(), response.message())
-      AppLogger.w(TAG, "Steam API error (attempt ${it.attempt}): ${error.message}")
+      AppLogger.w(TAG, "Steam API error: ${error.message}")
 
       // Throw exception to trigger retry if retryable
       if (error.isRetryable()) {

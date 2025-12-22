@@ -6,6 +6,8 @@ import com.steamdeck.mobile.domain.model.Box64Preset
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.model.WinlatorContainer
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
@@ -26,8 +28,26 @@ class WinlatorEngineImpl @Inject constructor(
   private const val TAG = "WinlatorEngine"
  }
 
- private var currentProcessId: String? = null
- private var currentEmulatorProcess: com.steamdeck.mobile.domain.emulator.EmulatorProcess? = null
+ /**
+  * Process state (thread-safe via Mutex)
+  *
+  * CRITICAL FIX (2025-12-22): Race Condition Prevention
+  * - Previous implementation used separate variables (currentProcessId, currentEmulatorProcess)
+  * - This caused race conditions when launchGame() and stopGame() were called concurrently
+  * - Solution: Use data class + Mutex for atomic state updates
+  *
+  * Thread Safety:
+  * - All access wrapped with processStateMutex.withLock { }
+  * - Prevents concurrent launch/stop operations from corrupting state
+  * - Mutex is suspending (non-blocking for coroutines)
+  */
+ private data class ProcessState(
+  val processId: String,
+  val emulatorProcess: com.steamdeck.mobile.domain.emulator.EmulatorProcess
+ )
+
+ private var processState: ProcessState? = null
+ private val processStateMutex = Mutex()
 
  // OPTIMIZATION: Cache default container to avoid repeated file system scans
  // Cleared on cleanup() to ensure fresh state - Thread-safe with AtomicReference
@@ -40,11 +60,19 @@ class WinlatorEngineImpl @Inject constructor(
   * - Call from ViewModel onCleared()
   * - Clear process references to null to enable GC
   * - Recommended to call when app exits or game terminates
+  *
+  * Thread Safety (2025-12-22):
+  * - Uses runBlocking to ensure cleanup completes synchronously
+  * - Acquires mutex before clearing process state
+  * - Prevents race with concurrent launch/stop operations
   */
  override fun cleanup() {
   AppLogger.d(TAG, "Cleaning up WinlatorEngine resources")
-  currentProcessId = null
-  currentEmulatorProcess = null
+  kotlinx.coroutines.runBlocking {
+   processStateMutex.withLock {
+    processState = null
+   }
+  }
   cachedDefaultContainer.set(null) // Clear container cache (thread-safe)
  }
 
@@ -125,8 +153,16 @@ class WinlatorEngineImpl @Inject constructor(
    when {
     launchResult.isSuccess -> {
      val emulatorProcess = launchResult.getOrThrow()
-     currentProcessId = emulatorProcess.id
-     currentEmulatorProcess = emulatorProcess
+
+     // CRITICAL: Atomically update process state (thread-safe)
+     // Prevents race condition between launch and stop operations
+     processStateMutex.withLock {
+      processState = ProcessState(
+       processId = emulatorProcess.id,
+       emulatorProcess = emulatorProcess
+      )
+     }
+
      AppLogger.i(TAG, "Game launched successfully: ProcessId=${emulatorProcess.id}, PID=${emulatorProcess.pid}")
      LaunchResult.Success(
       pid = emulatorProcess.pid ?: -1,
@@ -149,7 +185,10 @@ class WinlatorEngineImpl @Inject constructor(
  }
 
  override suspend fun isGameRunning(): Boolean {
-  val processId = currentProcessId ?: return false
+  // Thread-safe read of process ID
+  val processId = processStateMutex.withLock {
+   processState?.processId
+  } ?: return false
 
   // Check actual process status without blocking
   return try {
@@ -163,7 +202,11 @@ class WinlatorEngineImpl @Inject constructor(
 
  override suspend fun stopGame(): Result<Unit> {
   return try {
-   val processId = currentProcessId
+   // Thread-safe read of process ID
+   val processId = processStateMutex.withLock {
+    processState?.processId
+   }
+
    if (processId == null) {
     return Result.failure(IllegalStateException("No game is currently running"))
    }
@@ -175,7 +218,7 @@ class WinlatorEngineImpl @Inject constructor(
 
    if (killResult.isSuccess) {
     AppLogger.i(TAG, "Game stopped successfully")
-    cleanup() // Clean up resources to prevent memory leaks
+    cleanup() // Clean up resources to prevent memory leaks (uses mutex internally)
     Result.success(Unit)
    } else {
     val error = killResult.exceptionOrNull()

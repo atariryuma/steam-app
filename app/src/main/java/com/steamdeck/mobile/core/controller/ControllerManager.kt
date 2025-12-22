@@ -26,13 +26,25 @@ import javax.inject.Singleton
  *
  * Handles controller detection, input events, and profile management.
  * Emits normalized controller events for game input.
+ *
+ * Thread Safety (2025-12-22 Fix):
+ * - Changed from Dispatchers.Main to Dispatchers.IO to prevent ANR
+ * - Database queries (getConnectedControllers, getLastUsedProfile) must run on I/O thread
+ * - StateFlow is thread-safe (atomic updates)
+ * - UI observers automatically receive updates on Main thread via asStateFlow()
+ *
+ * Why This Is Safe:
+ * - StateFlow.value = ... is atomic (no race conditions)
+ * - All StateFlow emissions are thread-safe by design
+ * - UI collection via Flow happens on Main dispatcher (Compose default)
+ * - No manual thread switching needed for UI updates
  */
 @Singleton
 class ControllerManager @Inject constructor(
  @ApplicationContext private val context: Context,
  private val repository: ControllerRepository
 ) {
- private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+ private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
  companion object {
   private const val TAG = "ControllerManager"

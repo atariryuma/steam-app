@@ -59,22 +59,23 @@ class SyncSteamLibraryUseCase @Inject constructor(
 
    // Fetch game list from Steam API (use direct repository to get SteamGame objects)
    val steamGamesResult = steamRepositoryImpl.getOwnedGames(apiKey, steamId)
-   if (steamGamesResult.isFailure) {
-    val error = steamGamesResult.exceptionOrNull()
-    AppLogger.e(TAG, "GetOwnedGames failed for Steam ID: $steamId", error)
+   when (steamGamesResult) {
+    is DataResult.Error -> {
+     AppLogger.e(TAG, "GetOwnedGames failed for Steam ID: $steamId - ${steamGamesResult.error.message}")
+     return DataResult.Error(steamGamesResult.error)
+    }
+    is DataResult.Loading -> {
+     AppLogger.w(TAG, "GetOwnedGames still loading")
+     return DataResult.Error(AppError.Unknown(Exception("Still loading")))
+    }
+    is DataResult.Success -> {
+     AppLogger.d(TAG, "Successfully fetched games from Steam API")
 
-    // Convert to domain-specific error
-    val appError = convertToSteamSyncError(error)
-    return DataResult.Error(appError)
-   }
-
-   AppLogger.d(TAG, "Successfully fetched games from Steam API")
-
-   val steamGames = steamGamesResult.getOrNull() ?: emptyList()
-   if (steamGames.isEmpty()) {
-    AppLogger.i(TAG, "No games found for Steam ID: $steamId")
-    return DataResult.Success(0)
-   }
+     val steamGames = steamGamesResult.data
+     if (steamGames.isEmpty()) {
+      AppLogger.i(TAG, "No games found for Steam ID: $steamId")
+      return DataResult.Success(0)
+     }
 
    // Process game sync in parallel (performance optimization)
    val syncedCount = coroutineScope {
@@ -112,6 +113,8 @@ class SyncSteamLibraryUseCase @Inject constructor(
 
    AppLogger.i(TAG, "Sync completed - $syncedCount/${steamGames.size} games synced successfully")
    DataResult.Success(syncedCount)
+    }
+   }
 
   } catch (e: Exception) {
    AppLogger.e(TAG, "Sync failed with exception", e)
@@ -128,12 +131,16 @@ class SyncSteamLibraryUseCase @Inject constructor(
    val iconFileName = "icon_${steamGame.appId}.jpg"
    val iconPath = "$imagesDir/$iconFileName"
 
-   val result = steamRepositoryImpl.downloadGameImage(iconUrl, iconPath)
-   if (result.isSuccess) {
-    iconPath
-   } else {
-    AppLogger.w(TAG, "Failed to download icon for ${steamGame.name}")
-    null
+   when (val result = steamRepositoryImpl.downloadGameImage(iconUrl, iconPath)) {
+    is DataResult.Success -> iconPath
+    is DataResult.Error -> {
+     AppLogger.w(TAG, "Failed to download icon for ${steamGame.name}: ${result.error.message}")
+     null
+    }
+    is DataResult.Loading -> {
+     AppLogger.w(TAG, "Icon download still loading for ${steamGame.name}")
+     null
+    }
    }
   } catch (e: Exception) {
    AppLogger.e(TAG, "Exception downloading icon for ${steamGame.name}", e)
@@ -150,12 +157,16 @@ class SyncSteamLibraryUseCase @Inject constructor(
    val bannerFileName = "banner_${steamGame.appId}.jpg"
    val bannerPath = "$imagesDir/$bannerFileName"
 
-   val result = steamRepositoryImpl.downloadGameImage(bannerUrl, bannerPath)
-   if (result.isSuccess) {
-    bannerPath
-   } else {
-    AppLogger.w(TAG, "Failed to download banner for ${steamGame.name}")
-    null
+   when (val result = steamRepositoryImpl.downloadGameImage(bannerUrl, bannerPath)) {
+    is DataResult.Success -> bannerPath
+    is DataResult.Error -> {
+     AppLogger.w(TAG, "Failed to download banner for ${steamGame.name}: ${result.error.message}")
+     null
+    }
+    is DataResult.Loading -> {
+     AppLogger.w(TAG, "Banner download still loading for ${steamGame.name}")
+     null
+    }
    }
   } catch (e: Exception) {
    AppLogger.e(TAG, "Exception downloading banner for ${steamGame.name}", e)

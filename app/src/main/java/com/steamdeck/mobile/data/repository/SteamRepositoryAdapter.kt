@@ -1,5 +1,6 @@
 package com.steamdeck.mobile.data.repository
 
+import com.steamdeck.mobile.core.result.DataResult
 import com.steamdeck.mobile.data.mapper.SteamGameMapper
 import com.steamdeck.mobile.data.remote.steam.SteamRepository
 import com.steamdeck.mobile.domain.model.Game
@@ -19,12 +20,11 @@ class SteamRepositoryAdapter @Inject constructor(
 ) : ISteamRepository {
 
  override suspend fun getUserLibrary(steamId: String, apiKey: String): Result<List<Game>> {
-  return steamRepository.getOwnedGames(apiKey, steamId)
-   .mapCatching { steamGames ->
-    steamGames.map { steamGame ->
-     SteamGameMapper.toDomain(steamGame)
-    }
-   }
+  return when (val result = steamRepository.getOwnedGames(apiKey, steamId)) {
+   is DataResult.Success -> Result.success(result.data.map { SteamGameMapper.toDomain(it) })
+   is DataResult.Error -> Result.failure(Exception(result.error.message))
+   is DataResult.Loading -> Result.failure(Exception("Loading"))
+  }
  }
 
  override suspend fun getGameDetails(appId: String): Result<Game?> {
@@ -37,8 +37,11 @@ class SteamRepositoryAdapter @Inject constructor(
   // Simple validation: Try to fetch player summary with dummy SteamID
   // A valid API key will return proper response format even with invalid ID
   return try {
-   val result = steamRepository.getPlayerSummary(apiKey, "76561197960435530")
-   Result.success(result.isSuccess)
+   when (val result = steamRepository.getPlayerSummary(apiKey, "76561197960435530")) {
+    is DataResult.Success -> Result.success(true)
+    is DataResult.Error -> Result.success(false)
+    is DataResult.Loading -> Result.success(false)
+   }
   } catch (e: Exception) {
    Result.success(false)
   }

@@ -55,8 +55,17 @@ class SteamDisplayViewModel @Inject constructor(
      * - SteamLauncher creates SEPARATE process environment via winlatorEmulator.launchExecutable()
      * - WineProgramLauncherComponent runs in SAME XEnvironment as XServerComponent
      * - Both components started together via environment.startEnvironmentComponents()
+     *
+     * INTEGRATED MODE (2025-12-22):
+     * - Configure GLRenderer window filtering to hide Windows desktop
+     * - Only show Steam Big Picture window (seamless Android-like UX)
+     * - No virtual desktop mode (/desktop flag removed)
+     *
+     * @param containerId Wine container ID
+     * @param xServer XServer instance
+     * @param xServerView XServerView for accessing GLRenderer (window filtering)
      */
-    fun launchSteam(containerId: String, xServer: XServer) {
+    fun launchSteam(containerId: String, xServer: XServer, xServerView: com.steamdeck.mobile.presentation.widget.XServerView) {
         android.util.Log.d(TAG, "launchSteam() called with containerId: $containerId")
         viewModelScope.launch {
             try {
@@ -66,7 +75,7 @@ class SteamDisplayViewModel @Inject constructor(
                 _uiState.value = SteamDisplayUiState.InitializingXServer
                 android.util.Log.d(TAG, "Step 1: Initializing XEnvironment with WineProgramLauncherComponent")
 
-                val initialized = initializeXEnvironment(xServer, containerId)
+                val initialized = initializeXEnvironment(xServer, containerId, xServerView)
                 if (!initialized) {
                     AppLogger.e(TAG, "XEnvironment initialization failed")
                     _uiState.value = SteamDisplayUiState.Error("Failed to initialize display server")
@@ -97,10 +106,16 @@ class SteamDisplayViewModel @Inject constructor(
      * Initialize XEnvironment and start XServer Unix socket
      * MUST be called before launching Wine
      *
+     * INTEGRATED MODE (2025-12-22):
+     * - Configure GLRenderer window filtering after XEnvironment initialization
+     * - Hide Windows desktop (explorer.exe, progman, shell_traywnd)
+     * - Force Steam window to fullscreen
+     *
      * @param xServer The XServer instance for rendering
      * @param containerId The Wine container ID to launch Steam from
+     * @param xServerView XServerView for accessing GLRenderer
      */
-    private suspend fun initializeXEnvironment(xServer: XServer, containerId: String): Boolean = withContext(Dispatchers.IO) {
+    private suspend fun initializeXEnvironment(xServer: XServer, containerId: String, xServerView: com.steamdeck.mobile.presentation.widget.XServerView): Boolean = withContext(Dispatchers.IO) {
         try {
             // CRITICAL: Install rootfs from assets if needed
             // This provides complete Ubuntu-based Linux environment for Wine/Box64
@@ -148,6 +163,28 @@ class SteamDisplayViewModel @Inject constructor(
                 android.util.Log.e(TAG, "XAUTHORITY file already exists: ${xAuthFile.absolutePath}")
             }
 
+            // CRITICAL FIX: Create /etc/hosts file for localhost hostname resolution
+            // Wine's gethostname() returns "localhost" which needs to resolve to 127.0.0.1
+            // Without this file, Wine gets "Failed to resolve your host name IP" error
+            val etcDir = File(rootfsDir, "etc")
+            if (!etcDir.exists()) {
+                etcDir.mkdirs()
+                android.util.Log.i(TAG, "Created /etc directory in rootfs: ${etcDir.absolutePath}")
+                AppLogger.d(TAG, "Created /etc directory in rootfs")
+            }
+
+            val hostsFile = File(etcDir, "hosts")
+            val hostsContent = """
+                127.0.0.1       localhost
+                ::1             ip6-localhost
+            """.trimIndent()
+
+            // Always create/overwrite hosts file to ensure correct content
+            hostsFile.writeText(hostsContent)
+            hostsFile.setReadable(true, false)
+            android.util.Log.i(TAG, "Created /etc/hosts file: ${hostsFile.absolutePath}")
+            AppLogger.i(TAG, "Created /etc/hosts file with localhost → 127.0.0.1 mapping")
+
             // Verify X11 libraries exist in rootfs (helps debug connection failures)
             verifyX11Libraries(rootfsDir)
 
@@ -189,24 +226,36 @@ class SteamDisplayViewModel @Inject constructor(
                 return@withContext false
             }
 
-            // Build Wine command: wine explorer /desktop=shell,1280x720 steam.exe -bigpicture
-            // This matches Winlator's XServerDisplayActivity pattern
-            val screenSize = xServer.screenInfo.toString()  // e.g., "1280x720"
-            val guestCommand = "wine explorer /desktop=shell,$screenSize \"${steamExe.absolutePath}\" -bigpicture"
+            // INTEGRATED MODE (2025-12-22): Configure GLRenderer window filtering
+            // CRITICAL: WM_CLASS is case-sensitive - Wine uses LOWERCASE for Windows executables
+            // Wine normalizes "Steam.exe" → "steam.exe" in X11 WM_CLASS property
+            val renderer = xServerView.renderer
+            renderer.setUnviewableWMClasses("explorer.exe", "progman", "shell_traywnd")
+            renderer.setForceFullscreenWMClass("steam.exe")  // Force Steam Big Picture fullscreen (lowercase!)
+            AppLogger.i(TAG, "Configured integrated mode: hide desktop, force fullscreen steam.exe")
 
-            AppLogger.d(TAG, "Guest command: $guestCommand")
+            // Build Wine command: Launch Steam Big Picture
+            // INTEGRATED MODE: No /desktop flag (virtual desktop disabled)
+            // GLRenderer handles fullscreen via forceFullscreenWMClass instead
+            val steamPath = "C:/Program Files (x86)/Steam/Steam.exe"
+            val escapedPath = steamPath.replace(" ", "\\ ")
+            val guestCommand = "wine explorer $escapedPath -bigpicture"
+
+            AppLogger.d(TAG, "Guest command (integrated mode): $guestCommand")
 
             // Configure WineProgramLauncherComponent
             val guestProgramLauncher = WineProgramLauncherComponent()
             guestProgramLauncher.setGuestExecutable(guestCommand)
-            guestProgramLauncher.setWoW64Mode(true)  // Steam requires 64-bit Wine with WoW64
+            // CRITICAL: Wine is WoW64-only build - Steam.exe (32-bit) runs via WoW64
+            // WoW64 = Windows-on-Windows 64-bit (32-bit apps on 64-bit Wine)
+            guestProgramLauncher.setWoW64Mode(true)
+            AppLogger.i(TAG, "Configured WoW64 mode for 32-bit Steam.exe on 64-bit Wine")
 
             // CRITICAL: Use STABILITY preset for maximum reliability
-            // STABILITY includes BOX64_DYNAREC_WAIT=0 (interpreter fallback)
-            // which is essential for Steam's 32-bit code stability in WoW64 mode
+            // Both Box86 and Box64 presets for WoW64 mode (32-bit Steam + 64-bit Wine)
             guestProgramLauncher.setBox86Preset(com.steamdeck.mobile.box86_64.Box86_64Preset.STABILITY)
             guestProgramLauncher.setBox64Preset(com.steamdeck.mobile.box86_64.Box86_64Preset.STABILITY)
-            AppLogger.i(TAG, "Applied STABILITY preset (STRONGMEM=2, WAIT=0, CALLRET=0)")
+            AppLogger.i(TAG, "Applied Box86+Box64 STABILITY presets for WoW64")
 
             // CRITICAL: Set binding paths for PRoot to mount container drives
             // This allows Wine to access C: drive (container's drive_c directory)
@@ -219,9 +268,27 @@ class SteamDisplayViewModel @Inject constructor(
             val envVars = EnvVars()
             // CRITICAL: Set WINEPREFIX to container path (NOT rootfs)
             // Wine needs to know which container prefix to use
-            envVars.put("WINEPREFIX", containerDir.absolutePath)
-            envVars.put("WINEDEBUG", "-all,+err")  // Minimal logging for performance
+            envVars.put("WINEPREFIX", "/root")
+            envVars.put("DISPLAY", ":0")  // X11 display for Wine GUI
+            // NOTE: WINEARCH removed - Wine is WoW64-only build (doesn't support win32)
+            // Steam.exe (32-bit) automatically runs via WoW64 on 64-bit Wine
+            envVars.put("WINEDEBUG", "+winsock,+wininet,+winhttp,+err")  // Network debugging
             envVars.put("WINEESYNC", "1")  // Enable ESYNC for better performance
+            // NOTE: Virtual desktop mode disabled - Steam CEF requires normal windowed mode
+            // envVars.put("WINE_EXPLORER_DESKTOP", "shell,$screenSize")
+
+            // CRITICAL FIX (2025-12-22): BOX86/BOX64 settings via STABILITY preset
+            // User analysis: "WINEARCH removal" + "BOX86 settings" must be done as a SET
+            // - WINEARCH removed (WoW64-only build) → Wine starts properly
+            // - BOX86 preset (STABILITY) → Provides complete set of env vars (STRONGMEM=2, CALLRET=0, etc.)
+            // Manual env vars removed - they were overwriting preset values and missing critical settings
+            // WineProgramLauncherComponent applies preset via addBox86EnvVars() + addBox64EnvVars()
+            AppLogger.i(TAG, "Using STABILITY preset for BOX86/BOX64 (applied by WineProgramLauncherComponent)")
+
+            // DPI scaling: 100% (96 DPI = default)
+            // At native 2400x1080, Steam Big Picture should look good without scaling
+            envVars.put("WINE_DPI", "96")
+
             envVars.put("MESA_GL_VERSION_OVERRIDE", "4.6")
             envVars.put("MESA_GLSL_VERSION_OVERRIDE", "460")
             envVars.put("MESA_DEBUG", "silent")
@@ -239,11 +306,15 @@ class SteamDisplayViewModel @Inject constructor(
             xEnvironment?.addComponent(guestProgramLauncher)
             AppLogger.d(TAG, "Added WineProgramLauncherComponent to environment")
 
-            // Start environment (creates Unix socket via XConnectorEpoll AND launches Wine)
-            xEnvironment?.startEnvironmentComponents()
-            AppLogger.d(TAG, "Started environment components (XServer + Steam launcher)")
+            // CRITICAL FIX (2025-12-22): Start XServerComponent FIRST, THEN Wine
+            // Problem: startEnvironmentComponents() launches ALL components simultaneously
+            // Wine tries to connect to :0 before socket exists → "no driver could be loaded"
+            // Solution: Start XServerComponent, wait for socket, THEN start Wine launcher
+            AppLogger.i(TAG, "Starting XServerComponent (creating Unix socket)...")
+            xServerComponent.start()
+            AppLogger.d(TAG, "XServerComponent started, waiting for socket...")
 
-            // Wait for Unix socket to be ready
+            // Wait for Unix socket to be ready BEFORE launching Wine
             AppLogger.d(TAG, "Waiting for socket: ${socketConfig.path}")
             val socketReady = waitForSocket(socketConfig.path, SOCKET_TIMEOUT_MS)
 
@@ -263,6 +334,12 @@ class SteamDisplayViewModel @Inject constructor(
             }
 
             AppLogger.i(TAG, "XServer socket ready: ${socketConfig.path}")
+
+            // NOW start Wine launcher (socket is ready, Wine can connect immediately)
+            AppLogger.i(TAG, "Socket verified, starting Wine launcher...")
+            guestProgramLauncher.start()
+            AppLogger.i(TAG, "Wine launcher started successfully")
+
             true
 
         } catch (e: Exception) {

@@ -160,7 +160,10 @@ public class WineProgramLauncherComponent extends EnvironmentComponent {
         boolean enableBox86_64Logs = preferences.getBoolean("enable_box86_64_logs", false);
 
         EnvVars envVars = new EnvVars();
-        if (!wow64Mode) addBox86EnvVars(envVars, enableBox86_64Logs);
+        // CRITICAL FIX (2025-12-22): Always add Box86 env vars for WoW64 mode
+        // Steam.exe (32-bit) runs via WoW64 and needs Box86 settings for stability
+        // User analysis: "WINEARCH removal" + "BOX86 settings" must be done as a SET
+        addBox86EnvVars(envVars, enableBox86_64Logs);  // Always call (removed wow64Mode check)
         addBox64EnvVars(envVars, enableBox86_64Logs);
         envVars.put("HOME", ImageFs.HOME_PATH);
         envVars.put("USER", ImageFs.USER);
@@ -215,8 +218,15 @@ public class WineProgramLauncherComponent extends EnvironmentComponent {
         // Bind the entire /system directory to ensure all dependencies are accessible
         command += " --bind=/system";
 
+        // CRITICAL: Bind /etc/resolv.conf for DNS resolution in Wine
+        // Steam needs working DNS to connect to Valve servers
+        command += " --bind=/system/etc/resolv.conf:/etc/resolv.conf";
+
+        // NOTE: /etc/hosts is now created directly in rootfs by SteamDisplayViewModel
+        // No need for PRoot binding - file exists inside the chroot environment
+
         if (bindingPaths != null) {
-            for (String path : bindingPaths) command += " --bind="+(new File(path)).getAbsolutePath();
+            for (String path : bindingPaths) command += " --bind=" + (new File(path)).getAbsolutePath() + ":/root";
         }
 
         // CRITICAL FIX: Copy box64 into rootfs instead of symlinking
@@ -359,6 +369,18 @@ public class WineProgramLauncherComponent extends EnvironmentComponent {
         envVars.putAll(Box86_64PresetManager.getEnvVars("box64", environment.getContext(), box64Preset));
         envVars.put("BOX64_X11GLX", "1");
         envVars.put("BOX64_NORCFILES", "1");
+
+        // CRITICAL: Set Box64 library search paths for Wine DLLs
+        // Without these, Wine cannot load ntdll.so and other core libraries
+        // Matches WinlatorEmulator.kt line 2093-2095
+        Context context = environment.getContext();
+        ImageFs imageFs = environment.getImageFs();
+        File rootfsDir = imageFs.getRootDir();
+        String rootfsLibPath = rootfsDir.getAbsolutePath() + "/usr/lib:" + rootfsDir.getAbsolutePath() + "/lib";
+        String wineLibPath = imageFs.getWinePath() + "/lib/wine/x86_64-unix";
+        String x86_64LibPath = rootfsDir.getAbsolutePath() + "/usr/lib/x86_64-linux-gnu";
+        envVars.put("BOX64_LD_LIBRARY_PATH", rootfsLibPath + ":" + x86_64LibPath + ":" + wineLibPath);
+        envVars.put("BOX64_PATH", imageFs.getWinePath() + "/bin");
     }
 
     public void suspendProcess() {

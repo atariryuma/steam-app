@@ -118,16 +118,36 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * Launch game (FIXED: Flow-based monitoring prevents memory leaks)
+  * Launch game with XServer integrated mode (FIXED: Flow-based monitoring prevents memory leaks)
+  *
+  * XServer Integrated Mode (2025-12-22):
+  * - Displays only game windows without Windows desktop background
+  * - Uses GLRenderer window filtering (forceFullscreenWMClass, unviewableWMClasses)
+  * - Removes Wine virtual desktop mode for seamless Android-like UX
+  *
   * @param gameId Game ID to launch
   * @param xServer XServer instance for graphics rendering
+  * @param xServerView XServerView for window filtering configuration
   */
- fun launchGame(gameId: Long, xServer: XServer) {
+ fun launchGame(gameId: Long, xServer: XServer, xServerView: com.steamdeck.mobile.presentation.widget.XServerView) {
   viewModelScope.launch {
    AppLogger.i(TAG, ">>> ViewModel: Starting game launch for gameId=$gameId")
 
    // Store XServer reference for game display
    this@GameDetailViewModel.xServer = xServer
+
+   // Configure XServer integrated mode (hide desktop, show only game window)
+   val currentState = _uiState.value
+   if (currentState is GameDetailUiState.Success) {
+    val game = currentState.game
+    val gameExecutableName = java.io.File(game.executablePath).nameWithoutExtension
+
+    val renderer = xServerView.renderer
+    renderer.setUnviewableWMClasses("explorer.exe", "progman", "shell_traywnd")
+    renderer.setForceFullscreenWMClass(gameExecutableName)
+
+    AppLogger.d(TAG, ">>> XServer integrated mode configured: hide desktop, fullscreen $gameExecutableName")
+   }
 
    _launchState.value = LaunchState.Launching
    AppLogger.d(TAG, ">>> ViewModel: State changed to Launching")

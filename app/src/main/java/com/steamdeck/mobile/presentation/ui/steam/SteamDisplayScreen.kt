@@ -61,30 +61,42 @@ fun SteamDisplayScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
-    // CRITICAL: Use device's actual screen resolution for proper scaling
-    // Get display metrics to create fullscreen Big Picture mode
+    // Use device native resolution for fullscreen Big Picture experience
+    // Get actual display metrics to maximize screen real estate
     val displayMetrics = context.resources.displayMetrics
-    val actualScreenSize = "${displayMetrics.widthPixels}x${displayMetrics.heightPixels}"
+    val screenWidth = displayMetrics.widthPixels
+    val screenHeight = displayMetrics.heightPixels
+    val nativeScreenSize = "${screenWidth}x${screenHeight}"
 
     // DEBUG: Log screen composition
-    android.util.Log.e("SteamDisplayScreen", "=== COMPOSABLE CALLED === containerId=$containerId, actualScreenSize=$actualScreenSize")
+    android.util.Log.e("SteamDisplayScreen", "=== COMPOSABLE CALLED === containerId=$containerId, nativeScreenSize=$nativeScreenSize")
 
-    // Create XServer instance (X11 protocol server) with actual screen resolution
+    // Create XServer instance (X11 protocol server) with device native resolution
     val xServer = remember {
-        android.util.Log.e("SteamDisplayScreen", "Creating XServer with resolution: $actualScreenSize")
-        XServer(ScreenInfo(actualScreenSize))
-    }
-
-    // Launch Steam Big Picture when screen is displayed
-    LaunchedEffect(containerId, xServer) {
-        android.util.Log.e("SteamDisplayScreen", "LaunchedEffect triggered with containerId: $containerId")
-        viewModel.launchSteam(containerId, xServer)
-        android.util.Log.e("SteamDisplayScreen", "viewModel.launchSteam() called")
+        android.util.Log.e("SteamDisplayScreen", "Creating XServer with resolution: $nativeScreenSize")
+        XServer(ScreenInfo(nativeScreenSize))
     }
 
     // XServerView wraps GLSurfaceView for OpenGL rendering
+    // MUST be created before LaunchedEffect (ViewModel needs it for window filtering)
+    // IMPORTANT: xServerView is stable across recompositions (remember with xServer key)
     val xServerView = remember(xServer) {
         XServerView(context, xServer)
+    }
+
+    // Launch Steam Big Picture with delay to ensure GLRenderer initialization
+    // CRITICAL: GLSurfaceView.onResume() triggers async OpenGL context creation
+    // We must wait for this to complete before Wine connects to X11
+    LaunchedEffect(containerId) {
+        android.util.Log.e("SteamDisplayScreen", "=== [VERSION 3] LaunchedEffect START === containerId=$containerId")
+        android.util.Log.e("SteamDisplayScreen", "=== [VERSION 3] Line 92: About to delay 500ms ===")
+
+        // Wait for GLRenderer initialization (500ms is sufficient for GL context creation)
+        kotlinx.coroutines.delay(500)
+
+        android.util.Log.e("SteamDisplayScreen", "=== [VERSION 3] Line 96: Delay complete, launching Steam ===")
+        viewModel.launchSteam(containerId, xServer, xServerView)
+        android.util.Log.e("SteamDisplayScreen", "=== [VERSION 3] Line 98: launchSteam() called ===")
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -153,11 +165,16 @@ fun SteamDisplayScreen(
         }
     }
 
-    // Lifecycle management: pause/resume OpenGL rendering
+    // Lifecycle management: Keep XServer running when navigating away
+    // CHANGED (2025-12-22): Remove onPause() to preserve XServer state
+    // - Old behavior: onPause() when leaving screen → Steam process continues but rendering stops
+    // - New behavior: Keep rendering active → Seamless return to running game/Steam
+    // - XServer cleanup only happens when Activity is destroyed (handled by ViewModel)
     DisposableEffect(xServerView) {
         onDispose {
-            // Cleanup: pause rendering when screen is destroyed
-            xServerView.onPause()
+            // DO NOT call onPause() here - let XServer keep running
+            // Cleanup will be handled by ViewModel.onCleared() when Activity is destroyed
+            android.util.Log.d("SteamDisplayScreen", "Screen disposed but XServer kept alive")
         }
     }
 }

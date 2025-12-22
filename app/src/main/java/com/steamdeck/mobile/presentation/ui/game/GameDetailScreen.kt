@@ -152,7 +152,7 @@ fun GameDetailScreen(
      isSteamInstalled = isSteamInstalled,
      isScanning = isScanning,
      steamLaunchState = steamLaunchState,
-     onLaunchGame = { viewModel.launchGame(gameId, xServer) },
+     onLaunchGame = { viewModel.launchGame(gameId, xServer, xServerView) },
      onLaunchViaSteam = { viewModel.launchGameViaSteam(gameId) },
      onOpenSteamClient = { viewModel.openSteamClient(gameId) },
      onOpenSteamInstallPage = { viewModel.triggerGameDownload(gameId) },
@@ -276,10 +276,15 @@ fun GameDetailScreen(
      }
     )
 
-    // Lifecycle management for XServerView
+    // Lifecycle management: Keep XServer running when navigating away
+    // CHANGED (2025-12-22): Remove onPause() to preserve game state
+    // - Old behavior: onPause() when leaving screen → Game continues but rendering stops
+    // - New behavior: Keep rendering active → Seamless return to running game
+    // - XServer cleanup only happens when Activity is destroyed (handled by ViewModel)
     DisposableEffect(Unit) {
      onDispose {
-      xServerView.onPause()
+      // DO NOT call onPause() here - let game keep running in background
+      // Cleanup will be handled by ViewModel.onCleared() when Activity is destroyed
      }
     }
 

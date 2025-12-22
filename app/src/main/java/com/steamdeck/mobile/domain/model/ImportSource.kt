@@ -1,5 +1,7 @@
 package com.steamdeck.mobile.domain.model
 
+import androidx.compose.runtime.Immutable
+
 /**
  * Import source type
  */
@@ -12,7 +14,10 @@ enum class ImportSource {
 
 /**
  * Importable file information
+ *
+ * @Immutable enables Compose performance optimization
  */
+@Immutable
 data class ImportableFile(
  val name: String,
  val path: String,

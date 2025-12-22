@@ -59,7 +59,7 @@ fun SteamDisplayScreen(
     viewModel: SteamDisplayViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     // Use device native resolution for fullscreen Big Picture experience
     // Get actual display metrics to maximize screen real estate

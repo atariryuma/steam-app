@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -48,8 +49,8 @@ fun DownloadScreen(
  viewModel: DownloadViewModel = hiltViewModel(),
  onNavigateBack: () -> Unit
 ) {
- val downloads by viewModel.downloads.collectAsState()
- val activeDownloads by viewModel.activeDownloads.collectAsState()
+ val downloads by viewModel.downloads.collectAsStateWithLifecycle()
+ val activeDownloads by viewModel.activeDownloads.collectAsStateWithLifecycle()
 
  Scaffold(
   topBar = {

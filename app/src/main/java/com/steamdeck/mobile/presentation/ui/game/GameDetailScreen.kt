@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -61,11 +62,11 @@ fun GameDetailScreen(
  viewModel: GameDetailViewModel = hiltViewModel()
 ) {
  val context = LocalContext.current
- val uiState by viewModel.uiState.collectAsState()
- val launchState by viewModel.launchState.collectAsState()
- val steamLaunchState by viewModel.steamLaunchState.collectAsState()
- val isSteamInstalled by viewModel.isSteamInstalled.collectAsState()
- val isScanning by viewModel.isScanning.collectAsState()
+ val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+ val launchState by viewModel.launchState.collectAsStateWithLifecycle()
+ val steamLaunchState by viewModel.steamLaunchState.collectAsStateWithLifecycle()
+ val isSteamInstalled by viewModel.isSteamInstalled.collectAsStateWithLifecycle()
+ val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
  var showDeleteDialog by remember { mutableStateOf(false) }
  var showLaunchErrorDialog by remember { mutableStateOf(false) }
  var showSteamLaunchErrorDialog by remember { mutableStateOf(false) }

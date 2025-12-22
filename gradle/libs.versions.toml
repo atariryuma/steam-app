@@ -25,6 +25,7 @@ mockk = "1.13.13"
 arch-core-testing = "2.2.0"
 test-runner = "1.6.2"
 test-rules = "1.6.1"
+kotlin-retry = "2.0.1"
 
 [libraries]
 # Compose
@@ -107,6 +108,9 @@ retrofit-converter-kotlinx-serialization = { group = "com.jakewharton.retrofit",
 
 # ZXing (QR Code Generation)
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+
+# Kotlin Retry (Exponential backoff for network calls)
+kotlin-retry = { group = "com.michael-bull.kotlin-retry", name = "kotlin-retry", version.ref = "kotlin-retry" }
 
 # Testing
 junit = { group = "junit", name = "junit", version = "4.13.2" }

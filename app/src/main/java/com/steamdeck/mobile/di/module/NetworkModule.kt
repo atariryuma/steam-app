@@ -14,6 +14,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -51,6 +52,14 @@ object NetworkModule {
   return DataResultCallAdapterFactory()
  }
 
+ /**
+  * OkHttp Client with GitHub research-backed optimizations (2025)
+  *
+  * Optimizations:
+  * - Connection pooling (5 connections, 5min keep-alive) for reduced latency
+  * - Optimized timeouts for large file downloads
+  * - Automatic retry on connection failure
+  */
  @Provides
  @Singleton
  fun provideOkHttpClient(): OkHttpClient {
@@ -73,10 +82,20 @@ object NetworkModule {
      addInterceptor(loggingInterceptor)
     }
    }
-   // Timeout settings
+   // NEW: Connection pooling optimization (GitHub research)
+   // Max 5 idle connections, 5 minute keep-alive
+   // Reduces latency by reusing connections to same host
+   .connectionPool(
+    ConnectionPool(
+     maxIdleConnections = 5,
+     keepAliveDuration = 5,
+     timeUnit = TimeUnit.MINUTES
+    )
+   )
+   // Timeout settings (optimized for large downloads)
    .connectTimeout(30, TimeUnit.SECONDS)  // Connection timeout
-   .readTimeout(60, TimeUnit.SECONDS)   // Read timeout
-   .writeTimeout(60, TimeUnit.SECONDS)  // Write timeout
+   .readTimeout(90, TimeUnit.SECONDS)   // Read timeout (increased for large files)
+   .writeTimeout(90, TimeUnit.SECONDS)  // Write timeout (increased for large files)
    // Retry settings
    .retryOnConnectionFailure(true)   // Auto-retry on connection failure
    .build()

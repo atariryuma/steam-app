@@ -50,9 +50,27 @@ class DownloadManager @Inject constructor(
 
  companion object {
   private const val TAG = "DownloadManager"
-  private const val CHUNK_SIZE = 8 * 1024 * 1024L // 8MB chunks (recommended 2025)
+  // GitHub research (2025): 2-4MB chunks for better parallelization
+  // Smaller chunks = more concurrent segments = faster overall throughput
+  private const val CHUNK_SIZE = 2 * 1024 * 1024L // 2MB chunks (optimized for parallel downloads)
   private const val MAX_CONCURRENT_DOWNLOADS = 3
   private const val DOWNLOAD_WORK_PREFIX = "download_"
+
+  /**
+   * Calculate optimal chunk size based on file size
+   * - Small files (<10MB): 1MB chunks
+   * - Medium files (10-100MB): 2MB chunks
+   * - Large files (100-500MB): 4MB chunks
+   * - Very large files (>500MB): 8MB chunks
+   */
+  fun calculateOptimalChunkSize(fileSize: Long): Long {
+   return when {
+    fileSize < 10_000_000 -> 1024 * 1024L // 1MB for small files
+    fileSize < 100_000_000 -> 2 * 1024 * 1024L // 2MB for medium files
+    fileSize < 500_000_000 -> 4 * 1024 * 1024L // 4MB for large files
+    else -> 8 * 1024 * 1024L // 8MB for very large files
+   }
+  }
  }
 
  /**

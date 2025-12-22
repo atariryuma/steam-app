@@ -62,6 +62,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -103,10 +104,10 @@ fun SettingsScreen(
  steamLoginViewModel: SteamLoginViewModel = hiltViewModel()
 ) {
  val context = LocalContext.current
- val uiState by viewModel.uiState.collectAsState()
- val syncState by viewModel.syncState.collectAsState()
- val steamInstallState by viewModel.steamInstallState.collectAsState()
- val steamLoginState by steamLoginViewModel.uiState.collectAsState()
+ val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+ val syncState by viewModel.syncState.collectAsStateWithLifecycle()
+ val steamInstallState by viewModel.steamInstallState.collectAsStateWithLifecycle()
+ val steamLoginState by steamLoginViewModel.uiState.collectAsStateWithLifecycle()
  val snackbarHostState = remember { SnackbarHostState() }
  var selectedSection by remember {
   mutableIntStateOf(if (initialSection >= 0) initialSection else 0)
@@ -377,7 +378,7 @@ private fun SteamAuthContent(
  onClear: () -> Unit,
  enabled: Boolean = true
 ) {
- val steamLoginState by steamLoginViewModel.uiState.collectAsState()
+ val steamLoginState by steamLoginViewModel.uiState.collectAsStateWithLifecycle()
 
  // Close WebView on authentication success and trigger auto-sync
  LaunchedEffect(steamLoginState) {
@@ -1291,7 +1292,7 @@ private fun ControllerContent(
 private fun WineTestIntegratedContent(
  viewModel: WineTestViewModel
 ) {
- val uiState by viewModel.uiState.collectAsState()
+ val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
  Column(
   modifier = Modifier

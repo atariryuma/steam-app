@@ -76,6 +76,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -146,7 +147,7 @@ fun HomeScreen(
  viewModel: HomeViewModel = hiltViewModel()
 ) {
  val context = LocalContext.current
- val uiState by viewModel.uiState.collectAsState()
+ val uiState by viewModel.uiState.collectAsStateWithLifecycle()
  var showAddGameDialog by remember { mutableStateOf(false) }
  var executableUri by remember { mutableStateOf<Uri?>(null) }
  var installFolderUri by remember { mutableStateOf<Uri?>(null) }

@@ -88,4 +88,18 @@ interface ISecurePreferences {
   * @return True if credentials exist, false otherwise
   */
  suspend fun hasSteamCredentials(): Boolean
+
+ /**
+  * Retrieves the Steam Big Picture Mode preference.
+  *
+  * @return True if Big Picture Mode is enabled, false otherwise (default: true)
+  */
+ suspend fun getSteamBigPictureMode(): Boolean
+
+ /**
+  * Saves the Steam Big Picture Mode preference.
+  *
+  * @param enabled True to enable Big Picture Mode, false for normal mode
+  */
+ suspend fun saveSteamBigPictureMode(enabled: Boolean)
 }

@@ -50,7 +50,9 @@ class GameDetailViewModel @Inject constructor(
  private val scanInstalledGamesUseCase: ScanInstalledGamesUseCase,
  private val triggerGameDownloadUseCase: TriggerGameDownloadUseCase,
  private val gameRepository: GameRepository,
- private val winlatorEngine: WinlatorEngine
+ private val winlatorEngine: WinlatorEngine,
+ private val controllerInputRouter: com.steamdeck.mobile.core.input.ControllerInputRouter,
+ private val gameControllerManager: com.steamdeck.mobile.core.input.GameControllerManager
 ) : ViewModel() {
 
  companion object {
@@ -71,6 +73,10 @@ class GameDetailViewModel @Inject constructor(
 
  private val _isScanning = MutableStateFlow(false)
  val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
+ // Controller connection state
+ val connectedControllers: StateFlow<List<com.steamdeck.mobile.core.input.GameController>> =
+  gameControllerManager.connectedControllers
 
  // FIXED: Track process monitoring job to prevent memory leaks
  // XServer instance for game display
@@ -193,6 +199,11 @@ class GameDetailViewModel @Inject constructor(
  fun stopGame() {
   viewModelScope.launch {
    AppLogger.i(TAG, ">>> Stopping game...")
+
+   // Stop controller input routing
+   controllerInputRouter.stopRouting()
+   AppLogger.i(TAG, ">>> Controller routing stopped")
+
    val result = winlatorEngine.stopGame()
    if (result.isSuccess) {
     _launchState.value = LaunchState.Idle

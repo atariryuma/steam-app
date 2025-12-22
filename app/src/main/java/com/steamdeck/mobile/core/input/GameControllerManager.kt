@@ -29,7 +29,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class GameControllerManager @Inject constructor(
- @ApplicationContext private val context: Context
+ @ApplicationContext private val context: Context,
+ private val eventBus: ControllerEventBus
 ) : InputManager.InputDeviceListener {
 
  companion object {
@@ -101,8 +102,9 @@ class GameControllerManager @Inject constructor(
 
  /**
   * Process key input
+  * NEW: Emits events to ControllerEventBus
   */
- fun handleKeyEvent(deviceId: Int, event: KeyEvent): Boolean {
+ suspend fun handleKeyEvent(deviceId: Int, event: KeyEvent): Boolean {
   if (!isControllerConnected(deviceId)) return false
 
   val currentState = _controllerState.value[deviceId] ?: ControllerState()
@@ -138,14 +140,19 @@ class GameControllerManager @Inject constructor(
   }
 
   _controllerState.value = _controllerState.value + (deviceId to updatedState)
+
+  // NEW: Emit event to bus for routing to uinput
+  eventBus.emitButtonEvent(deviceId, event.keyCode, event.action == KeyEvent.ACTION_DOWN)
+
   AppLogger.v(TAG, "Controller $deviceId: KeyEvent ${event.keyCode} action=${event.action}")
   return true
  }
 
  /**
   * Process motion input (analog stick, trigger)
+  * NEW: Emits events to ControllerEventBus
   */
- fun handleMotionEvent(deviceId: Int, event: MotionEvent): Boolean {
+ suspend fun handleMotionEvent(deviceId: Int, event: MotionEvent): Boolean {
   if (!isControllerConnected(deviceId)) return false
 
   val currentState = _controllerState.value[deviceId] ?: ControllerState()
@@ -178,6 +185,17 @@ class GameControllerManager @Inject constructor(
   )
 
   _controllerState.value = _controllerState.value + (deviceId to updatedState)
+
+  // NEW: Emit axis events to bus for routing to uinput
+  eventBus.emitAxisEvent(deviceId, MotionEvent.AXIS_X, leftX)
+  eventBus.emitAxisEvent(deviceId, MotionEvent.AXIS_Y, leftY)
+  eventBus.emitAxisEvent(deviceId, MotionEvent.AXIS_Z, rightX)
+  eventBus.emitAxisEvent(deviceId, MotionEvent.AXIS_RZ, rightY)
+  eventBus.emitAxisEvent(deviceId, MotionEvent.AXIS_LTRIGGER, triggerL)
+  eventBus.emitAxisEvent(deviceId, MotionEvent.AXIS_RTRIGGER, triggerR)
+  eventBus.emitAxisEvent(deviceId, MotionEvent.AXIS_HAT_X, hatX)
+  eventBus.emitAxisEvent(deviceId, MotionEvent.AXIS_HAT_Y, hatY)
+
   AppLogger.v(TAG, "Controller $deviceId: Motion LS($leftX,$leftY) RS($rightX,$rightY) Triggers($triggerL,$triggerR)")
   return true
  }

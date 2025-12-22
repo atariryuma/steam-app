@@ -352,7 +352,7 @@ class WinlatorEmulator @Inject constructor(
      extractAsset(ROOTFS_ASSET, rootfsTxzFile)
     }
 
-    progressCallback?.invoke(0.4f, "Decompressing Wine rootfs (this may take 2-3 minutes)...")
+    progressCallback?.invoke(0.4f, "Decompressing Wine rootfs...")
 
     // Extract .txz archive
     if (rootfsTxzFile.exists()) {
@@ -677,6 +677,20 @@ class WinlatorEmulator @Inject constructor(
     AppLogger.w(TAG, "Wine Gecko installation error (non-fatal)", e)
    }
 
+   // Configure Wine DirectInput deadzone for game controller support
+   // This ensures proper joystick behavior in Windows games running under Wine
+   try {
+    AppLogger.i(TAG, "Configuring Wine DirectInput deadzone settings...")
+    val directInputResult = configureDirectInputDeadzone(containerDir)
+    if (directInputResult.isFailure) {
+     AppLogger.w(TAG, "DirectInput configuration failed (non-fatal): ${directInputResult.exceptionOrNull()?.message}")
+    } else {
+     AppLogger.i(TAG, "DirectInput deadzone configuration completed successfully")
+    }
+   } catch (e: Exception) {
+    AppLogger.w(TAG, "DirectInput configuration error (non-fatal)", e)
+   }
+
    val container = EmulatorContainer(
     id = containerId,
     name = config.name,
@@ -788,6 +802,32 @@ class WinlatorEmulator @Inject constructor(
    val environmentVars = buildEnvironmentVariables(container).toMutableMap()
    val rootfsLibraryPath = buildRootfsLibraryPath()
 
+   // STEAM-SPECIFIC ENVIRONMENT VARIABLES
+   // Research shows Steam requires special configuration on Wine+Box64
+   val isSteam = executable.name.equals("Steam.exe", ignoreCase = true)
+   if (isSteam) {
+    AppLogger.i(TAG, "Detected Steam.exe - applying Steam-specific optimizations")
+
+    // Enable detailed Wine logging for Steam startup diagnostics
+    // Based on Winlator/Box64 community findings:
+    // - +x11drv: X11 display/window issues (most common Steam problem)
+    // - +steam: Steam-specific Wine messages
+    // - +thread: Thread creation issues
+    environmentVars["WINEDEBUG"] = "+err,+warn,+x11drv,+steam,+thread,+loaddll"
+
+    // Steam Big Picture mode optimization (from XDA-Developers guide)
+    environmentVars["STEAM_RUNTIME"] = "0"  // Disable Steam Runtime (use Wine libraries)
+
+    // Box64 Compatibility preset for Steam (from GitHub brunodev85/winlator)
+    // Steam requires conservative Box64 settings to avoid crashes
+    environmentVars["BOX64_DYNAREC_SAFEFLAGS"] = "2"  // Safe dynarec mode
+    environmentVars["BOX64_DYNAREC_STRONGMEM"] = "3"  // Strong memory ordering
+    environmentVars["BOX64_DYNAREC_BIGBLOCK"] = "1"   // Conservative basic block size
+
+    AppLogger.d(TAG, "Steam optimizations applied: WINEDEBUG=${environmentVars["WINEDEBUG"]}")
+    AppLogger.d(TAG, "Steam Box64 settings: SAFEFLAGS=2, STRONGMEM=3, BIGBLOCK=1")
+   }
+
    // Add executable's directory to WINEDLLPATH for DLL loading
    // Priority: Game DLLs first, then Wine system DLLs
    // This allows Wine to find both game-specific DLLs (ffmpeg.dll) and Windows system DLLs (winhttp.dll)
@@ -861,6 +901,7 @@ class WinlatorEmulator @Inject constructor(
    // This prevents the process from blocking when output buffer fills up
    // OPTIMIZATION: Rate-limit logging to reduce I/O overhead (10-20% CPU reduction)
    // BEST PRACTICE: Use cancellable reading loop instead of forEach
+   // IMPORTANT: Steam debugging - log all output for first 100 lines to diagnose startup issues
    CoroutineScope(Dispatchers.IO).launch {
     try {
      process.inputStream.bufferedReader().use { reader ->
@@ -868,17 +909,38 @@ class WinlatorEmulator @Inject constructor(
       // Use while loop to continuously read until EOF (process termination)
       while (true) {
        val line = reader.readLine() ?: break  // EOF reached, process terminated
-       // Only log errors and first 50 lines to reduce logging overhead
-       if (line.contains("err", ignoreCase = true) ||
+       // Enhanced Steam debugging: log more context for troubleshooting
+       // - First 100 lines (expanded from 50 for Steam startup diagnostics)
+       // - All errors, warnings, failures
+       // - X11/display issues (common Steam problem on Wine)
+       // - Graphics/DXVK/Vulkan issues
+       // - Steam-specific messages
+       val isSteam = executable.absolutePath.contains("Steam", ignoreCase = true)
+       val shouldLog = lineCount < 100 || // First 100 lines for Steam startup diagnostics
+           line.contains("err", ignoreCase = true) ||
            line.contains("warn", ignoreCase = true) ||
            line.contains("fail", ignoreCase = true) ||
-           lineCount < 50) {
+           line.contains("fatal", ignoreCase = true) ||
+           line.contains("X11", ignoreCase = true) ||
+           line.contains("display", ignoreCase = true) ||
+           line.contains("DISPLAY", ignoreCase = true) ||
+           line.contains("vulkan", ignoreCase = true) ||
+           line.contains("dxvk", ignoreCase = true) ||
+           line.contains("d3d", ignoreCase = true) ||
+           (isSteam && (
+            line.contains("steam", ignoreCase = true) ||
+            line.contains("Starting", ignoreCase = true) ||
+            line.contains("Loaded", ignoreCase = true) ||
+            line.contains("Failed", ignoreCase = true)
+           ))
+
+       if (shouldLog) {
         AppLogger.d(TAG, "[Wine:$pid] $line")
        }
        lineCount++
       }
-      if (lineCount >= 50) {
-       AppLogger.d(TAG, "[Wine:$pid] ... ($lineCount total lines, showing errors only)")
+      if (lineCount >= 100) {
+       AppLogger.d(TAG, "[Wine:$pid] ... ($lineCount total lines, showing errors and Steam-specific messages only)")
       }
      }
     } catch (e: Exception) {
@@ -2023,11 +2085,17 @@ REGEDIT4
    put("LC_ALL", "C")
    // CRITICAL: Use minimal logging to prevent SIGSEGV crashes
    // Excessive logging (+all,+relay,+file) destabilizes Wine execution
+   // NOTE: WINEDEBUG may be overridden by Steam-specific settings in launchExecutable()
    put("WINEDEBUG", "+err,+process,+loaddll") // DEBUG: Enable Wine error/process/dll logs
    put("WINEARCH", "win64") // 64-bit prefix with WoW64 for 32-bit app support (matches Winlator)
    put("WINELOADERNOEXEC", "1")
    // DO NOT set WINESERVER - let Wine find it via PATH (same reason as wineboot)
    // put("WINESERVER", wineserverBinary.absolutePath)
+
+   // X11/Display configuration (critical for Steam UI rendering)
+   // Based on Wine/Box64/Winlator community best practices
+   put("LIBGL_ALWAYS_INDIRECT", "1")  // Use indirect rendering (software fallback)
+   put("GALLIUM_DRIVER", "softpipe")  // Force software renderer (avoid GPU driver issues)
 
    // Graphics configuration
    when (config.directXWrapper) {
@@ -2099,6 +2167,16 @@ REGEDIT4
    // This bypasses Android SELinux restrictions on dlopen from app_data_file
    put("BOX64_EMULATED_LIBS", "libc.so.6:libpthread.so.0:libdl.so.2:librt.so.1:libm.so.6")
    put("BOX64_ALLOWMISSINGLIBS", "1")
+
+   // SDL2 Controller Configuration (for native uinput support)
+   // Allow Steam Virtual Gamepad (created via /dev/uinput)
+   put("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD", "1")
+   // Disable HID API to force SDL to use uinput backend
+   put("SDL_JOYSTICK_HIDAPI", "0")
+
+   // Wine DirectInput Configuration
+   // Enable XInput support for better controller compatibility
+   put("WINE_ENABLE_XINPUT", "1")
 
    // Custom environment variables from config (takes final priority for most settings)
    putAll(config.customEnvVars)
@@ -2625,6 +2703,56 @@ REGEDIT4
 
   } catch (e: Exception) {
    AppLogger.e(TAG, "Failed to open Winlator app", e)
+   Result.failure(e)
+  }
+ }
+
+ /**
+  * Configure Wine DirectInput deadzone settings for game controller support
+  *
+  * Creates and applies a .reg file to set DirectInput deadzone in Wine's registry.
+  * The deadzone value (0x3e8 = 1000 in decimal) represents a 10% deadzone,
+  * which prevents controller drift and improves joystick accuracy.
+  *
+  * @param containerDir Wine container directory
+  * @return Result indicating success or failure of the operation
+  */
+ private suspend fun configureDirectInputDeadzone(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
+  try {
+   // Create DirectInput deadzone registry configuration
+   // Wine Registry Editor format (same as Windows .reg files)
+   val deadzoneRegContent = """
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\Software\Wine\DirectInput]
+"DefaultDeadZone"=dword:000003e8
+
+""".trimIndent()
+
+   // Write .reg file to container directory
+   val deadzoneRegFile = File(containerDir, "directinput_deadzone.reg")
+   deadzoneRegFile.writeText(deadzoneRegContent)
+   AppLogger.d(TAG, "Created DirectInput registry file: ${deadzoneRegFile.absolutePath}")
+
+   // Apply registry file using Wine regedit
+   // regedit /S applies registry changes silently (no GUI)
+   val regResult = executeWineCommand(
+    containerDir = containerDir,
+    executable = "regedit",
+    arguments = listOf("/S", deadzoneRegFile.absolutePath)
+   )
+
+   if (regResult.isSuccess) {
+    AppLogger.i(TAG, "DirectInput deadzone configured successfully (10% deadzone)")
+    // Clean up temporary .reg file
+    deadzoneRegFile.delete()
+    Result.success(Unit)
+   } else {
+    AppLogger.w(TAG, "Failed to apply DirectInput registry: ${regResult.exceptionOrNull()?.message}")
+    Result.failure(regResult.exceptionOrNull() ?: Exception("Failed to apply DirectInput registry"))
+   }
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Error configuring DirectInput deadzone", e)
    Result.failure(e)
   }
  }

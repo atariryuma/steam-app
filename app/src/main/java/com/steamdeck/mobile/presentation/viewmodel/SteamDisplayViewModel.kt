@@ -34,7 +34,8 @@ import javax.inject.Inject
 @HiltViewModel
 class SteamDisplayViewModel @Inject constructor(
     private val steamLauncher: SteamLauncher,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val securePreferences: com.steamdeck.mobile.domain.repository.ISecurePreferences
 ) : ViewModel() {
 
     companion object {
@@ -86,8 +87,8 @@ class SteamDisplayViewModel @Inject constructor(
 
                 // Step 2: Launch Steam via WineProgramLauncherComponent (already started with XEnvironment)
                 _uiState.value = SteamDisplayUiState.Launching
-                android.util.Log.d(TAG, "Step 2: Steam Big Picture launching via WineProgramLauncherComponent")
-                AppLogger.i(TAG, "Steam Big Picture launching: containerId=$containerId")
+                android.util.Log.d(TAG, "Step 2: Steam launching via WineProgramLauncherComponent")
+                AppLogger.i(TAG, "Steam launching: containerId=$containerId")
 
                 // WineProgramLauncherComponent automatically launches when environment.startEnvironmentComponents() is called
                 // No need for separate steamLauncher.launchSteamBigPicture() call
@@ -221,81 +222,48 @@ class SteamDisplayViewModel @Inject constructor(
 
             if (!steamExe.exists()) {
                 AppLogger.e(TAG, "Steam not found: ${steamExe.absolutePath}")
-                AppLogger.e(TAG, "Container dir: ${containerDir.absolutePath}, exists: ${containerDir.exists()}")
                 xEnvironment?.stopEnvironmentComponents()
                 return@withContext false
             }
 
-            // INTEGRATED MODE (2025-12-22): Configure GLRenderer window filtering
-            // CRITICAL: WM_CLASS is case-sensitive - Wine uses LOWERCASE for Windows executables
-            // Wine normalizes "Steam.exe" → "steam.exe" in X11 WM_CLASS property
+            // SIMPLE IMPLEMENTATION (2025-12-23): Minimal window filtering
             val renderer = xServerView.renderer
-            renderer.setUnviewableWMClasses("explorer.exe", "progman", "shell_traywnd")
-            renderer.setForceFullscreenWMClass("steam.exe")  // Force Steam Big Picture fullscreen (lowercase!)
-            AppLogger.i(TAG, "Configured integrated mode: hide desktop, force fullscreen steam.exe")
+            renderer.setUnviewableWMClasses("progman", "shell_traywnd")  // Hide Windows desktop only
+            AppLogger.i(TAG, "Simple mode: Hide desktop only, no forced fullscreen")
 
-            // Build Wine command: Launch Steam Big Picture
-            // INTEGRATED MODE: No /desktop flag (virtual desktop disabled)
-            // GLRenderer handles fullscreen via forceFullscreenWMClass instead
+            // SIMPLE STEAM LAUNCH (2025-12-23)
             val steamPath = "C:/Program Files (x86)/Steam/Steam.exe"
             val escapedPath = steamPath.replace(" ", "\\ ")
-            val guestCommand = "wine explorer $escapedPath -bigpicture"
+            val screenSize = "1280x720"
 
-            AppLogger.d(TAG, "Guest command (integrated mode): $guestCommand")
+            // SIMPLE FLAGS (2025-12-23): -noreactlogin to avoid CEF login issues
+            // Research: CEF (Chromium) doesn't work well in Wine
+            // -noreactlogin: Disables React-based login UI (uses classic VGUI instead)
+            // --no-cef-sandbox: Disables CEF sandbox (Wine incompatibility)
+            val launchFlags = "-noreactlogin --no-cef-sandbox"
 
-            // Configure WineProgramLauncherComponent
+            // SIMPLE WINE COMMAND (2025-12-23)
+            val guestCommand = "wine explorer /desktop=shell,$screenSize $escapedPath $launchFlags"
+            AppLogger.i(TAG, "Simple Steam launch: $guestCommand")
+
+            // SIMPLE LAUNCHER CONFIGURATION (2025-12-23)
             val guestProgramLauncher = WineProgramLauncherComponent()
             guestProgramLauncher.setGuestExecutable(guestCommand)
-            // CRITICAL (2025-12-22): WoW64 mode REQUIRED for Steam.exe
-            // Steam.exe is 32-bit but Wine needs WoW64 layer to load ntdll.so properly
-            // Research confirmed: wine explorer + WoW64 is the standard Wine/Steam approach
-            // Sources: WineHQ Explorer Wiki, Steam Community Wine Guide
-            guestProgramLauncher.setWoW64Mode(true)
-            AppLogger.i(TAG, "Configured WoW64 mode for Steam.exe (32-bit app on 64-bit Wine)")
-
-            // CRITICAL: Use STABILITY preset for maximum reliability
-            // Both Box86 and Box64 presets for WoW64 mode (32-bit Steam + 64-bit Wine)
+            guestProgramLauncher.setWoW64Mode(true)  // Steam is 32-bit
             guestProgramLauncher.setBox86Preset(com.steamdeck.mobile.box86_64.Box86_64Preset.STABILITY)
             guestProgramLauncher.setBox64Preset(com.steamdeck.mobile.box86_64.Box86_64Preset.STABILITY)
-            AppLogger.i(TAG, "Applied Box86+Box64 STABILITY presets for WoW64")
+            AppLogger.i(TAG, "WoW64 + STABILITY preset enabled")
 
-            // CRITICAL: Set binding paths for PRoot to mount container drives
-            // This allows Wine to access C: drive (container's drive_c directory)
-            // Format: PRoot --bind={containerDir}:/{mountpoint}
-            val bindingPaths = arrayOf(containerDir.absolutePath)
-            guestProgramLauncher.setBindingPaths(bindingPaths)
-            AppLogger.d(TAG, "Set binding paths: ${bindingPaths.joinToString()}")
+            // SIMPLE ENVIRONMENT SETUP (2025-12-23)
+            guestProgramLauncher.setBindingPaths(arrayOf(containerDir.absolutePath))
 
-            // Set environment variables for Wine
             val envVars = EnvVars()
-            // CRITICAL: Set WINEPREFIX to container path (NOT rootfs)
-            // Wine needs to know which container prefix to use
             envVars.put("WINEPREFIX", "/root")
-            envVars.put("DISPLAY", ":0")  // X11 display for Wine GUI
-            // NOTE: WINEARCH removed - Wine is WoW64-only build (doesn't support win32)
-            // Steam.exe (32-bit) automatically runs via WoW64 on 64-bit Wine
-            envVars.put("WINEDEBUG", "+winsock,+wininet,+winhttp,+err")  // Network debugging
-            envVars.put("WINEESYNC", "1")  // Enable ESYNC for better performance
-            // NOTE: Virtual desktop mode disabled - Steam CEF requires normal windowed mode
-            // envVars.put("WINE_EXPLORER_DESKTOP", "shell,$screenSize")
-
-            // CRITICAL FIX (2025-12-22): BOX86/BOX64 settings via STABILITY preset
-            // User analysis: "WINEARCH removal" + "BOX86 settings" must be done as a SET
-            // - WINEARCH removed (WoW64-only build) → Wine starts properly
-            // - BOX86 preset (STABILITY) → Provides complete set of env vars (STRONGMEM=2, CALLRET=0, etc.)
-            // Manual env vars removed - they were overwriting preset values and missing critical settings
-            // WineProgramLauncherComponent applies preset via addBox86EnvVars() + addBox64EnvVars()
-            AppLogger.i(TAG, "Using STABILITY preset for BOX86/BOX64 (applied by WineProgramLauncherComponent)")
-
-            // DPI scaling: 100% (96 DPI = default)
-            // At native 2400x1080, Steam Big Picture should look good without scaling
-            envVars.put("WINE_DPI", "96")
-
-            envVars.put("MESA_GL_VERSION_OVERRIDE", "4.6")
-            envVars.put("MESA_GLSL_VERSION_OVERRIDE", "460")
-            envVars.put("MESA_DEBUG", "silent")
-            envVars.put("MESA_NO_ERROR", "1")
+            envVars.put("DISPLAY", ":0")
+            // DETAILED DEBUG (2025-12-23): Check why Steam exits immediately
+            envVars.put("WINEDEBUG", "+err,+warn,+steam,+winhttp,+ole,+shell")
             guestProgramLauncher.setEnvVars(envVars)
+            AppLogger.i(TAG, "Simple environment with detailed logging enabled")
 
             // Add termination callback (navigate back on exit)
             guestProgramLauncher.setTerminationCallback { status ->

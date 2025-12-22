@@ -194,16 +194,25 @@ class NativeUInputBridge @Inject constructor(
 
  companion object {
   private const val TAG = "NativeUInputBridge"
+
+  // Xbox 360 controller VID/PID
+  private const val XBOX360_VENDOR_ID = 0x045e
+  private const val XBOX360_PRODUCT_ID = 0x028e
+
   init {
    try {
     System.loadLibrary("uinput_bridge")
+    AppLogger.i(TAG, "Native library loaded successfully")
    } catch (e: UnsatisfiedLinkError) {
     AppLogger.w(TAG, "Native library not available: ${e.message}")
    }
   }
  }
 
- // Native methods (not implemented)
+ private var isInitialized = false
+ private var controllerId: Int = -1
+
+ // Native methods (implemented in uinput_jni.c)
  private external fun nativeInit(): Boolean
  private external fun nativeCreateVirtualController(
   name: String,
@@ -215,19 +224,91 @@ class NativeUInputBridge @Inject constructor(
  private external fun nativeDestroy()
 
  override fun initialize(): Result<Unit> {
-  return Result.failure(UnsupportedOperationException("Native uinput not yet implemented"))
+  return try {
+   if (isInitialized) {
+    AppLogger.w(TAG, "Already initialized")
+    return Result.success(Unit)
+   }
+
+   if (!nativeInit()) {
+    val errorMsg = "Failed to initialize uinput (/dev/uinput permission denied?)"
+    AppLogger.e(TAG, errorMsg)
+    return Result.failure(Exception(errorMsg))
+   }
+
+   controllerId = nativeCreateVirtualController(
+    "Steam Deck Mobile Controller",
+    XBOX360_VENDOR_ID,
+    XBOX360_PRODUCT_ID
+   )
+
+   if (controllerId < 0) {
+    val errorMsg = "Failed to create virtual controller"
+    AppLogger.e(TAG, errorMsg)
+    return Result.failure(Exception(errorMsg))
+   }
+
+   isInitialized = true
+   AppLogger.i(TAG, "Native uinput bridge initialized (controller ID: $controllerId)")
+   Result.success(Unit)
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Failed to initialize native uinput", e)
+   Result.failure(e)
+  }
  }
 
  override fun isInstalled(): Boolean {
-  return false // Not yet implemented
+  return isInitialized
  }
 
  override fun launch(): Result<Unit> {
-  return Result.failure(UnsupportedOperationException("Native uinput not yet implemented"))
+  // uinput is automatically recognized by kernel, no launch needed
+  return if (isInitialized) {
+   Result.success(Unit)
+  } else {
+   Result.failure(Exception("Not initialized"))
+  }
  }
 
  override fun cleanup() {
-  // nativeDestroy() when implemented
+  if (isInitialized) {
+   try {
+    nativeDestroy()
+    isInitialized = false
+    controllerId = -1
+    AppLogger.i(TAG, "Native uinput bridge cleaned up")
+   } catch (e: Exception) {
+    AppLogger.e(TAG, "Error during cleanup", e)
+   }
+  }
+ }
+
+ /**
+  * Send button event
+  * @param button Xbox button code (BTN_A=304, BTN_B=305, etc.)
+  * @param pressed true for press, false for release
+  * @return true on success, false on failure
+  */
+ fun sendButtonEvent(button: Int, pressed: Boolean): Boolean {
+  if (!isInitialized) {
+   AppLogger.w(TAG, "Not initialized, cannot send button event")
+   return false
+  }
+  return nativeSendButtonEvent(button, pressed)
+ }
+
+ /**
+  * Send axis event
+  * @param axis evdev axis code (ABS_X=0, ABS_Y=1, etc.)
+  * @param value -1.0 ~ 1.0 (Android value)
+  * @return true on success, false on failure
+  */
+ fun sendAxisEvent(axis: Int, value: Float): Boolean {
+  if (!isInitialized) {
+   AppLogger.w(TAG, "Not initialized, cannot send axis event")
+   return false
+  }
+  return nativeSendAxisEvent(axis, value)
  }
 
  /**
@@ -264,6 +345,37 @@ class NativeUInputBridge @Inject constructor(
 class InputBridgeNotInstalledException : Exception(
  "InputBridge app not installed. Please install from Google Play or https://inputbridge.net/"
 )
+
+/**
+ * Xbox 360 button code constants (Linux input event codes)
+ */
+object XboxButtonCodes {
+ const val BTN_A = 0x130      // 304
+ const val BTN_B = 0x131      // 305
+ const val BTN_X = 0x133      // 307
+ const val BTN_Y = 0x134      // 308
+ const val BTN_TL = 0x136     // 310 (LB)
+ const val BTN_TR = 0x137     // 311 (RB)
+ const val BTN_SELECT = 0x13a // 314 (Back)
+ const val BTN_START = 0x13b  // 315 (Start)
+ const val BTN_MODE = 0x13c   // 316 (Xbox button)
+ const val BTN_THUMBL = 0x13d // 317 (Left stick press)
+ const val BTN_THUMBR = 0x13e // 318 (Right stick press)
+}
+
+/**
+ * evdev axis code constants (Linux input event codes)
+ */
+object EvdevAxisCodes {
+ const val ABS_X = 0x00     // 0 (Left stick X)
+ const val ABS_Y = 0x01     // 1 (Left stick Y)
+ const val ABS_Z = 0x02     // 2 (Left trigger)
+ const val ABS_RX = 0x03    // 3 (Right stick X)
+ const val ABS_RY = 0x04    // 4 (Right stick Y)
+ const val ABS_RZ = 0x05    // 5 (Right trigger)
+ const val ABS_HAT0X = 0x10 // 16 (D-pad X)
+ const val ABS_HAT0Y = 0x11 // 17 (D-pad Y)
+}
 
 /**
  * Input bridge configuration

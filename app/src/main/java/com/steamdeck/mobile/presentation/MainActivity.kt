@@ -4,6 +4,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.InputDevice
+import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -12,9 +15,13 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
+import com.steamdeck.mobile.core.input.GameControllerManager
 import com.steamdeck.mobile.presentation.navigation.SteamDeckApp
 import com.steamdeck.mobile.presentation.theme.SteamDeckMobileTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * Main application Activity
@@ -25,6 +32,9 @@ import dagger.hilt.android.AndroidEntryPoint
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var gameControllerManager: GameControllerManager
 
     // Permission request launcher
     private val requestPermissionLauncher = registerForActivityResult(
@@ -110,5 +120,57 @@ class MainActivity : ComponentActivity() {
         if (hasFocus) {
             enableImmersiveMode()
         }
+    }
+
+    /**
+     * Dispatch key events to GameControllerManager
+     * Routes controller button presses to input routing system
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Check if event is from a game controller
+        val device = InputDevice.getDevice(event.deviceId)
+        val isGameController = device != null && (
+            device.sources and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
+            device.sources and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
+        )
+
+        if (isGameController) {
+            lifecycleScope.launch {
+                try {
+                    if (gameControllerManager.handleKeyEvent(event.deviceId, event)) {
+                        // Event handled by controller manager
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Error handling key event", e)
+                }
+            }
+        }
+
+        return super.dispatchKeyEvent(event)
+    }
+
+    /**
+     * Dispatch motion events to GameControllerManager
+     * Routes analog stick/trigger movements to input routing system
+     */
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        // Check if event is from a game controller
+        if (event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK ||
+            event.source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD) {
+
+            lifecycleScope.launch {
+                try {
+                    if (gameControllerManager.handleMotionEvent(event.deviceId, event)) {
+                        // Event handled by controller manager
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Error handling motion event", e)
+                }
+            }
+        }
+
+        return super.dispatchGenericMotionEvent(event)
     }
 }

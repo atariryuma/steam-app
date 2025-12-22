@@ -303,6 +303,10 @@
     <string name="install_complete_notification">%1$s is ready to play!</string>
     <string name="install_monitoring_notification">Monitoring installation…</string>
 
+    <!-- Steam Big Picture Mode Setting -->
+    <string name="setting_steam_big_picture_mode_title">Big Picture Mode</string>
+    <string name="setting_steam_big_picture_mode_description">Launch Steam in full-screen Big Picture mode (recommended for mobile)</string>
+
     <!-- XServer integration -->
     <string name="steam_display_initializing_xserver">Initializing Display Server…</string>
     <string name="steam_display_launching_steam">Launching Steam…</string>
@@ -350,5 +354,12 @@ Check:
 Try:
 1. Clear app cache
 2. Reinstall the app</string>
+
+    <!-- Controller Status -->
+    <string name="controller_connected">Controller Connected</string>
+    <string name="controller_disconnected">No Controller Connected</string>
+    <string name="controller_input_active">Input Active</string>
+    <string name="controller_uinput_failed">uinput initialization failed - Please use InputBridge app</string>
+    <string name="controller_count">%1$d controller(s) connected</string>
 
 </resources>

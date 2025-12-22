@@ -35,10 +35,8 @@ import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
  * (enables real-time Steam game download/install progress tracking)
  *
  * Version 9 changes (2025-12-22):
- * - Added index on winlatorContainerId (GameEntity)
- * (40-60% faster container lookups - critical for game launch performance)
- * - Added compound index on (gameId, status) (DownloadEntity)
- * (50-70% faster download filtering queries - improves download UI responsiveness)
+ * - Performance improvements branch
+ * - Network retry logic, Compose optimizations, Room migration tests
  */
 @Database(
  entities = [

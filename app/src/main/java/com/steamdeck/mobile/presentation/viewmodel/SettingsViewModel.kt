@@ -41,7 +41,8 @@ class SettingsViewModel @Inject constructor(
  private val steamLauncher: SteamLauncher,
  private val steamSetupManager: SteamSetupManager,
  private val steamAuthManager: com.steamdeck.mobile.core.steam.SteamAuthManager,
- private val steamConfigManager: com.steamdeck.mobile.core.steam.SteamConfigManager
+ private val steamConfigManager: com.steamdeck.mobile.core.steam.SteamConfigManager,
+ private val steamRepository: com.steamdeck.mobile.data.remote.steam.SteamRepository
 ) : ViewModel() {
 
  companion object {
@@ -305,6 +306,28 @@ class SettingsViewModel @Inject constructor(
 
    _syncState.value = SyncState.Syncing(progress = 0f, message = "Starting sync...")
    AppLogger.i(TAG, "Starting library sync for Steam ID: $steamId, Container ID: $containerId")
+
+   // Fetch username from Steam API if not already stored
+   val storedUsername = securePreferences.getSteamUsername().first()
+   if (storedUsername.isNullOrBlank()) {
+    val apiKey = currentData?.steamApiKey
+    if (!apiKey.isNullOrBlank()) {
+     try {
+      when (val playerResult = steamRepository.getPlayerSummary(apiKey, steamId)) {
+       is DataResult.Success -> {
+        val personaName = playerResult.data.personaName
+        securePreferences.saveSteamUsername(personaName)
+        AppLogger.i(TAG, "Saved Steam username: $personaName")
+       }
+       else -> {
+        AppLogger.w(TAG, "Failed to fetch Steam username: API returned error")
+       }
+      }
+     } catch (e: Exception) {
+      AppLogger.w(TAG, "Failed to fetch Steam username: ${e.message}")
+     }
+    }
+   }
 
    // Type-safe error handling using DataResult<Int>
    when (val result = syncSteamLibraryUseCase(steamId, containerId)) {

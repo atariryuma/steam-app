@@ -38,7 +38,8 @@ class SteamDisplayViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val securePreferences: com.steamdeck.mobile.domain.repository.ISecurePreferences,
     private val steamConfigManager: com.steamdeck.mobile.core.steam.SteamConfigManager,
-    private val steamAuthManager: com.steamdeck.mobile.core.steam.SteamAuthManager
+    private val steamAuthManager: com.steamdeck.mobile.core.steam.SteamAuthManager,
+    private val winlatorEmulator: com.steamdeck.mobile.core.winlator.WinlatorEmulator
 ) : ViewModel() {
 
     companion object {
@@ -317,74 +318,57 @@ class SteamDisplayViewModel @Inject constructor(
             renderer.setUnviewableWMClasses("progman", "shell_traywnd")  // Hide Windows desktop only
             AppLogger.i(TAG, "Simple mode: Hide desktop only, no forced fullscreen")
 
-            // STEAM LAUNCH WITH BACKSLASH ESCAPING (2025-12-23)
-            // User's proven solution for handling paths with spaces in Winlator
-            // Escape spaces with backslash instead of using quotes or 8.3 paths
-            val steamPath = "C:/Program Files (x86)/Steam/Steam.exe".escapeForWinlator()
-            val steamDir = "C:/Program Files (x86)/Steam".escapeForWinlator()
+            // STEAM LAUNCH - USE WINE START.EXE VIA WINLATOR (2025-12-23)
+            // CRITICAL APPROACH: wine start.exe → explorer.exe → Steam.exe (desktop environment)
+            // - WinlatorEmulator handles ALL environment setup (LD_LIBRARY_PATH, BOX64_LD_LIBRARY_PATH, WINEDLLPATH, etc.)
+            // - start.exe launches Steam via explorer.exe → creates desktop environment → X11 driver loads
+            // - Direct Steam.exe execution caused "nodrv_CreateWindow" (X11 driver not loading)
+            // - Evidence: Previous logs showed "wine explorer /desktop=shell" successfully opened desktop
 
-            // STEAM LAUNCH WITH WINE DESKTOP SHELL (2025-12-23)
-            // CRITICAL: Steam requires Wine desktop shell to create X11 windows
-            // Restored from working log: wine explorer /desktop=shell,1280x720 path args
-            // This successfully launched desktop, need to fix Steam execution
-            val screenSize = "1280x720"
-            val guestCommand = "wine explorer /desktop=shell,$screenSize $steamPath --no-cef-sandbox -tenfoot"
-            AppLogger.i(TAG, "Launching Wine desktop + Steam (restored from logs): $guestCommand")
-            AppLogger.i(TAG, "Desktop: shell,$screenSize | Steam path: $steamPath | Flags: --no-cef-sandbox -tenfoot")
-
-            // SIMPLE LAUNCHER CONFIGURATION (2025-12-23)
-            val guestProgramLauncher = WineProgramLauncherComponent()
-            guestProgramLauncher.setGuestExecutable(guestCommand)
-            guestProgramLauncher.setWoW64Mode(true)  // Steam is 32-bit
-            guestProgramLauncher.setBox86Preset(com.steamdeck.mobile.box86_64.Box86_64Preset.STABILITY)
-            guestProgramLauncher.setBox64Preset(com.steamdeck.mobile.box86_64.Box86_64Preset.STABILITY)
-            AppLogger.i(TAG, "WoW64 + STABILITY preset enabled")
-
-            // ENVIRONMENT SETUP WITH USER'S PROVEN CONFIGURATION (2025-12-23)
-            guestProgramLauncher.setBindingPaths(arrayOf(containerDir.absolutePath))
-
-            val envVars = EnvVars()
-            envVars.put("WINEPREFIX", "/root")
-            envVars.put("DISPLAY", ":0")
-
-            // X11 library path for Steam GUI (CRITICAL for window creation)
-            envVars.put("LD_LIBRARY_PATH", "/usr/lib:/lib")
-
-            // Wine configuration
-            envVars.put("WINEDEBUG", "-all,+err")  // Minimal logging for performance
-            envVars.put("WINEESYNC", "1")  // Enable ESYNC for better performance
-            envVars.put("WINEDLLOVERRIDES", "mscoree,mshtml=")  // Disable .NET and IE to prevent popup dialogs
-            // Note: WINEARCH removed per user's config (auto-detect from container)
-
-            // Box86 emulation settings for 32-bit Steam.exe
-            envVars.put("BOX86_DYNAREC_STRONGMEM", "1")  // Strong memory ordering (compatibility)
-            envVars.put("BOX86_DYNAREC_CALLRET", "0")  // Disable call/ret optimization (stability)
-            envVars.put("BOX86_NOGTK", "1")  // Disable GTK wrapping (Steam uses Qt)
-
-            // Box64 emulation settings for 64-bit Wine host
-            envVars.put("BOX64_DYNAREC_STRONGMEM", "1")  // Strong memory ordering (compatibility)
-            envVars.put("BOX64_DYNAREC_CALLRET", "0")  // Disable call/ret optimization (stability)
-            envVars.put("BOX64_DYNAREC_BLEEDING_EDGE", "0")  // Disable experimental optimizations (stability)
-
-            // Mesa/OpenGL configuration
-            envVars.put("MESA_GL_VERSION_OVERRIDE", "4.6")
-            envVars.put("MESA_GLSL_VERSION_OVERRIDE", "460")
-            envVars.put("MESA_DEBUG", "silent")
-            envVars.put("MESA_NO_ERROR", "1")
-
-            guestProgramLauncher.setEnvVars(envVars)
-            AppLogger.i(TAG, "Applied user's proven environment configuration with Box86/64 stability settings")
-
-            // Add termination callback (navigate back on exit)
-            guestProgramLauncher.setTerminationCallback { status ->
-                AppLogger.i(TAG, "Steam process terminated with status: $status")
-                viewModelScope.launch {
-                    _uiState.value = SteamDisplayUiState.Error("Steam closed (exit code: $status)")
-                }
+            // Get Winlator container (Steam is installed in container, not rootfs)
+            AppLogger.i(TAG, "Getting Winlator container: $containerId")
+            val containersResult = winlatorEmulator.listContainers()
+            if (containersResult.isFailure) {
+                AppLogger.e(TAG, "Failed to list containers: ${containersResult.exceptionOrNull()?.message}")
+                xEnvironment?.stopEnvironmentComponents()
+                return@withContext false
             }
 
-            xEnvironment?.addComponent(guestProgramLauncher)
-            AppLogger.d(TAG, "Added WineProgramLauncherComponent to environment")
+            val containers = containersResult.getOrNull() ?: emptyList()
+            val emulatorContainer = containers.firstOrNull { it.id == containerId }
+            if (emulatorContainer == null) {
+                AppLogger.e(TAG, "Container not found: $containerId")
+                xEnvironment?.stopEnvironmentComponents()
+                return@withContext false
+            }
+
+            // APPROACH 3 (2025-12-23): Direct Steam.exe execution (same as game launching)
+            // Previous attempts:
+            // 1. wine explorer /desktop=shell,SIZE cmd /c start → Desktop opens but Steam doesn't start
+            // 2. wine start.exe → Steam.exe launches but nodrv_CreateWindow error
+            //
+            // NEW APPROACH: Use EXACT same method as SteamLauncher.kt (game launching)
+            // - Direct launchExecutable(Steam.exe, arguments)
+            // - No start.exe, no explorer.exe, no desktop shell
+            // - If game launching works, this should work too
+
+            // Steam.exe path
+            val steamExeFile = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/Steam.exe")
+            if (!steamExeFile.exists()) {
+                AppLogger.e(TAG, "Steam not found: ${steamExeFile.absolutePath}")
+                xEnvironment?.stopEnvironmentComponents()
+                return@withContext false
+            }
+
+            AppLogger.i(TAG, "Launching Steam directly (same method as game launching)")
+            AppLogger.i(TAG, "Steam path: ${steamExeFile.absolutePath}")
+
+            // Direct Steam.exe arguments (no start.exe wrapper)
+            // -lognetapi: Network API debug logging
+            // -vgui: Legacy VGUI interface (more stable than CEF)
+            // --no-cef-sandbox: Disable CEF sandboxing for Wine compatibility
+            val steamArguments = listOf("-lognetapi", "-vgui", "--no-cef-sandbox")
+            AppLogger.i(TAG, "Steam arguments: $steamArguments")
 
             // CRITICAL FIX (2025-12-22): Start XServerComponent FIRST, THEN Wine
             // Problem: startEnvironmentComponents() launches ALL components simultaneously
@@ -415,10 +399,33 @@ class SteamDisplayViewModel @Inject constructor(
 
             AppLogger.i(TAG, "XServer socket ready: ${socketConfig.path}")
 
-            // NOW start Wine launcher (socket is ready, Wine can connect immediately)
-            AppLogger.i(TAG, "Socket verified, starting Wine launcher...")
-            guestProgramLauncher.start()
-            AppLogger.i(TAG, "Wine launcher started successfully")
+            // NOW launch Steam directly (socket is ready, Wine can connect immediately)
+            AppLogger.i(TAG, "Socket verified, launching Steam.exe directly...")
+            val launchResult = winlatorEmulator.launchExecutable(
+                container = emulatorContainer,
+                executable = steamExeFile,  // Launch Steam.exe directly (same as game launching)
+                arguments = steamArguments
+            )
+
+            if (launchResult.isFailure) {
+                val error = launchResult.exceptionOrNull()
+                AppLogger.e(TAG, "Failed to launch Steam: ${error?.message}")
+                xEnvironment?.stopEnvironmentComponents()
+                return@withContext false
+            }
+
+            val steamProcess = launchResult.getOrElse {
+                AppLogger.e(TAG, "Failed to get Steam process handle: ${it.message}")
+                xEnvironment?.stopEnvironmentComponents()
+                return@withContext false
+            }
+
+            AppLogger.i(TAG, "Steam launched successfully (direct execution)")
+            AppLogger.i(TAG, "Steam.exe process PID: ${steamProcess.pid}")
+            AppLogger.i(TAG, "Using same launch method as game execution via SteamLauncher.kt")
+
+            // NOTE: Process monitoring is handled by WinlatorEmulator internally
+            // Steam will run in background, displaying in XServer view
 
             true
 

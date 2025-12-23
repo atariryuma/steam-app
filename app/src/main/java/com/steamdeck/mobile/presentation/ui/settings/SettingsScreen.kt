@@ -1045,7 +1045,7 @@ private fun SteamClientContent(
 
     is SteamInstallState.Installed -> {
      // Switch UI based on authentication state
-     if (isAuthenticated && steamUsername != null) {
+     if (isAuthenticated && !steamUsername.isNullOrBlank()) {
       // Authenticated: Auto-login configured, ready to use
       SteamInstalledAuthenticatedContent(
        installPath = state.installPath,
@@ -2652,275 +2652,278 @@ private fun SteamInstalledUnauthenticatedContent(
 ) {
  var showAdvancedOptions by remember { mutableStateOf(false) }
 
- // Header with success icon
- Row(
+ Column(
   modifier = Modifier.fillMaxWidth(),
-  verticalAlignment = Alignment.CenterVertically,
-  horizontalArrangement = Arrangement.spacedBy(16.dp)
+  verticalArrangement = Arrangement.spacedBy(16.dp)
  ) {
-  Surface(
-   shape = RoundedCornerShape(12.dp),
-   color = SteamColorPalette.Green.copy(alpha = 0.2f)
+  // Header with success icon
+  Row(
+   modifier = Modifier.fillMaxWidth(),
+   verticalAlignment = Alignment.CenterVertically,
+   horizontalArrangement = Arrangement.spacedBy(16.dp)
   ) {
-   Icon(
-    imageVector = Icons.Default.CheckCircle,
-    contentDescription = null,
-    modifier = Modifier
-     .size(56.dp)
-     .padding(12.dp),
-    tint = SteamColorPalette.Green
-   )
-  }
-  Column(modifier = Modifier.weight(1f)) {
-   Text(
-    text = stringResource(R.string.steam_client_title),
-    style = MaterialTheme.typography.titleLarge.copy(
-     fontWeight = FontWeight.Bold
-    ),
-    color = Color.White
-   )
-   Text(
-    text = stringResource(R.string.steam_status_installed),
-    style = MaterialTheme.typography.bodyMedium,
-    color = SteamColorPalette.Green
-   )
-  }
- }
-
- // Divider
- Box(
-  modifier = Modifier
-   .fillMaxWidth()
-   .height(1.dp)
-   .background(SteamColorPalette.Medium)
- )
-
- // Next step guidance
- Surface(
-  shape = RoundedCornerShape(6.dp),
-  color = SteamColorPalette.Blue.copy(alpha = 0.15f)
- ) {
-  Column(
-   modifier = Modifier
-    .fillMaxWidth()
-    .padding(16.dp),
-   verticalArrangement = Arrangement.spacedBy(12.dp)
-  ) {
-   Row(
-    horizontalArrangement = Arrangement.spacedBy(12.dp),
-    verticalAlignment = Alignment.CenterVertically
+   Surface(
+    shape = RoundedCornerShape(12.dp),
+    color = SteamColorPalette.Green.copy(alpha = 0.2f)
    ) {
     Icon(
-     imageVector = Icons.Default.Info,
+     imageVector = Icons.Default.CheckCircle,
      contentDescription = null,
-     tint = SteamColorPalette.Blue,
-     modifier = Modifier.size(24.dp)
-    )
-    Text(
-     text = stringResource(R.string.steam_next_step_auth),
-     style = MaterialTheme.typography.titleSmall.copy(
-      fontWeight = FontWeight.Bold
-     ),
-     color = SteamColorPalette.Blue
+     modifier = Modifier
+      .size(56.dp)
+      .padding(12.dp),
+     tint = SteamColorPalette.Green
     )
    }
-   Text(
-    text = stringResource(R.string.steam_auth_required_description),
-    style = MaterialTheme.typography.bodyMedium,
-    color = SteamColorPalette.LightText,
-    lineHeight = 20.sp
-   )
-  }
- }
-
- // PRIMARY: Next step button (Navigate to Authentication)
- Button(
-  onClick = onNavigateToAuth,
-  modifier = Modifier
-   .fillMaxWidth()
-   .height(48.dp),
-  colors = ButtonDefaults.buttonColors(
-   containerColor = Color.Transparent
-  ),
-  shape = RoundedCornerShape(4.dp),
-  contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
- ) {
-  Box(
-   modifier = Modifier
-    .fillMaxSize()
-    .background(
-     brush = Brush.linearGradient(
-      colors = listOf(
-       SteamColorPalette.Green,
-       SteamColorPalette.Green.copy(alpha = 0.8f)
-      )
-     )
-    ),
-   contentAlignment = Alignment.Center
-  ) {
-   Row(
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-    verticalAlignment = Alignment.CenterVertically
-   ) {
+   Column(modifier = Modifier.weight(1f)) {
     Text(
-     text = stringResource(R.string.button_next_authenticate),
-     style = MaterialTheme.typography.titleMedium.copy(
+     text = stringResource(R.string.steam_client_title),
+     style = MaterialTheme.typography.titleLarge.copy(
       fontWeight = FontWeight.Bold
      ),
      color = Color.White
     )
-    Icon(
-     imageVector = Icons.Default.KeyboardArrowRight,
-     contentDescription = null,
-     tint = Color.White
+    Text(
+     text = stringResource(R.string.steam_status_installed),
+     style = MaterialTheme.typography.bodyMedium,
+     color = SteamColorPalette.Green
     )
    }
   }
- }
 
- // ADVANCED: Collapsible section
- Column(
-  modifier = Modifier.fillMaxWidth(),
-  verticalArrangement = Arrangement.spacedBy(12.dp)
- ) {
-  // Divider with text
-  Row(
-   modifier = Modifier.fillMaxWidth(),
-   verticalAlignment = Alignment.CenterVertically,
-   horizontalArrangement = Arrangement.spacedBy(8.dp)
+  // Divider
+  Box(
+   modifier = Modifier
+    .fillMaxWidth()
+    .height(1.dp)
+    .background(SteamColorPalette.Medium)
+  )
+
+  // Next step guidance
+  Surface(
+   shape = RoundedCornerShape(6.dp),
+   color = SteamColorPalette.Blue.copy(alpha = 0.15f)
+  ) {
+   Column(
+    modifier = Modifier
+     .fillMaxWidth()
+     .padding(16.dp),
+    verticalArrangement = Arrangement.spacedBy(12.dp)
+   ) {
+    Row(
+     horizontalArrangement = Arrangement.spacedBy(12.dp),
+     verticalAlignment = Alignment.CenterVertically
+    ) {
+     Icon(
+      imageVector = Icons.Default.Info,
+      contentDescription = null,
+      tint = SteamColorPalette.Blue,
+      modifier = Modifier.size(24.dp)
+     )
+     Text(
+      text = stringResource(R.string.steam_next_step_auth),
+      style = MaterialTheme.typography.titleSmall.copy(
+       fontWeight = FontWeight.Bold
+      ),
+      color = SteamColorPalette.Blue
+     )
+    }
+    Text(
+     text = stringResource(R.string.steam_auth_required_description),
+     style = MaterialTheme.typography.bodyMedium,
+     color = SteamColorPalette.LightText,
+     lineHeight = 20.sp
+    )
+   }
+  }
+
+  // PRIMARY: Next step button (Navigate to Authentication)
+  Button(
+   onClick = onNavigateToAuth,
+   modifier = Modifier
+    .fillMaxWidth()
+    .height(48.dp),
+   colors = ButtonDefaults.buttonColors(
+    containerColor = Color.Transparent
+   ),
+   shape = RoundedCornerShape(4.dp),
+   contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
   ) {
    Box(
     modifier = Modifier
-     .weight(1f)
-     .height(1.dp)
-     .background(SteamColorPalette.Medium)
-   )
-   TextButton(
-    onClick = { showAdvancedOptions = !showAdvancedOptions }
-   ) {
-    Text(
-     text = if (showAdvancedOptions)
-      stringResource(R.string.button_hide_advanced)
-     else
-      stringResource(R.string.button_advanced_options),
-     style = MaterialTheme.typography.labelMedium,
-     color = SteamColorPalette.Gray
-    )
-    Spacer(modifier = Modifier.width(4.dp))
-    Icon(
-     imageVector = if (showAdvancedOptions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-     contentDescription = null,
-     tint = SteamColorPalette.Gray,
-     modifier = Modifier.size(18.dp)
-    )
-   }
-   Box(
-    modifier = Modifier
-     .weight(1f)
-     .height(1.dp)
-     .background(SteamColorPalette.Medium)
-   )
-  }
-
-  // Advanced options content
-  if (showAdvancedOptions) {
-   Column(
-    verticalArrangement = Arrangement.spacedBy(12.dp)
-   ) {
-    // Warning box
-    Surface(
-     shape = RoundedCornerShape(6.dp),
-     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-    ) {
-     Row(
-      modifier = Modifier
-       .fillMaxWidth()
-       .padding(12.dp),
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-      verticalAlignment = Alignment.CenterVertically
-     ) {
-      Icon(
-       imageVector = Icons.Default.Warning,
-       contentDescription = null,
-       tint = MaterialTheme.colorScheme.error,
-       modifier = Modifier.size(20.dp)
+     .fillMaxSize()
+     .background(
+      brush = Brush.linearGradient(
+       colors = listOf(
+        SteamColorPalette.Green,
+        SteamColorPalette.Green.copy(alpha = 0.8f)
+       )
       )
-      Text(
-       text = stringResource(R.string.steam_manual_login_warning),
-       style = MaterialTheme.typography.bodySmall,
-       color = MaterialTheme.colorScheme.onErrorContainer
-      )
-     }
-    }
-
-    // Install path
-    Surface(
-     shape = RoundedCornerShape(6.dp),
-     color = SteamColorPalette.Medium.copy(alpha = 0.3f)
+     ),
+    contentAlignment = Alignment.Center
+   ) {
+    Row(
+     horizontalArrangement = Arrangement.spacedBy(8.dp),
+     verticalAlignment = Alignment.CenterVertically
     ) {
      Text(
-      text = "Install path:\n$installPath",
-      style = MaterialTheme.typography.bodySmall.copy(
-       fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+      text = stringResource(R.string.button_next_authenticate),
+      style = MaterialTheme.typography.titleMedium.copy(
+       fontWeight = FontWeight.Bold
       ),
-      color = SteamColorPalette.Gray,
-      modifier = Modifier
-       .fillMaxWidth()
-       .padding(12.dp)
+      color = Color.White
+     )
+     Icon(
+      imageVector = Icons.Default.KeyboardArrowRight,
+      contentDescription = null,
+      tint = Color.White
      )
     }
+   }
+  }
 
-    // Manual open button (no auto-login)
-    OutlinedButton(
-     onClick = { onOpen(containerId) },
-     modifier = Modifier.fillMaxWidth(),
-     colors = ButtonDefaults.outlinedButtonColors(
-      contentColor = SteamColorPalette.Blue
-     ),
-     border = BorderStroke(1.dp, SteamColorPalette.Blue),
-     shape = RoundedCornerShape(4.dp)
+  // ADVANCED: Collapsible section
+  Column(
+   modifier = Modifier.fillMaxWidth(),
+   verticalArrangement = Arrangement.spacedBy(12.dp)
+  ) {
+   // Divider with text
+   Row(
+    modifier = Modifier.fillMaxWidth(),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(8.dp)
+   ) {
+    Box(
+     modifier = Modifier
+      .weight(1f)
+      .height(1.dp)
+      .background(SteamColorPalette.Medium)
+    )
+    TextButton(
+     onClick = { showAdvancedOptions = !showAdvancedOptions }
     ) {
+     Text(
+      text = if (showAdvancedOptions)
+       stringResource(R.string.button_hide_advanced)
+      else
+       stringResource(R.string.button_advanced_options),
+      style = MaterialTheme.typography.labelMedium,
+      color = SteamColorPalette.Gray
+     )
+     Spacer(modifier = Modifier.width(4.dp))
      Icon(
-      imageVector = Icons.Default.SportsEsports,
+      imageVector = if (showAdvancedOptions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
       contentDescription = null,
+      tint = SteamColorPalette.Gray,
       modifier = Modifier.size(18.dp)
      )
-     Spacer(modifier = Modifier.width(6.dp))
-     Text(
-      text = stringResource(R.string.steam_open_client),
-      style = MaterialTheme.typography.titleSmall
-     )
     }
-
-    Text(
-     text = stringResource(R.string.steam_manual_login_note),
-     style = MaterialTheme.typography.bodySmall,
-     color = SteamColorPalette.Gray,
-     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+    Box(
+     modifier = Modifier
+      .weight(1f)
+      .height(1.dp)
+      .background(SteamColorPalette.Medium)
     )
    }
+
+   // Advanced options content
+   if (showAdvancedOptions) {
+    Column(
+     verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+     // Warning box
+     Surface(
+      shape = RoundedCornerShape(6.dp),
+      color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+     ) {
+      Row(
+       modifier = Modifier
+        .fillMaxWidth()
+        .padding(12.dp),
+       horizontalArrangement = Arrangement.spacedBy(12.dp),
+       verticalAlignment = Alignment.CenterVertically
+      ) {
+       Icon(
+        imageVector = Icons.Default.Warning,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.error,
+        modifier = Modifier.size(20.dp)
+       )
+       Text(
+        text = stringResource(R.string.steam_manual_login_warning),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onErrorContainer
+       )
+      }
+     }
+
+     // Install path
+     Surface(
+      shape = RoundedCornerShape(6.dp),
+      color = SteamColorPalette.Medium.copy(alpha = 0.3f)
+     ) {
+      Text(
+       text = "Install path:\n$installPath",
+       style = MaterialTheme.typography.bodySmall.copy(
+        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+       ),
+       color = SteamColorPalette.Gray,
+       modifier = Modifier
+        .fillMaxWidth()
+        .padding(12.dp)
+      )
+     }
+
+     // Manual open button (no auto-login)
+     OutlinedButton(
+      onClick = { onOpen(containerId) },
+      modifier = Modifier.fillMaxWidth(),
+      colors = ButtonDefaults.outlinedButtonColors(
+       contentColor = SteamColorPalette.Blue
+      ),
+      border = BorderStroke(1.dp, SteamColorPalette.Blue),
+      shape = RoundedCornerShape(4.dp)
+     ) {
+      Icon(
+       imageVector = Icons.Default.SportsEsports,
+       contentDescription = null,
+       modifier = Modifier.size(18.dp)
+      )
+      Spacer(modifier = Modifier.width(6.dp))
+      Text(
+       text = stringResource(R.string.steam_open_client),
+       style = MaterialTheme.typography.titleSmall
+      )
+     }
+
+     Text(
+      text = stringResource(R.string.steam_manual_login_note),
+      style = MaterialTheme.typography.bodySmall,
+      color = SteamColorPalette.Gray,
+      fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+     )
+    }
+   }
   }
- }
 
- Spacer(modifier = Modifier.height(8.dp))
-
- // DESTRUCTIVE: Uninstall button
- OutlinedButton(
-  onClick = { onUninstall(containerId) },
-  modifier = Modifier.fillMaxWidth(),
-  colors = ButtonDefaults.outlinedButtonColors(
-   contentColor = SteamColorPalette.Gray
-  ),
-  border = BorderStroke(1.dp, SteamColorPalette.Gray),
-  shape = RoundedCornerShape(4.dp)
- ) {
-  Icon(
-   imageVector = Icons.Default.Clear,
-   contentDescription = null,
-   modifier = Modifier.size(18.dp)
-  )
-  Spacer(modifier = Modifier.width(6.dp))
-  Text(stringResource(R.string.button_uninstall))
+  // DESTRUCTIVE: Uninstall button
+  OutlinedButton(
+   onClick = { onUninstall(containerId) },
+   modifier = Modifier.fillMaxWidth(),
+   colors = ButtonDefaults.outlinedButtonColors(
+    contentColor = SteamColorPalette.Gray
+   ),
+   border = BorderStroke(1.dp, SteamColorPalette.Gray),
+   shape = RoundedCornerShape(4.dp)
+  ) {
+   Icon(
+    imageVector = Icons.Default.Clear,
+    contentDescription = null,
+    modifier = Modifier.size(18.dp)
+   )
+   Spacer(modifier = Modifier.width(6.dp))
+   Text(stringResource(R.string.button_uninstall))
+  }
  }
 }
 
@@ -2943,179 +2946,169 @@ private fun SteamInstalledAuthenticatedContent(
  onOpen: (String) -> Unit,
  onUninstall: (String) -> Unit
 ) {
- // Header with success icon
- Row(
+ Column(
   modifier = Modifier.fillMaxWidth(),
-  verticalAlignment = Alignment.CenterVertically,
-  horizontalArrangement = Arrangement.spacedBy(16.dp)
+  verticalArrangement = Arrangement.spacedBy(16.dp)
  ) {
-  Surface(
-   shape = RoundedCornerShape(12.dp),
-   color = SteamColorPalette.Green.copy(alpha = 0.2f)
+  // Header with success icon
+  Row(
+   modifier = Modifier.fillMaxWidth(),
+   verticalAlignment = Alignment.CenterVertically,
+   horizontalArrangement = Arrangement.spacedBy(16.dp)
   ) {
-   Icon(
-    imageVector = Icons.Default.CheckCircle,
-    contentDescription = null,
-    modifier = Modifier
-     .size(56.dp)
-     .padding(12.dp),
-    tint = SteamColorPalette.Green
-   )
-  }
-  Column(modifier = Modifier.weight(1f)) {
-   Text(
-    text = stringResource(R.string.steam_client_title),
-    style = MaterialTheme.typography.titleLarge.copy(
-     fontWeight = FontWeight.Bold
-    ),
-    color = Color.White
-   )
-   Text(
-    text = stringResource(R.string.steam_status_installed_authenticated),
-    style = MaterialTheme.typography.bodyMedium,
-    color = SteamColorPalette.Green
-   )
-  }
- }
-
- // Divider
- Box(
-  modifier = Modifier
-   .fillMaxWidth()
-   .height(1.dp)
-   .background(SteamColorPalette.Medium)
- )
-
- // Auto-login configured status
- Surface(
-  shape = RoundedCornerShape(6.dp),
-  color = SteamColorPalette.Green.copy(alpha = 0.1f)
- ) {
-  Column(
-   modifier = Modifier
-    .fillMaxWidth()
-    .padding(16.dp),
-   verticalArrangement = Arrangement.spacedBy(8.dp)
-  ) {
-   Row(
-    horizontalArrangement = Arrangement.spacedBy(12.dp),
-    verticalAlignment = Alignment.CenterVertically
+   Surface(
+    shape = RoundedCornerShape(12.dp),
+    color = SteamColorPalette.Green.copy(alpha = 0.2f)
    ) {
     Icon(
      imageVector = Icons.Default.CheckCircle,
      contentDescription = null,
-     tint = SteamColorPalette.Green,
-     modifier = Modifier.size(20.dp)
-    )
-    Text(
-     text = stringResource(R.string.steam_autologin_configured),
-     style = MaterialTheme.typography.titleSmall.copy(
-      fontWeight = FontWeight.Bold
-     ),
-     color = SteamColorPalette.Green
+     modifier = Modifier
+      .size(56.dp)
+      .padding(12.dp),
+     tint = SteamColorPalette.Green
     )
    }
-   Row(
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-    verticalAlignment = Alignment.CenterVertically
-   ) {
+   Column(modifier = Modifier.weight(1f)) {
     Text(
-     text = stringResource(R.string.steam_account_label),
-     style = MaterialTheme.typography.bodySmall,
-     color = SteamColorPalette.Gray
-    )
-    Text(
-     text = steamUsername,
-     style = MaterialTheme.typography.bodySmall.copy(
-      fontWeight = FontWeight.Bold,
-      fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-     ),
-     color = SteamColorPalette.LightText
-    )
-   }
-  }
- }
-
- // Install path
- Surface(
-  shape = RoundedCornerShape(6.dp),
-  color = SteamColorPalette.Medium.copy(alpha = 0.3f)
- ) {
-  Text(
-   text = "Install path:\n$installPath",
-   style = MaterialTheme.typography.bodySmall.copy(
-    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-   ),
-   color = SteamColorPalette.Gray,
-   modifier = Modifier
-    .fillMaxWidth()
-    .padding(12.dp)
-  )
- }
-
- // PRIMARY: Open Steam Client button (with auto-login)
- Button(
-  onClick = { onOpen(containerId) },
-  modifier = Modifier
-   .fillMaxWidth()
-   .height(48.dp),
-  colors = ButtonDefaults.buttonColors(
-   containerColor = Color.Transparent
-  ),
-  shape = RoundedCornerShape(4.dp),
-  contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
- ) {
-  Box(
-   modifier = Modifier
-    .fillMaxSize()
-    .background(
-     brush = Brush.linearGradient(
-      colors = listOf(
-       SteamColorPalette.BrightBlue,
-       SteamColorPalette.DeepBlue
-      )
-     )
-    ),
-   contentAlignment = Alignment.Center
-  ) {
-   Row(
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-    verticalAlignment = Alignment.CenterVertically
-   ) {
-    Icon(
-     imageVector = Icons.Default.SportsEsports,
-     contentDescription = null,
-     tint = Color.White
-    )
-    Text(
-     text = stringResource(R.string.steam_open_client),
-     style = MaterialTheme.typography.titleMedium.copy(
+     text = stringResource(R.string.steam_client_title),
+     style = MaterialTheme.typography.titleLarge.copy(
       fontWeight = FontWeight.Bold
      ),
      color = Color.White
     )
+    Text(
+     text = stringResource(R.string.steam_status_installed_authenticated),
+     style = MaterialTheme.typography.bodyMedium,
+     color = SteamColorPalette.Green
+    )
    }
   }
- }
 
- Spacer(modifier = Modifier.height(16.dp))
-
- // Uninstall button
- OutlinedButton(
-  onClick = { onUninstall(containerId) },
-  modifier = Modifier.fillMaxWidth(),
-  colors = ButtonDefaults.outlinedButtonColors(
-   contentColor = SteamColorPalette.Gray
-  ),
-  border = BorderStroke(1.dp, SteamColorPalette.Gray),
-  shape = RoundedCornerShape(4.dp)
- ) {
-  Icon(
-   imageVector = Icons.Default.Clear,
-   contentDescription = null,
-   modifier = Modifier.size(18.dp)
+  // Divider
+  Box(
+   modifier = Modifier
+    .fillMaxWidth()
+    .height(1.dp)
+    .background(SteamColorPalette.Medium)
   )
-  Spacer(modifier = Modifier.width(6.dp))
-  Text(stringResource(R.string.button_uninstall))
+
+  // Auto-login configured status
+  Surface(
+   shape = RoundedCornerShape(6.dp),
+   color = SteamColorPalette.Green.copy(alpha = 0.1f)
+  ) {
+   Column(
+    modifier = Modifier
+     .fillMaxWidth()
+     .padding(16.dp),
+    verticalArrangement = Arrangement.spacedBy(8.dp)
+   ) {
+    Row(
+     horizontalArrangement = Arrangement.spacedBy(12.dp),
+     verticalAlignment = Alignment.CenterVertically
+    ) {
+     Icon(
+      imageVector = Icons.Default.CheckCircle,
+      contentDescription = null,
+      tint = SteamColorPalette.Green,
+      modifier = Modifier.size(20.dp)
+     )
+     Text(
+      text = stringResource(R.string.steam_autologin_configured),
+      style = MaterialTheme.typography.titleSmall.copy(
+       fontWeight = FontWeight.Bold
+      ),
+      color = SteamColorPalette.Green
+     )
+    }
+    Text(
+     text = stringResource(R.string.steam_account_label, steamUsername),
+     style = MaterialTheme.typography.bodySmall,
+     color = SteamColorPalette.Gray
+    )
+   }
+  }
+
+  // Install path
+  Surface(
+   shape = RoundedCornerShape(6.dp),
+   color = SteamColorPalette.Medium.copy(alpha = 0.3f)
+  ) {
+   Text(
+    text = "Install path:\n$installPath",
+    style = MaterialTheme.typography.bodySmall.copy(
+     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+    ),
+    color = SteamColorPalette.Gray,
+    modifier = Modifier
+     .fillMaxWidth()
+     .padding(12.dp)
+   )
+  }
+
+  // PRIMARY: Open Steam Client button (with auto-login)
+  Button(
+   onClick = { onOpen(containerId) },
+   modifier = Modifier
+    .fillMaxWidth()
+    .height(48.dp),
+   colors = ButtonDefaults.buttonColors(
+    containerColor = Color.Transparent
+   ),
+   shape = RoundedCornerShape(4.dp),
+   contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+  ) {
+   Box(
+    modifier = Modifier
+     .fillMaxSize()
+     .background(
+      brush = Brush.linearGradient(
+       colors = listOf(
+        SteamColorPalette.BrightBlue,
+        SteamColorPalette.DeepBlue
+       )
+      )
+     ),
+    contentAlignment = Alignment.Center
+   ) {
+    Row(
+     horizontalArrangement = Arrangement.spacedBy(8.dp),
+     verticalAlignment = Alignment.CenterVertically
+    ) {
+     Icon(
+      imageVector = Icons.Default.SportsEsports,
+      contentDescription = null,
+      tint = Color.White
+     )
+     Text(
+      text = stringResource(R.string.steam_open_client),
+      style = MaterialTheme.typography.titleMedium.copy(
+       fontWeight = FontWeight.Bold
+      ),
+      color = Color.White
+     )
+    }
+   }
+  }
+
+  // Uninstall button
+  OutlinedButton(
+   onClick = { onUninstall(containerId) },
+   modifier = Modifier.fillMaxWidth(),
+   colors = ButtonDefaults.outlinedButtonColors(
+    contentColor = SteamColorPalette.Gray
+   ),
+   border = BorderStroke(1.dp, SteamColorPalette.Gray),
+   shape = RoundedCornerShape(4.dp)
+  ) {
+   Icon(
+    imageVector = Icons.Default.Clear,
+    contentDescription = null,
+    modifier = Modifier.size(18.dp)
+   )
+   Spacer(modifier = Modifier.width(6.dp))
+   Text(stringResource(R.string.button_uninstall))
+  }
  }
 }

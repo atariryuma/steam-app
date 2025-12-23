@@ -666,6 +666,19 @@ class WinlatorEmulator @Inject constructor(
     AppLogger.i(TAG, "Wine DNS registry configured successfully")
    }
 
+   // CRITICAL FIX (2025-12-23): Configure Wine to use X11 graphics driver
+   // Problem: Without this registry setting, Wine defaults to "null" driver (nodrv)
+   // This causes "nodrv_CreateWindow: Application tried to create a window, but no driver could be loaded"
+   // Solution: Set HKEY_CURRENT_USER\Software\Wine\Drivers "Graphics"="x11"
+   AppLogger.i(TAG, "Configuring Wine X11 graphics driver...")
+   val x11DriverResult = setWineX11Driver(containerDir)
+   if (x11DriverResult.isFailure) {
+    AppLogger.e(TAG, "CRITICAL: Failed to set Wine X11 driver: ${x11DriverResult.exceptionOrNull()?.message}")
+    AppLogger.e(TAG, "Steam and games will fail to display windows without X11 driver")
+   } else {
+    AppLogger.i(TAG, "Wine X11 graphics driver configured successfully")
+   }
+
    // NEW: Install Wine Mono for .NET Framework compatibility
    // Required for 32-bit applications (e.g., SteamSetup.exe NSIS installer)
    try {
@@ -833,9 +846,11 @@ class WinlatorEmulator @Inject constructor(
 
    // STEAM-SPECIFIC ENVIRONMENT VARIABLES
    // Research shows Steam requires special configuration on Wine+Box64
-   val isSteam = executable.name.equals("Steam.exe", ignoreCase = true)
+   // CRITICAL: Detect both direct Steam.exe launch AND wine start.exe → Steam.exe launch
+   val isSteam = executable.name.equals("Steam.exe", ignoreCase = true) ||
+                 (executable.name.equals("start.exe", ignoreCase = true) && arguments.contains("Steam.exe"))
    if (isSteam) {
-    AppLogger.i(TAG, "Detected Steam.exe - applying Steam-specific optimizations")
+    AppLogger.i(TAG, "Detected Steam.exe launch (executable=${executable.name}, args=$arguments) - applying Steam-specific optimizations")
 
     // Enable detailed Wine logging for Steam startup diagnostics
     // Based on Winlator/Box64 community findings:
@@ -2076,6 +2091,146 @@ REGEDIT4
      } catch (e: Exception) {
          AppLogger.e(TAG, "Failed to set Wine DNS configuration (non-fatal)", e)
          Result.failure(EmulatorException("Failed to set Wine DNS configuration: ${e.message}", e))
+     }
+ }
+
+ /**
+  * Set Wine X11 graphics driver in registry.
+  *
+  * CRITICAL FIX (2025-12-23): Configure Wine to use X11 graphics driver
+  * Problem: Without this registry setting, Wine defaults to "null" driver (nodrv)
+  * This causes "nodrv_CreateWindow: Application tried to create a window, but no driver could be loaded"
+  * Solution: Set HKEY_CURRENT_USER\Software\Wine\Drivers "Graphics"="x11"
+  *
+  * @param containerDir Wine container directory (WINEPREFIX)
+  * @return Result indicating success or failure
+  */
+ private suspend fun setWineX11Driver(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
+     try {
+         AppLogger.i(TAG, "Configuring Wine X11 graphics driver registry...")
+
+         // Create .reg file with X11 driver configuration
+         val regFile = File(context.cacheDir, "set_wine_x11_driver.reg")
+         regFile.writeText("""
+REGEDIT4
+
+[HKEY_CURRENT_USER\Software\Wine\Drivers]
+"Graphics"="x11"
+"Audio"="alsa"
+
+         """.trimIndent())
+
+         // Build Wine environment
+         val wineEnv = buildMap {
+             put("WINEPREFIX", containerDir.absolutePath)
+             put("WINEARCH", "win64")
+             put("WINEDEBUG", "-all")
+         }
+
+         // Get binaries
+         val box64Binary = getBox64Binary()
+         if (!box64Binary.exists()) {
+             regFile.delete()
+             AppLogger.w(TAG, "Box64 binary not found, skipping X11 driver registry configuration")
+             return@withContext Result.failure(Box64BinaryNotFoundException())
+         }
+
+         if (!wineBinary.exists()) {
+             regFile.delete()
+             AppLogger.w(TAG, "Wine binary not found, skipping X11 driver registry configuration")
+             return@withContext Result.failure(WineBinaryNotFoundException())
+         }
+
+         if (!prootBinary.exists()) {
+             regFile.delete()
+             AppLogger.w(TAG, "Proot binary not found, skipping X11 driver registry configuration")
+             return@withContext Result.failure(
+                 EmulatorException("Proot binary not found at ${prootBinary.absolutePath}")
+             )
+         }
+
+         // Execute: proot wine regedit /S set_wine_x11_driver.reg
+         val command = buildList {
+             add(prootBinary.absolutePath)
+             add("-b")
+             add("${rootfsDir.absolutePath}:/data/data/com.winlator/files/rootfs")
+             add(box64Binary.absolutePath)
+             add(wineBinary.absolutePath)
+             add("regedit")
+             add("/S") // Silent mode
+             add(regFile.absolutePath)
+         }
+
+         AppLogger.d(TAG, "Executing X11 driver regedit command: ${command.joinToString(" ")}")
+
+         val processBuilder = ProcessBuilder(command)
+
+         // Add Wine environment with library paths
+         val fullEnv = wineEnv.toMutableMap().apply {
+             put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:/usr/bin:/bin")
+             put("LD_LIBRARY_PATH",
+                 "${rootfsDir.absolutePath}/usr/lib:" +
+                 "${rootfsDir.absolutePath}/lib:" +
+                 "${wineDir.absolutePath}/lib:" +
+                 "${wineDir.absolutePath}/lib/wine/x86_64-unix"
+             )
+             put("BOX64_LD_LIBRARY_PATH",
+                 "${rootfsDir.absolutePath}/usr/lib:" +
+                 "${rootfsDir.absolutePath}/lib:" +
+                 "${rootfsDir.absolutePath}/usr/lib/x86_64-linux-gnu:" +
+                 "${wineDir.absolutePath}/lib/wine/x86_64-unix"
+             )
+             put("BOX64_PATH", "${wineDir.absolutePath}/bin")
+             put("BOX64_EMULATED_LIBS", "libc.so.6:libpthread.so.0:libdl.so.2:librt.so.1:libm.so.6")
+             put("BOX64_ALLOWMISSINGLIBS", "1")
+         }
+
+         processBuilder.environment().clear()
+         processBuilder.environment().putAll(fullEnv)
+
+         val process = processBuilder.start()
+
+         // Wait for regedit to complete (max 30 seconds)
+         val completed = withTimeoutOrNull(30_000L) {
+             process.waitFor()
+             true
+         } ?: false
+
+         // Read output
+         val output = try {
+             process.inputStream.bufferedReader().readText()
+         } catch (e: Exception) {
+             "Failed to read output: ${e.message}"
+         }
+
+         if (!completed) {
+             process.destroy()
+             regFile.delete()
+             AppLogger.w(TAG, "X11 driver regedit timeout after 30s. Output: $output")
+             return@withContext Result.failure(
+                 EmulatorException("X11 driver regedit timeout after 30 seconds")
+             )
+         }
+
+         val exitCode = process.exitValue()
+         AppLogger.d(TAG, "X11 driver regedit exit code: $exitCode")
+         AppLogger.d(TAG, "X11 driver regedit output: $output")
+
+         regFile.delete()
+
+         if (exitCode != 0) {
+             AppLogger.w(TAG, "X11 driver regedit failed with exit code $exitCode")
+             return@withContext Result.failure(
+                 EmulatorException("X11 driver regedit failed with exit code $exitCode: $output")
+             )
+         }
+
+         AppLogger.i(TAG, "Successfully configured Wine X11 graphics driver registry")
+         Result.success(Unit)
+
+     } catch (e: Exception) {
+         AppLogger.e(TAG, "Failed to set Wine X11 driver configuration", e)
+         Result.failure(EmulatorException("Failed to set Wine X11 driver configuration: ${e.message}", e))
      }
  }
 

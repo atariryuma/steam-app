@@ -307,15 +307,17 @@ class SteamDisplayViewModel @Inject constructor(
             // OPTIMIZED STEAM LAUNCH FLAGS (2025-12-23 Research)
             // -tcp: Force TCP protocol (REMOVED - not officially documented, unclear benefit)
             // -lognetapi: Enable network API logging to logs/netapi_log.txt (for debugging)
-            // -no-browser: Completely disable CEF (Chromium Embedded Framework)
             // --no-cef-sandbox: Disable CEF sandboxing (Wine compatibility)
+            // -vgui: Use legacy VGUI interface (Wine compatibility, lightweight)
+            //
+            // REMOVED: -no-browser (prevented login screen from appearing)
             //
             // Based on:
             // - https://developer.valvesoftware.com/wiki/Command_line_options_(Steam)
             // - https://github.com/Bluscream/Steam-Client-Docs/blob/master/Command%20Line%20Arguments.MD
-            val guestCommand = "wine explorer /desktop=shell,$screenSize cmd /c start \"\" \"$steamPath\" -lognetapi -no-browser --no-cef-sandbox"
+            val guestCommand = "wine explorer /desktop=shell,$screenSize cmd /c start \"\" \"$steamPath\" -lognetapi -vgui --no-cef-sandbox"
             AppLogger.i(TAG, "Launching desktop with auto-start Steam: $guestCommand")
-            AppLogger.i(TAG, "Steam flags: -lognetapi (network debug), -no-browser (disable CEF), --no-cef-sandbox (Wine compat)")
+            AppLogger.i(TAG, "Steam flags: -lognetapi (network debug), -vgui (legacy UI), --no-cef-sandbox (Wine compat)")
 
             // SIMPLE LAUNCHER CONFIGURATION (2025-12-23)
             val guestProgramLauncher = WineProgramLauncherComponent()

@@ -228,9 +228,17 @@ public class WineProgramLauncherComponent extends EnvironmentComponent {
         // Bind the entire /system directory to ensure all dependencies are accessible
         command += " --bind=/system";
 
-        // CRITICAL: Bind /etc/resolv.conf for DNS resolution in Wine
-        // Steam needs working DNS to connect to Valve servers
-        command += " --bind=/system/etc/resolv.conf:/etc/resolv.conf";
+        // CRITICAL DNS FIX (2025-12-23): Bind rootfs resolv.conf for DNS resolution
+        // Problem: /system/etc/resolv.conf doesn't exist on Android 10+
+        // Solution: SteamDisplayViewModel creates resolv.conf in rootfs/etc/, bind it here
+        // This enables Steam to resolve cdn.steamstatic.com and other Valve domains
+        File rootfsResolvConf = new File(rootDir, "etc/resolv.conf");
+        if (rootfsResolvConf.exists()) {
+            command += " --bind=" + rootfsResolvConf.getAbsolutePath() + ":/etc/resolv.conf";
+            android.util.Log.i("WineProgramLauncher", "Binding DNS config: " + rootfsResolvConf.getAbsolutePath() + " → /etc/resolv.conf");
+        } else {
+            android.util.Log.w("WineProgramLauncher", "WARNING: /etc/resolv.conf not found in rootfs, DNS resolution may fail");
+        }
 
         // NOTE: /etc/hosts is now created directly in rootfs by SteamDisplayViewModel
         // No need for PRoot binding - file exists inside the chroot environment

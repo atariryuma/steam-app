@@ -21,6 +21,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -35,7 +36,9 @@ import javax.inject.Inject
 class SteamDisplayViewModel @Inject constructor(
     private val steamLauncher: SteamLauncher,
     @ApplicationContext private val context: Context,
-    private val securePreferences: com.steamdeck.mobile.domain.repository.ISecurePreferences
+    private val securePreferences: com.steamdeck.mobile.domain.repository.ISecurePreferences,
+    private val steamConfigManager: com.steamdeck.mobile.core.steam.SteamConfigManager,
+    private val steamAuthManager: com.steamdeck.mobile.core.steam.SteamAuthManager
 ) : ViewModel() {
 
     companion object {
@@ -178,13 +181,37 @@ class SteamDisplayViewModel @Inject constructor(
             val hostsContent = """
                 127.0.0.1       localhost
                 ::1             ip6-localhost
+
+                # Steam CDN servers (Cloudflare edge) - bypass DNS lookup
+                # These IPs are for cdn.steamstatic.com and related domains
+                # Source: Winlator Android-only success pattern (Step 3)
+                104.18.42.129   cdn.steamstatic.com
+                104.18.43.129   cdn.steamstatic.com
+                104.18.42.129   media.steampowered.com
+                104.18.42.129   steamcdn-a.akamaihd.net
             """.trimIndent()
 
             // Always create/overwrite hosts file to ensure correct content
             hostsFile.writeText(hostsContent)
             hostsFile.setReadable(true, false)
             android.util.Log.i(TAG, "Created /etc/hosts file: ${hostsFile.absolutePath}")
-            AppLogger.i(TAG, "Created /etc/hosts file with localhost → 127.0.0.1 mapping")
+            AppLogger.i(TAG, "Created /etc/hosts with localhost + Steam CDN direct IPs")
+
+            // CRITICAL DNS FIX (2025-12-23): Create /etc/resolv.conf in rootfs
+            // Problem: /system/etc/resolv.conf doesn't exist on Android 10+
+            // Solution: Create resolv.conf in rootfs, bind it via PRoot
+            val resolvConfFile = File(etcDir, "resolv.conf")
+            val resolvConfContent = """
+                # DNS configuration for Wine/Steam network access
+                # Using Google Public DNS (reliable, low-latency)
+                nameserver 8.8.8.8
+                nameserver 8.8.4.4
+            """.trimIndent()
+
+            resolvConfFile.writeText(resolvConfContent)
+            resolvConfFile.setReadable(true, false)
+            android.util.Log.i(TAG, "Created /etc/resolv.conf file: ${resolvConfFile.absolutePath}")
+            AppLogger.i(TAG, "Created /etc/resolv.conf with Google DNS (8.8.8.8, 8.8.4.4)")
 
             // Verify X11 libraries exist in rootfs (helps debug connection failures)
             verifyX11Libraries(rootfsDir)
@@ -226,25 +253,69 @@ class SteamDisplayViewModel @Inject constructor(
                 return@withContext false
             }
 
+            // CRITICAL: Create Steam auto-login configuration
+            // 1. loginusers.vdf: User account info for auto-login
+            // 2. config.vdf: CDN servers + AutoLoginUser setting
+            AppLogger.i(TAG, "Configuring Steam auto-login...")
+            val steamId = try {
+                securePreferences.getSteamId().first()
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "Failed to get Steam ID: ${e.message}")
+                null
+            }
+
+            // Create loginusers.vdf if Steam ID is available
+            if (steamId != null) {
+                AppLogger.i(TAG, "Creating loginusers.vdf for Steam ID: $steamId")
+                val authResult = steamAuthManager.createLoginUsersVdf(containerDir)
+                if (authResult.isFailure) {
+                    AppLogger.w(TAG, "Failed to create loginusers.vdf (non-fatal): ${authResult.exceptionOrNull()?.message}")
+                    AppLogger.w(TAG, "Auto-login will not work, manual login required")
+                } else {
+                    AppLogger.i(TAG, "loginusers.vdf created successfully - Steam will auto-login")
+                }
+            } else {
+                AppLogger.i(TAG, "No Steam ID found - skipping auto-login configuration")
+                AppLogger.i(TAG, "User must login via QR code in Settings to enable auto-login")
+            }
+
+            // Create config.vdf with CDN servers and auto-login settings
+            AppLogger.i(TAG, "Creating Steam config.vdf with pre-configured CDN servers...")
+            val configResult = steamConfigManager.createConfigVdf(containerDir, steamId)
+            if (configResult.isFailure) {
+                AppLogger.w(TAG, "Failed to create config.vdf (non-fatal): ${configResult.exceptionOrNull()?.message}")
+                AppLogger.w(TAG, "Steam may fail to download manifest during bootstrap")
+            } else {
+                if (steamId != null) {
+                    AppLogger.i(TAG, "Steam config.vdf created with auto-login enabled for SteamID: $steamId")
+                } else {
+                    AppLogger.i(TAG, "Steam config.vdf created (no auto-login, manual login required)")
+                }
+            }
+
             // SIMPLE IMPLEMENTATION (2025-12-23): Minimal window filtering
             val renderer = xServerView.renderer
             renderer.setUnviewableWMClasses("progman", "shell_traywnd")  // Hide Windows desktop only
             AppLogger.i(TAG, "Simple mode: Hide desktop only, no forced fullscreen")
 
-            // SIMPLE STEAM LAUNCH (2025-12-23)
+            // DESKTOP SHELL + STEAM AUTO-LAUNCH (2025-12-23)
+            // Show Windows desktop persistently, auto-launch Steam in background
+            // Desktop stays open even if Steam exits
             val steamPath = "C:/Program Files (x86)/Steam/Steam.exe"
-            val escapedPath = steamPath.replace(" ", "\\ ")
             val screenSize = "1280x720"
 
-            // SIMPLE FLAGS (2025-12-23): -noreactlogin to avoid CEF login issues
-            // Research: CEF (Chromium) doesn't work well in Wine
-            // -noreactlogin: Disables React-based login UI (uses classic VGUI instead)
-            // --no-cef-sandbox: Disables CEF sandbox (Wine incompatibility)
-            val launchFlags = "-noreactlogin --no-cef-sandbox"
-
-            // SIMPLE WINE COMMAND (2025-12-23)
-            val guestCommand = "wine explorer /desktop=shell,$screenSize $escapedPath $launchFlags"
-            AppLogger.i(TAG, "Simple Steam launch: $guestCommand")
+            // OPTIMIZED STEAM LAUNCH FLAGS (2025-12-23 Research)
+            // -tcp: Force TCP protocol (REMOVED - not officially documented, unclear benefit)
+            // -lognetapi: Enable network API logging to logs/netapi_log.txt (for debugging)
+            // -no-browser: Completely disable CEF (Chromium Embedded Framework)
+            // --no-cef-sandbox: Disable CEF sandboxing (Wine compatibility)
+            //
+            // Based on:
+            // - https://developer.valvesoftware.com/wiki/Command_line_options_(Steam)
+            // - https://github.com/Bluscream/Steam-Client-Docs/blob/master/Command%20Line%20Arguments.MD
+            val guestCommand = "wine explorer /desktop=shell,$screenSize cmd /c start \"\" \"$steamPath\" -lognetapi -no-browser --no-cef-sandbox"
+            AppLogger.i(TAG, "Launching desktop with auto-start Steam: $guestCommand")
+            AppLogger.i(TAG, "Steam flags: -lognetapi (network debug), -no-browser (disable CEF), --no-cef-sandbox (Wine compat)")
 
             // SIMPLE LAUNCHER CONFIGURATION (2025-12-23)
             val guestProgramLauncher = WineProgramLauncherComponent()
@@ -260,10 +331,17 @@ class SteamDisplayViewModel @Inject constructor(
             val envVars = EnvVars()
             envVars.put("WINEPREFIX", "/root")
             envVars.put("DISPLAY", ":0")
-            // DETAILED DEBUG (2025-12-23): Check why Steam exits immediately
-            envVars.put("WINEDEBUG", "+err,+warn,+steam,+winhttp,+ole,+shell")
+
+            // RESTORE ORIGINAL WORKING CONFIGURATION (from first successful implementation)
+            envVars.put("WINEDEBUG", "-all,+err")  // Minimal logging for performance
+            envVars.put("WINEESYNC", "1")  // Enable ESYNC for better performance
+            envVars.put("MESA_GL_VERSION_OVERRIDE", "4.6")
+            envVars.put("MESA_GLSL_VERSION_OVERRIDE", "460")
+            envVars.put("MESA_DEBUG", "silent")
+            envVars.put("MESA_NO_ERROR", "1")
+
             guestProgramLauncher.setEnvVars(envVars)
-            AppLogger.i(TAG, "Simple environment with detailed logging enabled")
+            AppLogger.i(TAG, "Restored original working environment configuration")
 
             // Add termination callback (navigate back on exit)
             guestProgramLauncher.setTerminationCallback { status ->

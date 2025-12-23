@@ -60,12 +60,13 @@ class SteamConfigManager @Inject constructor(
      * VDF Format: Valve's KeyValue text format (similar to JSON but tab-indented)
      *
      * @param containerDir Wine container directory containing Steam installation
-     * @param steamId Optional Steam ID for auto-login configuration
+     * @param accountName Optional Steam account name (NOT SteamID64) for auto-login
+     *                    Example: "myusername" (the name used for Steam login)
      * @return Result indicating success or failure
      */
-    suspend fun createConfigVdf(containerDir: File, steamId: String? = null): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun createConfigVdf(containerDir: File, accountName: String? = null): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val steamDir = File(containerDir, "drive_c/Program Files (x86)/Steam")
+            val steamDir = File(containerDir, SteamConstants.STEAM_INSTALL_PATH)
             if (!steamDir.exists()) {
                 AppLogger.w(TAG, "Steam directory not found: ${steamDir.absolutePath}")
                 return@withContext Result.failure(
@@ -73,7 +74,7 @@ class SteamConfigManager @Inject constructor(
                 )
             }
 
-            val configDir = File(steamDir, "config")
+            val configDir = File(steamDir, SteamConstants.STEAM_CONFIG_DIR)
             if (!configDir.exists()) {
                 val created = configDir.mkdirs()
                 if (!created) {
@@ -118,10 +119,11 @@ class SteamConfigManager @Inject constructor(
                 // which often fails in Wine environments
                 appendLine("\t\t\t\t\"AutoUpdateBehavior\"\t\t\"UpdateOnlyOnClose\"")
 
-                // AUTO-LOGIN CONFIGURATION (if Steam ID provided)
+                // AUTO-LOGIN CONFIGURATION (if account name provided)
                 // This enables automatic login using credentials from loginusers.vdf
-                if (steamId != null) {
-                    appendLine("\t\t\t\t\"AutoLoginUser\"\t\t\"$steamId\"")
+                // IMPORTANT: AutoLoginUser requires Steam account name, NOT SteamID64
+                if (accountName != null) {
+                    appendLine("\t\t\t\t\"AutoLoginUser\"\t\t\"$accountName\"")
                     appendLine("\t\t\t\t\"RememberPassword\"\t\t\"1\"")
                 }
 
@@ -136,8 +138,8 @@ class SteamConfigManager @Inject constructor(
             AppLogger.d(TAG, "  Content Servers: ${CONTENT_SERVERS.size} endpoints")
             AppLogger.d(TAG, "  CM Servers: ${CM_SERVERS.size} endpoints")
             AppLogger.d(TAG, "  Download Region: US - Washington DC")
-            if (steamId != null) {
-                AppLogger.d(TAG, "  Auto-Login User: $steamId (enabled)")
+            if (accountName != null) {
+                AppLogger.d(TAG, "  Auto-Login User: $accountName (enabled)")
             }
             AppLogger.d(TAG, "  Config path: ${configVdf.absolutePath}")
 
@@ -145,6 +147,53 @@ class SteamConfigManager @Inject constructor(
         } catch (e: Exception) {
             AppLogger.e(TAG, "Failed to create config.vdf", e)
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Create config.vdf with cache guard (5-minute timeout)
+     *
+     * Prevents duplicate VDF writes by checking if the file was recently created.
+     * If the file was modified within the last 5 minutes, skip writing.
+     *
+     * Use case: Avoid redundant writes when called from multiple locations
+     * (e.g., SettingsViewModel and SteamDisplayViewModel)
+     *
+     * @param containerDir Wine container directory containing Steam installation
+     * @param accountName Optional Steam account name (NOT SteamID64) for auto-login
+     * @return VdfWriteResult - Created/Skipped/Error with detailed state
+     */
+    suspend fun createConfigVdfIfNeeded(containerDir: File, accountName: String? = null): VdfWriteResult = withContext(Dispatchers.IO) {
+        try {
+            val vdfFile = File(containerDir, "${SteamConstants.STEAM_INSTALL_PATH}/${SteamConstants.STEAM_CONFIG_DIR}/config.vdf")
+
+            // Cache guard: Check if file needs updating
+            if (!vdfFile.shouldWriteVdf()) {
+                val ageSeconds = (System.currentTimeMillis() - vdfFile.lastModified()) / 1000
+                AppLogger.d(TAG, "Skipping config.vdf write (cached, age: ${ageSeconds}s)")
+                return@withContext VdfWriteResult.Skipped(ageSeconds)
+            }
+
+            // File expired or doesn't exist, create/update
+            val result = createConfigVdf(containerDir, accountName)
+            return@withContext if (result.isSuccess) {
+                AppLogger.d(TAG, "config.vdf created/updated")
+                VdfWriteResult.Created
+            } else {
+                val throwable = result.exceptionOrNull() ?: Exception("Unknown error")
+                val exception = if (throwable is Exception) throwable else Exception(throwable.message, throwable)
+                VdfWriteResult.Error(
+                    message = exception.message ?: "Failed to create config.vdf",
+                    exception = exception
+                )
+            }
+
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Failed to create config.vdf with cache guard", e)
+            VdfWriteResult.Error(
+                message = e.message ?: "Unexpected error",
+                exception = e
+            )
         }
     }
 
@@ -160,7 +209,7 @@ class SteamConfigManager @Inject constructor(
      */
     suspend fun updateConfigVdf(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val configVdf = File(containerDir, "drive_c/Program Files (x86)/Steam/config/config.vdf")
+            val configVdf = File(containerDir, "${SteamConstants.STEAM_INSTALL_PATH}/${SteamConstants.STEAM_CONFIG_DIR}/config.vdf")
 
             if (!configVdf.exists()) {
                 AppLogger.d(TAG, "config.vdf doesn't exist, creating new one")
@@ -197,7 +246,7 @@ class SteamConfigManager @Inject constructor(
      */
     suspend fun verifyConfigVdf(containerDir: File): Boolean = withContext(Dispatchers.IO) {
         try {
-            val configVdf = File(containerDir, "drive_c/Program Files (x86)/Steam/config/config.vdf")
+            val configVdf = File(containerDir, "${SteamConstants.STEAM_INSTALL_PATH}/${SteamConstants.STEAM_CONFIG_DIR}/config.vdf")
 
             if (!configVdf.exists()) {
                 AppLogger.w(TAG, "config.vdf does not exist")

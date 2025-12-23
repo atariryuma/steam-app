@@ -296,7 +296,8 @@ fun SteamDeckNavHost(
     authUrl = authUrl,
     callbackUrl = "http://127.0.0.1:8080/auth/callback",
     onAuthCallback = { callbackUrl -> loginViewModel.handleCallback(callbackUrl) },
-    onError = { errorMessage -> AppLogger.e("Navigation", "OpenID error: $errorMessage") }
+    onError = { errorMessage -> AppLogger.e("Navigation", "OpenID error: $errorMessage") },
+    onCancel = { navController.navigateUp() }
    )
 
    // Handle authentication success

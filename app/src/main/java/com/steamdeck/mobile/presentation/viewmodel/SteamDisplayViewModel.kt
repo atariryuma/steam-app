@@ -264,32 +264,51 @@ class SteamDisplayViewModel @Inject constructor(
                 null
             }
 
-            // Create loginusers.vdf if Steam ID is available
+            // Create loginusers.vdf if Steam ID is available (CACHE GUARD - 2025-12-23)
             if (steamId != null) {
-                AppLogger.i(TAG, "Creating loginusers.vdf for Steam ID: $steamId")
-                val authResult = steamAuthManager.createLoginUsersVdf(containerDir)
-                if (authResult.isFailure) {
-                    AppLogger.w(TAG, "Failed to create loginusers.vdf (non-fatal): ${authResult.exceptionOrNull()?.message}")
-                    AppLogger.w(TAG, "Auto-login will not work, manual login required")
-                } else {
-                    AppLogger.i(TAG, "loginusers.vdf created successfully - Steam will auto-login")
+                AppLogger.i(TAG, "Creating loginusers.vdf for Steam ID: $steamId (with cache guard)")
+                val authResult = steamAuthManager.createLoginUsersVdfIfNeeded(containerDir)
+                when (authResult) {
+                    is com.steamdeck.mobile.core.steam.VdfWriteResult.Created -> {
+                        AppLogger.i(TAG, "loginusers.vdf created successfully - Steam will auto-login")
+                    }
+                    is com.steamdeck.mobile.core.steam.VdfWriteResult.Skipped -> {
+                        AppLogger.d(TAG, "loginusers.vdf skipped (cached, age: ${authResult.ageSeconds}s) - already exists")
+                    }
+                    is com.steamdeck.mobile.core.steam.VdfWriteResult.Error -> {
+                        AppLogger.w(TAG, "Failed to create loginusers.vdf (non-fatal): ${authResult.message}")
+                        AppLogger.w(TAG, "Auto-login will not work, manual login required")
+                    }
                 }
             } else {
                 AppLogger.i(TAG, "No Steam ID found - skipping auto-login configuration")
                 AppLogger.i(TAG, "User must login via QR code in Settings to enable auto-login")
             }
 
-            // Create config.vdf with CDN servers and auto-login settings
-            AppLogger.i(TAG, "Creating Steam config.vdf with pre-configured CDN servers...")
-            val configResult = steamConfigManager.createConfigVdf(containerDir, steamId)
-            if (configResult.isFailure) {
-                AppLogger.w(TAG, "Failed to create config.vdf (non-fatal): ${configResult.exceptionOrNull()?.message}")
-                AppLogger.w(TAG, "Steam may fail to download manifest during bootstrap")
-            } else {
-                if (steamId != null) {
-                    AppLogger.i(TAG, "Steam config.vdf created with auto-login enabled for SteamID: $steamId")
-                } else {
-                    AppLogger.i(TAG, "Steam config.vdf created (no auto-login, manual login required)")
+            // Create config.vdf with CDN servers and auto-login settings (CACHE GUARD - 2025-12-23)
+            AppLogger.i(TAG, "Creating Steam config.vdf with pre-configured CDN servers (with cache guard)...")
+            // NOTE: createConfigVdfIfNeeded now requires account name, not Steam ID
+            val steamUsername = try {
+                securePreferences.getSteamUsername().first()
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "Failed to get Steam username: ${e.message}")
+                null
+            }
+            val configResult = steamConfigManager.createConfigVdfIfNeeded(containerDir, steamUsername)
+            when (configResult) {
+                is com.steamdeck.mobile.core.steam.VdfWriteResult.Created -> {
+                    if (steamUsername != null) {
+                        AppLogger.i(TAG, "Steam config.vdf created with auto-login enabled for account: $steamUsername")
+                    } else {
+                        AppLogger.i(TAG, "Steam config.vdf created (no auto-login, manual login required)")
+                    }
+                }
+                is com.steamdeck.mobile.core.steam.VdfWriteResult.Skipped -> {
+                    AppLogger.d(TAG, "config.vdf skipped (cached, age: ${configResult.ageSeconds}s) - already exists")
+                }
+                is com.steamdeck.mobile.core.steam.VdfWriteResult.Error -> {
+                    AppLogger.w(TAG, "Failed to create config.vdf (non-fatal): ${configResult.message}")
+                    AppLogger.w(TAG, "Steam may fail to download manifest during bootstrap")
                 }
             }
 
@@ -298,26 +317,20 @@ class SteamDisplayViewModel @Inject constructor(
             renderer.setUnviewableWMClasses("progman", "shell_traywnd")  // Hide Windows desktop only
             AppLogger.i(TAG, "Simple mode: Hide desktop only, no forced fullscreen")
 
-            // DESKTOP SHELL + STEAM AUTO-LAUNCH (2025-12-23)
-            // Show Windows desktop persistently, auto-launch Steam in background
-            // Desktop stays open even if Steam exits
-            val steamPath = "C:/Program Files (x86)/Steam/Steam.exe"
-            val screenSize = "1280x720"
+            // STEAM LAUNCH WITH BACKSLASH ESCAPING (2025-12-23)
+            // User's proven solution for handling paths with spaces in Winlator
+            // Escape spaces with backslash instead of using quotes or 8.3 paths
+            val steamPath = "C:/Program Files (x86)/Steam/Steam.exe".escapeForWinlator()
+            val steamDir = "C:/Program Files (x86)/Steam".escapeForWinlator()
 
-            // OPTIMIZED STEAM LAUNCH FLAGS (2025-12-23 Research)
-            // -tcp: Force TCP protocol (REMOVED - not officially documented, unclear benefit)
-            // -lognetapi: Enable network API logging to logs/netapi_log.txt (for debugging)
-            // --no-cef-sandbox: Disable CEF sandboxing (Wine compatibility)
-            // -vgui: Use legacy VGUI interface (Wine compatibility, lightweight)
-            //
-            // REMOVED: -no-browser (prevented login screen from appearing)
-            //
-            // Based on:
-            // - https://developer.valvesoftware.com/wiki/Command_line_options_(Steam)
-            // - https://github.com/Bluscream/Steam-Client-Docs/blob/master/Command%20Line%20Arguments.MD
-            val guestCommand = "wine explorer /desktop=shell,$screenSize cmd /c start \"\" \"$steamPath\" -lognetapi -vgui --no-cef-sandbox"
-            AppLogger.i(TAG, "Launching desktop with auto-start Steam: $guestCommand")
-            AppLogger.i(TAG, "Steam flags: -lognetapi (network debug), -vgui (legacy UI), --no-cef-sandbox (Wine compat)")
+            // STEAM LAUNCH WITH WINE DESKTOP SHELL (2025-12-23)
+            // CRITICAL: Steam requires Wine desktop shell to create X11 windows
+            // Restored from working log: wine explorer /desktop=shell,1280x720 path args
+            // This successfully launched desktop, need to fix Steam execution
+            val screenSize = "1280x720"
+            val guestCommand = "wine explorer /desktop=shell,$screenSize $steamPath --no-cef-sandbox -tenfoot"
+            AppLogger.i(TAG, "Launching Wine desktop + Steam (restored from logs): $guestCommand")
+            AppLogger.i(TAG, "Desktop: shell,$screenSize | Steam path: $steamPath | Flags: --no-cef-sandbox -tenfoot")
 
             // SIMPLE LAUNCHER CONFIGURATION (2025-12-23)
             val guestProgramLauncher = WineProgramLauncherComponent()
@@ -327,23 +340,40 @@ class SteamDisplayViewModel @Inject constructor(
             guestProgramLauncher.setBox64Preset(com.steamdeck.mobile.box86_64.Box86_64Preset.STABILITY)
             AppLogger.i(TAG, "WoW64 + STABILITY preset enabled")
 
-            // SIMPLE ENVIRONMENT SETUP (2025-12-23)
+            // ENVIRONMENT SETUP WITH USER'S PROVEN CONFIGURATION (2025-12-23)
             guestProgramLauncher.setBindingPaths(arrayOf(containerDir.absolutePath))
 
             val envVars = EnvVars()
             envVars.put("WINEPREFIX", "/root")
             envVars.put("DISPLAY", ":0")
 
-            // RESTORE ORIGINAL WORKING CONFIGURATION (from first successful implementation)
+            // X11 library path for Steam GUI (CRITICAL for window creation)
+            envVars.put("LD_LIBRARY_PATH", "/usr/lib:/lib")
+
+            // Wine configuration
             envVars.put("WINEDEBUG", "-all,+err")  // Minimal logging for performance
             envVars.put("WINEESYNC", "1")  // Enable ESYNC for better performance
+            envVars.put("WINEDLLOVERRIDES", "mscoree,mshtml=")  // Disable .NET and IE to prevent popup dialogs
+            // Note: WINEARCH removed per user's config (auto-detect from container)
+
+            // Box86 emulation settings for 32-bit Steam.exe
+            envVars.put("BOX86_DYNAREC_STRONGMEM", "1")  // Strong memory ordering (compatibility)
+            envVars.put("BOX86_DYNAREC_CALLRET", "0")  // Disable call/ret optimization (stability)
+            envVars.put("BOX86_NOGTK", "1")  // Disable GTK wrapping (Steam uses Qt)
+
+            // Box64 emulation settings for 64-bit Wine host
+            envVars.put("BOX64_DYNAREC_STRONGMEM", "1")  // Strong memory ordering (compatibility)
+            envVars.put("BOX64_DYNAREC_CALLRET", "0")  // Disable call/ret optimization (stability)
+            envVars.put("BOX64_DYNAREC_BLEEDING_EDGE", "0")  // Disable experimental optimizations (stability)
+
+            // Mesa/OpenGL configuration
             envVars.put("MESA_GL_VERSION_OVERRIDE", "4.6")
             envVars.put("MESA_GLSL_VERSION_OVERRIDE", "460")
             envVars.put("MESA_DEBUG", "silent")
             envVars.put("MESA_NO_ERROR", "1")
 
             guestProgramLauncher.setEnvVars(envVars)
-            AppLogger.i(TAG, "Restored original working environment configuration")
+            AppLogger.i(TAG, "Applied user's proven environment configuration with Box86/64 stability settings")
 
             // Add termination callback (navigate back on exit)
             guestProgramLauncher.setTerminationCallback { status ->
@@ -492,4 +522,20 @@ sealed class SteamDisplayUiState {
 
     /** Error occurred during launch */
     data class Error(val message: String) : SteamDisplayUiState()
+}
+
+/**
+ * Extension function to escape paths for Winlator shell commands
+ *
+ * Winlator's Wine launcher requires backslash escaping for spaces in file paths
+ * instead of using quotes or 8.3 short path format.
+ *
+ * Example:
+ * - Input: "C:/Program Files (x86)/Steam"
+ * - Output: "C:/Program\ Files\ (x86)/Steam"
+ *
+ * @return Path with spaces escaped by backslashes
+ */
+private fun String.escapeForWinlator(): String {
+    return this.replace(" ", "\\ ")
 }

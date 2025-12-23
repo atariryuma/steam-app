@@ -69,15 +69,16 @@ class SteamAuthManager @Inject constructor(
 
             val username = securePreferences.getSteamUsername().first() ?: "SteamUser"
 
-            // Validate SteamID64 format (17 digits, starts with 7656119)
-            if (steamId.length != 17 || !steamId.startsWith("7656119")) {
-                AppLogger.e(TAG, "Invalid SteamID64 format: $steamId")
+            // Validate SteamID64 format using SteamIdValidator
+            val validationError = SteamIdValidator.validateWithMessage(steamId)
+            if (validationError != null) {
+                AppLogger.e(TAG, "Invalid SteamID64: $validationError")
                 return@withContext Result.failure(
-                    Exception("Invalid Steam ID format: $steamId")
+                    Exception(validationError)
                 )
             }
 
-            val steamDir = File(containerDir, "drive_c/Program Files (x86)/Steam")
+            val steamDir = File(containerDir, SteamConstants.STEAM_INSTALL_PATH)
             if (!steamDir.exists()) {
                 AppLogger.w(TAG, "Steam directory not found: ${steamDir.absolutePath}")
                 return@withContext Result.failure(
@@ -85,7 +86,7 @@ class SteamAuthManager @Inject constructor(
                 )
             }
 
-            val configDir = File(steamDir, "config")
+            val configDir = File(steamDir, SteamConstants.STEAM_CONFIG_DIR)
             if (!configDir.exists()) {
                 val created = configDir.mkdirs()
                 if (!created) {
@@ -133,6 +134,52 @@ class SteamAuthManager @Inject constructor(
     }
 
     /**
+     * Create loginusers.vdf with cache guard (5-minute timeout)
+     *
+     * Prevents duplicate VDF writes by checking if the file was recently created.
+     * If the file was modified within the last 5 minutes, skip writing.
+     *
+     * Use case: Avoid redundant writes when called from multiple locations
+     * (e.g., SettingsViewModel and SteamDisplayViewModel)
+     *
+     * @param containerDir Wine container directory containing Steam installation
+     * @return VdfWriteResult - Created/Skipped/Error with detailed state
+     */
+    suspend fun createLoginUsersVdfIfNeeded(containerDir: File): VdfWriteResult = withContext(Dispatchers.IO) {
+        try {
+            val vdfFile = File(containerDir, "${SteamConstants.STEAM_INSTALL_PATH}/${SteamConstants.STEAM_CONFIG_DIR}/loginusers.vdf")
+
+            // Cache guard: Check if file needs updating
+            if (!vdfFile.shouldWriteVdf()) {
+                val ageSeconds = (System.currentTimeMillis() - vdfFile.lastModified()) / 1000
+                AppLogger.d(TAG, "Skipping loginusers.vdf write (cached, age: ${ageSeconds}s)")
+                return@withContext VdfWriteResult.Skipped(ageSeconds)
+            }
+
+            // File expired or doesn't exist, create/update
+            val result = createLoginUsersVdf(containerDir)
+            return@withContext if (result.isSuccess) {
+                AppLogger.d(TAG, "loginusers.vdf created/updated")
+                VdfWriteResult.Created
+            } else {
+                val throwable = result.exceptionOrNull() ?: Exception("Unknown error")
+                val exception = if (throwable is Exception) throwable else Exception(throwable.message, throwable)
+                VdfWriteResult.Error(
+                    message = exception.message ?: "Failed to create loginusers.vdf",
+                    exception = exception
+                )
+            }
+
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Failed to create loginusers.vdf with cache guard", e)
+            VdfWriteResult.Error(
+                message = e.message ?: "Unexpected error",
+                exception = e
+            )
+        }
+    }
+
+    /**
      * Verify loginusers.vdf exists and contains valid configuration
      *
      * @param containerDir Wine container directory
@@ -140,7 +187,7 @@ class SteamAuthManager @Inject constructor(
      */
     suspend fun verifyLoginUsersVdf(containerDir: File): Boolean = withContext(Dispatchers.IO) {
         try {
-            val loginUsersVdf = File(containerDir, "drive_c/Program Files (x86)/Steam/config/loginusers.vdf")
+            val loginUsersVdf = File(containerDir, "${SteamConstants.STEAM_INSTALL_PATH}/${SteamConstants.STEAM_CONFIG_DIR}/loginusers.vdf")
 
             if (!loginUsersVdf.exists()) {
                 AppLogger.w(TAG, "loginusers.vdf does not exist")
@@ -180,7 +227,7 @@ class SteamAuthManager @Inject constructor(
      */
     suspend fun deleteLoginUsersVdf(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val loginUsersVdf = File(containerDir, "drive_c/Program Files (x86)/Steam/config/loginusers.vdf")
+            val loginUsersVdf = File(containerDir, "${SteamConstants.STEAM_INSTALL_PATH}/${SteamConstants.STEAM_CONFIG_DIR}/loginusers.vdf")
 
             if (loginUsersVdf.exists()) {
                 val deleted = loginUsersVdf.delete()

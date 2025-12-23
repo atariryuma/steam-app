@@ -174,7 +174,8 @@
       "Bash(while true)",
       "Bash(call gradlew.bat assembleDebug --console=plain)",
       "Bash(git merge:*)",
-      "Bash(call C:/Projects/steam-app/gradlew.bat assembleDebug --no-configuration-cache)"
+      "Bash(call C:/Projects/steam-app/gradlew.bat assembleDebug --no-configuration-cache)",
+      "Bash(C:/Projects/steam-app/quick-build.bat)"
     ]
   }
 }

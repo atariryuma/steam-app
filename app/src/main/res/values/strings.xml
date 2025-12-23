@@ -41,6 +41,11 @@
     <string name="error_game_not_found">Game not found</string>
     <string name="error_database">Database error occurred</string>
     <string name="error_file_not_found">File not found</string>
+
+    <!-- Steam Auto-Launch (2025-12-23) -->
+    <string name="steam_auto_launching">Launching Steam client...</string>
+    <string name="steam_auto_launch_success">Steam client running</string>
+    <string name="steam_auto_launch_failed">Steam launch failed</string>
     <string name="error_permission_denied">Permission denied</string>
     <string name="error_timeout">Request timed out</string>
     <string name="error_invalid_input">Invalid input</string>
@@ -361,5 +366,58 @@ Try:
     <string name="controller_input_active">Input Active</string>
     <string name="controller_uinput_failed">uinput initialization failed - Please use InputBridge app</string>
     <string name="controller_count">%1$d controller(s) connected</string>
+
+    <!-- Settings UX Improvements - Step 1: Steam Client Installation -->
+    <string name="steam_client_title">Steam Client</string>
+    <string name="steam_status_installed">Installed</string>
+    <string name="steam_status_installed_authenticated">Installed &amp; Authenticated</string>
+    <string name="steam_next_step_auth">Next Step: Authenticate with Steam</string>
+    <string name="steam_open_client">Open Steam Client</string>
+    <string name="button_uninstall">Uninstall</string>
+    <string name="steam_auth_required_description">Steam auto-login requires authentication. Complete Step 2 to enable seamless auto-login.</string>
+    <string name="steam_manual_login_warning">⚠️ Manual Login Required</string>
+    <string name="steam_manual_login_note">Without authentication, you must login manually via QR code in Steam client.</string>
+    <string name="steam_autologin_configured">✓ Auto-login configured</string>
+    <string name="steam_account_label">Account: %s</string>
+    <string name="button_next_authenticate">Next: Authenticate</string>
+    <string name="button_advanced_options">Advanced Options</string>
+    <string name="button_hide_advanced">Hide Advanced</string>
+
+    <!-- Settings UX Improvements - Step 2: Steam Authentication -->
+    <string name="button_sync_library">Sync Library</string>
+    <string name="button_relogin">Re-Login</string>
+    <string name="button_clear_all_settings">Clear All Settings</string>
+    <string name="dialog_clear_settings_title">Clear All Settings?</string>
+    <string name="dialog_clear_settings_message">This will permanently delete:</string>
+    <string name="dialog_clear_settings_item_steam_id">• Steam ID and username</string>
+    <string name="dialog_clear_settings_item_api_key">• Steam Web API Key</string>
+    <string name="dialog_clear_settings_item_sync_history">• Library sync history</string>
+    <string name="dialog_clear_settings_item_all_prefs">• All preferences</string>
+    <string name="dialog_clear_settings_warning">You will need to re-authenticate and reconfigure everything.</string>
+    <string name="dialog_clear_settings_confirm">Clear All Settings</string>
+    <string name="login_success_title">Welcome back, %s!</string>
+    <string name="login_success_subtitle">Authentication successful</string>
+    <string name="login_success_next_steps">Next Steps:</string>
+    <string name="login_success_step_1">Steam client is launching…</string>
+    <string name="login_success_step_2">Sync your library to start playing</string>
+    <string name="button_go_to_library_sync">Go to Library Sync</string>
+    <string name="stage_launch_steam">Launch Steam Client</string>
+    <string name="stage_sync_library">Sync Game Library</string>
+    <string name="content_desc_cancel_login">Cancel login</string>
+    <string name="content_desc_back_button">Go back</string>
+    <string name="post_login_setup_title">Post-Login Setup</string>
+
+    <!-- Settings UX Improvements - Step 3: Library Sync -->
+    <string name="sync_success_title">Library Synced Successfully</string>
+    <string name="sync_success_message">Your Steam games are ready to play!</string>
+    <string name="sync_games_synced_count">%d games synced</string>
+    <string name="sync_failed_title">Sync Failed</string>
+    <string name="sync_error_details_label">Error Details:</string>
+    <string name="sync_troubleshooting_tip">💡 Tip: Check your API Key and network connection</string>
+    <string name="button_view_games">View Games</string>
+    <string name="button_sync_again">Sync Again</string>
+    <string name="button_dismiss">Dismiss</string>
+    <string name="content_desc_expand_details">Expand details</string>
+    <string name="content_desc_collapse_details">Collapse details</string>
 
 </resources>

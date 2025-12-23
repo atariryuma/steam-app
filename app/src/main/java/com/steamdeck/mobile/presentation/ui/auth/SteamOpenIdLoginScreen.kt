@@ -9,8 +9,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,7 +28,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.steamdeck.mobile.R
 import com.steamdeck.mobile.presentation.theme.SteamColorPalette
 
 /**
@@ -43,10 +56,12 @@ fun SteamOpenIdLoginScreen(
  authUrl: String,
  callbackUrl: String = "http://127.0.0.1:8080/auth/callback",
  onAuthCallback: (String) -> Unit,
- onError: (String) -> Unit = {}
+ onError: (String) -> Unit = {},
+ onCancel: () -> Unit
 ) {
  var isLoading by remember { mutableStateOf(true) }
  var loadProgress by remember { mutableStateOf(0) }
+ var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
  Box(
   modifier = Modifier
@@ -103,6 +118,9 @@ fun SteamOpenIdLoginScreen(
 
      // Load authentication URL
      loadUrl(authUrl)
+
+     // Store WebView reference for back navigation
+     webViewRef = this
     }
    },
    modifier = Modifier.fillMaxSize()
@@ -130,6 +148,49 @@ fun SteamOpenIdLoginScreen(
     CircularProgressIndicator(
      color = SteamColorPalette.Blue
     )
+   }
+  }
+
+  // Back button (conditional - only show when page history exists)
+  if (!isLoading && webViewRef?.canGoBack() == true) {
+   FloatingActionButton(
+    onClick = { webViewRef?.goBack() },
+    modifier = Modifier
+     .align(Alignment.TopStart)
+     .padding(16.dp),
+    containerColor = SteamColorPalette.Medium
+   ) {
+    Icon(
+     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+     contentDescription = stringResource(R.string.content_desc_back_button),
+     tint = androidx.compose.ui.graphics.Color.White
+    )
+   }
+  }
+
+  // Cancel button (always visible - top right)
+  IconButton(
+   onClick = onCancel,
+   modifier = Modifier
+    .align(Alignment.TopEnd)
+    .padding(16.dp)
+  ) {
+   Surface(
+    shape = CircleShape,
+    color = SteamColorPalette.Medium,
+    modifier = Modifier.size(40.dp)
+   ) {
+    Box(
+     contentAlignment = Alignment.Center,
+     modifier = Modifier.fillMaxSize()
+    ) {
+     Icon(
+      imageVector = Icons.Default.Close,
+      contentDescription = stringResource(R.string.content_desc_cancel_login),
+      tint = androidx.compose.ui.graphics.Color.White,
+      modifier = Modifier.size(24.dp)
+     )
+    }
    }
   }
  }

@@ -57,6 +57,9 @@ class SettingsViewModel @Inject constructor(
  private val _steamInstallState = MutableStateFlow<SteamInstallState>(SteamInstallState.Idle)
  val steamInstallState: StateFlow<SteamInstallState> = _steamInstallState.asStateFlow()
 
+ private val _autoLaunchSteamState = MutableStateFlow<AutoLaunchState>(AutoLaunchState.Idle)
+ val autoLaunchSteamState: StateFlow<AutoLaunchState> = _autoLaunchSteamState.asStateFlow()
+
  init {
   loadSettings()
   checkSteamInstallation()
@@ -113,7 +116,12 @@ class SettingsViewModel @Inject constructor(
  /**
   * Get Steam Big Picture Mode preference
   * @return True if Big Picture Mode is enabled, false otherwise
+  * @deprecated Big Picture Mode UI removed from Settings. Method kept for backward compatibility.
   */
+ @Deprecated(
+  message = "Big Picture Mode removed from UI. Use default desktop mode.",
+  level = DeprecationLevel.WARNING
+ )
  suspend fun getSteamBigPictureMode(): Boolean {
   return securePreferences.getSteamBigPictureMode()
  }
@@ -121,7 +129,12 @@ class SettingsViewModel @Inject constructor(
  /**
   * Toggle Steam Big Picture Mode
   * @param enabled True to enable Big Picture Mode, false for normal mode
+  * @deprecated Big Picture Mode UI removed from Settings. Method kept for backward compatibility.
   */
+ @Deprecated(
+  message = "Big Picture Mode removed from UI. Use default desktop mode.",
+  level = DeprecationLevel.WARNING
+ )
  fun setSteamBigPictureMode(enabled: Boolean) {
   viewModelScope.launch {
    try {
@@ -177,53 +190,84 @@ class SettingsViewModel @Inject constructor(
   *
   * Automatically syncs library after successful QR authentication
   *
-  * Flow (2025-12-23 OPTIMIZED):
+  * Flow (2025-12-23 OPTIMIZED WITH AUTO-LAUNCH):
   * 1. Write Steam credentials to VDF files using SteamAuthManager + SteamConfigManager
   *    - loginusers.vdf: User account info for auto-login
   *    - config.vdf: CDN servers + AutoLoginUser setting
-  * 2. Sync Steam library via Web API
+  * 2. Auto-launch Steam client (eliminates manual "Open Steam" button click)
+  * 3. Sync Steam library via Web API
   *
   * This ensures Steam client can auto-login AND connect to CDN servers properly
   *
   * CRITICAL IMPROVEMENT: Uses SteamAuthManager + SteamConfigManager instead of SteamCredentialManager
   * - Includes 7 CDN servers + 4 CM servers for reliable Steam bootstrap
   * - Prevents "Content Servers Unreachable" errors in Wine/PRoot environments
+  * - Auto-launches Steam after QR login for seamless user experience
   */
  fun syncAfterQrLogin() {
   viewModelScope.launch {
-   // Wait briefly to ensure QR authentication is complete
-   kotlinx.coroutines.delay(500)
-
-   // Get Steam ID and container ID
-   val steamIdFlow = securePreferences.getSteamId()
-   val steamId = steamIdFlow.first()
+   // Wait for QR authentication to complete (Flow-based synchronization)
+   val steamId = securePreferences.getSteamId().first { !it.isNullOrBlank() }
+   val steamUsername = securePreferences.getSteamUsername().first()
    val containerId = getSteamContainerId()
 
-   // Write Steam credentials to VDF files
-   if (steamId != null && containerId != null) {
-    AppLogger.i(TAG, "Writing Steam credentials after QR login: steamId=$steamId, containerId=$containerId")
-
-    val containerDir = java.io.File(context.filesDir, "winlator/containers/$containerId")
-
-    // 1. Create loginusers.vdf (user account info for auto-login)
-    val authResult = steamAuthManager.createLoginUsersVdf(containerDir)
-    if (authResult.isFailure) {
-     AppLogger.w(TAG, "Failed to create loginusers.vdf: ${authResult.exceptionOrNull()?.message}")
-     // Non-fatal error - continue with config.vdf
-    } else {
-     AppLogger.i(TAG, "✅ loginusers.vdf created successfully")
-    }
-
-    // 2. Create config.vdf (CDN servers + auto-login settings)
-    val configResult = steamConfigManager.createConfigVdf(containerDir, steamId)
-    if (configResult.isFailure) {
-     AppLogger.w(TAG, "Failed to create config.vdf: ${configResult.exceptionOrNull()?.message}")
-     // Non-fatal error - continue with sync
-    } else {
-     AppLogger.i(TAG, "✅ config.vdf created with CDN servers + auto-login")
-    }
-   } else {
+   // Validate prerequisites
+   if (steamId.isNullOrBlank() || containerId == null) {
     AppLogger.w(TAG, "Cannot write Steam credentials: steamId=$steamId, containerId=$containerId")
+    _autoLaunchSteamState.value = AutoLaunchState.Idle
+    // Proceed with library sync anyway
+    syncSteamLibrary()
+    return@launch
+   }
+
+   AppLogger.i(TAG, "Writing Steam credentials after QR login: steamId=$steamId, containerId=$containerId")
+   val containerDir = java.io.File(context.filesDir, "winlator/containers/$containerId")
+
+   // 1. Create loginusers.vdf (user account info for auto-login)
+   val authResult = steamAuthManager.createLoginUsersVdf(containerDir)
+   if (authResult.isFailure) {
+    AppLogger.w(TAG, "Failed to create loginusers.vdf: ${authResult.exceptionOrNull()?.message}")
+    _autoLaunchSteamState.value = AutoLaunchState.Idle
+    // VDF creation failed - skip Steam launch, proceed with sync
+    syncSteamLibrary()
+    return@launch
+   } else {
+    AppLogger.i(TAG, "✅ loginusers.vdf created successfully")
+   }
+
+   // 2. Create config.vdf (CDN servers + auto-login settings)
+   // IMPORTANT: Use Steam account name, NOT SteamID64
+   val configResult = steamConfigManager.createConfigVdf(containerDir, steamUsername)
+   if (configResult.isFailure) {
+    AppLogger.w(TAG, "Failed to create config.vdf: ${configResult.exceptionOrNull()?.message}")
+    _autoLaunchSteamState.value = AutoLaunchState.Idle
+    // VDF creation failed - skip Steam launch, proceed with sync
+    syncSteamLibrary()
+    return@launch
+   } else {
+    AppLogger.i(TAG, "✅ config.vdf created with CDN servers + auto-login (account: $steamUsername)")
+   }
+
+   // 3. Auto-launch Steam client (NEW - 2025-12-23)
+   _autoLaunchSteamState.value = AutoLaunchState.LaunchingSteam
+   try {
+    AppLogger.i(TAG, "Auto-launching Steam client after QR login")
+    val launchResult = steamLauncher.launchSteamClient(containerId.toString())
+
+    if (launchResult.isSuccess) {
+     _autoLaunchSteamState.value = AutoLaunchState.SteamRunning
+     AppLogger.i(TAG, "✅ Steam client launched successfully")
+     kotlinx.coroutines.delay(com.steamdeck.mobile.core.steam.SteamConstants.STEAM_INITIALIZATION_TIMEOUT_MS)
+    } else {
+     val errorMsg = launchResult.exceptionOrNull()?.message ?: "Unknown error"
+     _autoLaunchSteamState.value = AutoLaunchState.LaunchError(errorMsg)
+     AppLogger.w(TAG, "Failed to launch Steam client: $errorMsg")
+     // Non-fatal error - continue with sync
+    }
+   } catch (e: Exception) {
+    _autoLaunchSteamState.value = AutoLaunchState.LaunchError(e.message ?: "Unknown error")
+    AppLogger.e(TAG, "Exception during Steam auto-launch", e)
+    // Non-fatal error - continue with sync
    }
 
    // Proceed with library sync
@@ -285,6 +329,17 @@ class SettingsViewModel @Inject constructor(
     }
    }
   }
+ }
+
+ /**
+  * Reset sync state to Idle
+  *
+  * Used to manually dismiss Success/Error cards in Library Sync section.
+  * Replaces automatic state reset for persistent UI feedback.
+  */
+ fun resetSyncState() {
+  _syncState.value = SyncState.Idle
+  AppLogger.d(TAG, "Sync state reset to Idle")
  }
 
  /**
@@ -468,7 +523,7 @@ class SettingsViewModel @Inject constructor(
    // Check standard Steam installation path
    val steamExe = java.io.File(
     context.filesDir,
-    "winlator/containers/$containerId/drive_c/Program Files (x86)/Steam/Steam.exe"
+    "winlator/containers/$containerId/${com.steamdeck.mobile.core.steam.SteamConstants.STEAM_INSTALL_PATH}/${com.steamdeck.mobile.core.steam.SteamConstants.STEAM_EXE_NAME}"
    )
 
    if (steamExe.exists()) {
@@ -535,12 +590,6 @@ class SettingsViewModel @Inject constructor(
   }
  }
 
- /**
-  * Reset sync state
-  */
- fun resetSyncState() {
-  _syncState.value = SyncState.Idle
- }
 }
 
 /**
@@ -648,4 +697,28 @@ sealed class SteamInstallState {
  /** Error */
  @Immutable
  data class Error(val message: String) : SteamInstallState()
+}
+
+/**
+ * Auto Steam Launch State
+ *
+ * Tracks the status of automatic Steam client launch after QR login
+ */
+@Immutable
+sealed class AutoLaunchState {
+ /** Idle state */
+ @Immutable
+ data object Idle : AutoLaunchState()
+
+ /** Launching Steam client */
+ @Immutable
+ data object LaunchingSteam : AutoLaunchState()
+
+ /** Steam client running */
+ @Immutable
+ data object SteamRunning : AutoLaunchState()
+
+ /** Launch error */
+ @Immutable
+ data class LaunchError(val message: String) : AutoLaunchState()
 }

@@ -105,10 +105,26 @@ object SteamAuthModule {
  /**
   * Steam Authentication Managers
   *
-  * SteamAuthManager and SteamConfigManager use @Inject constructor,
-  * so Hilt automatically generates instances. No explicit @Provides needed.
+  * The following managers use @Inject constructor, so Hilt automatically
+  * generates instances (no explicit @Provides needed):
   *
   * - SteamAuthManager: Generates loginusers.vdf for auto-login
+  *   - Uses SteamIdValidator for robust SteamID64 validation
+  *   - Includes 5-minute cache guard to prevent redundant writes
+  *   - Use createLoginUsersVdfIfNeeded() for cached writes (returns VdfWriteResult)
+  *   - References: SteamConstants for paths, VdfCacheUtils for caching logic
+  *
   * - SteamConfigManager: Generates config.vdf with CDN servers
+  *   - Pre-configures 7 CDN servers + 4 CM servers for reliable Steam bootstrap
+  *   - AutoLoginUser setting requires Steam account name (NOT SteamID64)
+  *   - Includes 5-minute cache guard to prevent redundant writes
+  *   - Use createConfigVdfIfNeeded() for cached writes (returns VdfWriteResult)
+  *   - References: SteamConstants for paths, VdfCacheUtils for caching logic
+  *
+  * Shared Utilities (auto-injected):
+  * - SteamConstants: Centralized timeout and path configuration
+  * - SteamIdValidator: SteamID64 format validation (range: 76561197960265728-76561202255233023)
+  * - VdfWriteResult: Type-safe result wrapper (Created/Skipped/Error)
+  * - VdfCacheUtils: File modification time-based cache guard (5-minute timeout)
   */
 }

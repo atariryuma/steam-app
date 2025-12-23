@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -25,8 +26,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
@@ -35,19 +40,24 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -75,6 +85,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.steamdeck.mobile.R
 import com.steamdeck.mobile.presentation.theme.SteamColorPalette
 import com.steamdeck.mobile.presentation.ui.auth.SteamOpenIdLoginScreen
+import com.steamdeck.mobile.presentation.viewmodel.AutoLaunchState
 import com.steamdeck.mobile.presentation.viewmodel.SettingsUiState
 import com.steamdeck.mobile.presentation.viewmodel.SettingsViewModel
 import com.steamdeck.mobile.presentation.viewmodel.SteamInstallState
@@ -110,11 +121,13 @@ fun SettingsScreen(
  val syncState by viewModel.syncState.collectAsStateWithLifecycle()
  val steamInstallState by viewModel.steamInstallState.collectAsStateWithLifecycle()
  val steamLoginState by steamLoginViewModel.uiState.collectAsStateWithLifecycle()
+ val autoLaunchState by viewModel.autoLaunchSteamState.collectAsStateWithLifecycle()
  val snackbarHostState = remember { SnackbarHostState() }
  var selectedSection by remember {
   mutableIntStateOf(if (initialSection >= 0) initialSection else 0)
  }
  var showWebView by remember { mutableStateOf(false) }
+ var showClearSettingsDialog by remember { mutableStateOf(false) }
 
  // Update selectedSection when initialSection changes (navigation from drawer)
  LaunchedEffect(initialSection) {
@@ -146,7 +159,7 @@ fun SettingsScreen(
   }
  }
 
- // Show snackbar for sync completion messages
+ // Show snackbar for sync completion messages (persistent cards handle display)
  LaunchedEffect(syncState) {
   when (val state = syncState) {
    is SyncState.Success -> {
@@ -154,14 +167,16 @@ fun SettingsScreen(
      message = context.getString(R.string.games_synced_count, state.syncedGamesCount),
      duration = SnackbarDuration.Short
     )
-    viewModel.resetSyncState()
+    // REMOVED: viewModel.resetSyncState()
+    // Success card now persists until user dismisses
    }
    is SyncState.Error -> {
     snackbarHostState.showSnackbar(
      message = state.message,
-     duration = SnackbarDuration.Long
+     duration = SnackbarDuration.Short // Changed from Long
     )
-    viewModel.resetSyncState()
+    // REMOVED: viewModel.resetSyncState()
+    // Error card now persists until user dismisses
    }
    else -> {}
   }
@@ -179,6 +194,7 @@ fun SettingsScreen(
      data = state.data,
      syncState = syncState,
      steamInstallState = steamInstallState,
+     autoLaunchState = autoLaunchState,
      showWebView = showWebView,
      steamLoginViewModel = steamLoginViewModel,
      settingsViewModel = viewModel,
@@ -192,7 +208,9 @@ fun SettingsScreen(
      onInstallSteam = viewModel::installSteamClient,
      onOpenSteam = onNavigateToSteamDisplay,
      onUninstallSteam = viewModel::uninstallSteamClient,
-     onNavigateBack = onNavigateBack
+     onNavigateBack = onNavigateBack,
+     onNavigateToStep = { step -> selectedSection = step },
+     onRequestClearSettings = { showClearSettingsDialog = true }
     )
    }
    is SettingsUiState.Error -> {
@@ -205,6 +223,19 @@ fun SettingsScreen(
    hostState = snackbarHostState,
    modifier = Modifier.align(Alignment.BottomCenter)
   )
+
+  // Clear All Settings Confirmation Dialog
+  if (showClearSettingsDialog) {
+   ClearSettingsConfirmationDialog(
+    onConfirm = {
+     viewModel.clearSteamSettings()
+     showClearSettingsDialog = false
+    },
+    onDismiss = {
+     showClearSettingsDialog = false
+    }
+   )
+  }
  }
 }
 
@@ -219,6 +250,7 @@ private fun SettingsContent(
  data: com.steamdeck.mobile.presentation.viewmodel.SettingsData,
  syncState: SyncState,
  steamInstallState: SteamInstallState,
+ autoLaunchState: AutoLaunchState,
  showWebView: Boolean,
  steamLoginViewModel: SteamLoginViewModel,
  settingsViewModel: SettingsViewModel,
@@ -233,6 +265,8 @@ private fun SettingsContent(
  onOpenSteam: (String) -> Unit,
  onUninstallSteam: (String) -> Unit,
  onNavigateBack: () -> Unit,
+ onNavigateToStep: (Int) -> Unit,  // NEW: Navigate to specific step
+ onRequestClearSettings: () -> Unit,  // NEW: Request to show clear settings dialog
  modifier: Modifier = Modifier
 ) {
  Surface(
@@ -285,15 +319,21 @@ private fun SettingsContent(
       // Step 1: Steam Client Installation (no prerequisites)
       SteamClientContent(
        steamInstallState = steamInstallState,
+       isAuthenticated = data.isSteamConfigured,
+       steamUsername = data.steamUsername,
        defaultContainerId = "default_shared_container",
        viewModel = settingsViewModel,
        onInstall = onInstallSteam,
        onOpen = onOpenSteam,
-       onUninstall = onUninstallSteam
+       onUninstall = onUninstallSteam,
+       onNavigateToAuth = {
+        // Navigate to Step 2 (Authentication) tab
+        onNavigateToStep(1)
+       }
       )
      }
      1 -> {
-      // Step 2: Steam Authentication (requires Steam Client)
+      // Step 2: Steam Authentication (requires Steam Client for VDF files)
       val isSteamInstalled = steamInstallState is SteamInstallState.Installed
       if (!isSteamInstalled) {
        PrerequisiteWarning(
@@ -306,9 +346,14 @@ private fun SettingsContent(
        showWebView = showWebView,
        steamLoginViewModel = steamLoginViewModel,
        settingsViewModel = settingsViewModel,
+       autoLaunchState = autoLaunchState,
        onShowWebView = onShowWebView,
        onHideWebView = onHideWebView,
-       onClear = onClearSettings,
+       onNavigateToLibrarySync = {
+        // Navigate to Step 3 (Library Sync) tab
+        onNavigateToStep(2)
+       },
+       onRequestClearSettings = onRequestClearSettings,
        enabled = isSteamInstalled
       )
      }
@@ -333,6 +378,8 @@ private fun SettingsContent(
        data = data,
        syncState = syncState,
        onSync = onSyncLibrary,
+       onNavigateToHome = onNavigateBack, // Navigate back to Home screen (game library)
+       onDismissSyncState = { settingsViewModel.resetSyncState() },
        enabled = isSteamInstalled && isSteamAuthenticated
       )
      }
@@ -376,9 +423,11 @@ private fun SteamAuthContent(
  showWebView: Boolean,
  steamLoginViewModel: SteamLoginViewModel,
  settingsViewModel: SettingsViewModel,
+ autoLaunchState: AutoLaunchState,
  onShowWebView: () -> Unit,
  onHideWebView: () -> Unit,
- onClear: () -> Unit,
+ onNavigateToLibrarySync: () -> Unit,
+ onRequestClearSettings: () -> Unit,
  enabled: Boolean = true
 ) {
  val steamLoginState by steamLoginViewModel.uiState.collectAsStateWithLifecycle()
@@ -415,6 +464,10 @@ private fun SteamAuthContent(
     },
     onError = { errorMessage ->
      AppLogger.e("SteamAuth", "OpenID error: $errorMessage")
+    },
+    onCancel = {
+     // Cancel login - return to authentication screen
+     onHideWebView()
     }
    )
   }
@@ -427,8 +480,9 @@ private fun SteamAuthContent(
     SteamAuthLoggedInSection(
      username = data.steamUsername,
      steamId = data.steamId,
+     onNavigateToLibrarySync = onNavigateToLibrarySync,
      onRelogin = onShowWebView,
-     onLogout = onClear
+     onRequestClearSettings = onRequestClearSettings
     )
    } else {
     // Not logged in - Display OpenID login button
@@ -444,19 +498,34 @@ private fun SteamAuthContent(
     onSaveApiKey = settingsViewModel::saveSteamApiKey,
     enabled = enabled
    )
+
+   // Auto-launch Steam progress (NEW - 2025-12-23)
+   SteamAutoLaunchProgress(autoLaunchState = autoLaunchState)
   }
  }
 }
 
 /**
- * Steam authenticated section (Steam style design)
+ * Steam Authentication - Logged In Section
+ *
+ * Displays user information and provides three action buttons:
+ * 1. PRIMARY: Navigate to Library Sync (next step)
+ * 2. SECONDARY: Re-login (QR code authentication)
+ * 3. DESTRUCTIVE: Clear All Settings (with confirmation dialog)
+ *
+ * @param username Steam account name
+ * @param steamId SteamID64
+ * @param onNavigateToLibrarySync Callback to scroll/navigate to Library Sync section
+ * @param onRelogin Callback to initiate QR re-authentication
+ * @param onRequestClearSettings Callback to request clear all settings (triggers confirmation dialog)
  */
 @Composable
 private fun SteamAuthLoggedInSection(
  username: String,
  steamId: String,
+ onNavigateToLibrarySync: () -> Unit,
  onRelogin: () -> Unit,
- onLogout: () -> Unit
+ onRequestClearSettings: () -> Unit
 ) {
  Card(
   modifier = Modifier
@@ -546,41 +615,67 @@ private fun SteamAuthLoggedInSection(
      )
     }
 
-    // Right column: Buttons
+    // Right column: Action Buttons (3-tier hierarchy)
     Column(
      modifier = Modifier
       .weight(0.5f)
       .fillMaxHeight(),
      horizontalAlignment = Alignment.CenterHorizontally,
-     verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
+     verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically)
     ) {
+     // PRIMARY: Next step - Sync Library
      Button(
-      onClick = onRelogin,
+      onClick = onNavigateToLibrarySync,
       modifier = Modifier.fillMaxWidth(),
-      colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-       containerColor = SteamColorPalette.Blue,
-       contentColor = Color.White
+      colors = ButtonDefaults.buttonColors(
+       containerColor = SteamColorPalette.Green
       )
      ) {
+      Icon(
+       imageVector = Icons.Default.Refresh,
+       contentDescription = null,
+       modifier = Modifier.size(20.dp)
+      )
+      Spacer(modifier = Modifier.width(8.dp))
       Text(
-       "Re-Login",
+       text = stringResource(R.string.button_sync_library),
        style = MaterialTheme.typography.titleMedium.copy(
         fontWeight = FontWeight.Bold
        )
       )
      }
 
+     // SECONDARY: Re-Login
      OutlinedButton(
-      onClick = onLogout,
+      onClick = onRelogin,
       modifier = Modifier.fillMaxWidth(),
-      colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-       contentColor = SteamColorPalette.Gray
+      colors = ButtonDefaults.outlinedButtonColors(
+       contentColor = SteamColorPalette.Blue
       ),
-      border = BorderStroke(1.dp, SteamColorPalette.Gray)
+      border = BorderStroke(1.dp, SteamColorPalette.Blue)
      ) {
       Text(
-       "Logout",
+       text = stringResource(R.string.button_relogin),
        style = MaterialTheme.typography.titleMedium
+      )
+     }
+
+     // DESTRUCTIVE: Clear All Settings
+     TextButton(
+      onClick = onRequestClearSettings,
+      modifier = Modifier.fillMaxWidth()
+     ) {
+      Icon(
+       imageVector = Icons.Default.Warning,
+       contentDescription = null,
+       tint = MaterialTheme.colorScheme.error,
+       modifier = Modifier.size(18.dp)
+      )
+      Spacer(modifier = Modifier.width(6.dp))
+      Text(
+       text = stringResource(R.string.button_clear_all_settings),
+       style = MaterialTheme.typography.labelLarge,
+       color = MaterialTheme.colorScheme.error
       )
      }
     }
@@ -738,14 +833,33 @@ private fun SteamOpenIdAuthSection(
  }
 }
 
+/**
+ * Steam Client Installation Content
+ *
+ * Displays Steam client installation status and actions.
+ * Switches UI based on authentication state for better UX flow.
+ *
+ * @param steamInstallState Current installation state
+ * @param isAuthenticated Whether user has authenticated via QR code
+ * @param steamUsername Steam account name (for authenticated state)
+ * @param defaultContainerId Container ID for installation
+ * @param viewModel Settings ViewModel
+ * @param onInstall Install Steam client callback
+ * @param onOpen Open Steam client callback
+ * @param onUninstall Uninstall Steam client callback
+ * @param onNavigateToAuth Navigate to authentication step callback
+ */
 @Composable
 private fun SteamClientContent(
  steamInstallState: SteamInstallState,
+ isAuthenticated: Boolean,
+ steamUsername: String?,
  defaultContainerId: String,
  viewModel: SettingsViewModel,
  onInstall: (String) -> Unit,
  onOpen: (String) -> Unit,
- onUninstall: (String) -> Unit
+ onUninstall: (String) -> Unit,
+ onNavigateToAuth: () -> Unit
 ) {
  Card(
   modifier = Modifier.fillMaxWidth(),
@@ -930,170 +1044,25 @@ private fun SteamClientContent(
     }
 
     is SteamInstallState.Installed -> {
-     // Header with success icon
-     Row(
-      modifier = Modifier.fillMaxWidth(),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(16.dp)
-     ) {
-      Surface(
-       shape = RoundedCornerShape(12.dp),
-       color = SteamColorPalette.Green.copy(alpha = 0.2f)
-      ) {
-       Icon(
-        imageVector = Icons.Default.CheckCircle,
-        contentDescription = null,
-        modifier = Modifier
-         .size(56.dp)
-         .padding(12.dp),
-        tint = SteamColorPalette.Green
-       )
-      }
-      Column(modifier = Modifier.weight(1f)) {
-       Text(
-        text = "Steam Client",
-        style = MaterialTheme.typography.titleLarge.copy(
-         fontWeight = FontWeight.Bold
-        ),
-        color = Color.White
-       )
-       Text(
-        text = "Installed",
-        style = MaterialTheme.typography.bodyMedium,
-        color = SteamColorPalette.Green
-       )
-      }
-     }
-
-     // Divider
-     Box(
-      modifier = Modifier
-       .fillMaxWidth()
-       .height(1.dp)
-       .background(SteamColorPalette.Medium)
-     )
-
-     // Install path
-     Surface(
-      shape = RoundedCornerShape(6.dp),
-      color = SteamColorPalette.Medium.copy(alpha = 0.3f)
-     ) {
-      Text(
-       text = "Install path:\n${state.installPath}",
-       style = MaterialTheme.typography.bodySmall.copy(
-        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-       ),
-       color = SteamColorPalette.Gray,
-       modifier = Modifier
-        .fillMaxWidth()
-        .padding(12.dp)
+     // Switch UI based on authentication state
+     if (isAuthenticated && steamUsername != null) {
+      // Authenticated: Auto-login configured, ready to use
+      SteamInstalledAuthenticatedContent(
+       installPath = state.installPath,
+       containerId = state.containerId,
+       steamUsername = steamUsername,
+       onOpen = onOpen,
+       onUninstall = onUninstall
       )
-     }
-
-     // Open button
-     Button(
-      onClick = { onOpen(state.containerId) },
-      modifier = Modifier
-       .fillMaxWidth()
-       .height(48.dp),
-      colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-       containerColor = Color.Transparent
-      ),
-      shape = RoundedCornerShape(4.dp),
-      contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-     ) {
-      Box(
-       modifier = Modifier
-        .fillMaxSize()
-        .background(
-         brush = Brush.linearGradient(
-          colors = listOf(
-           SteamColorPalette.BrightBlue,
-           SteamColorPalette.DeepBlue
-          )
-         )
-        ),
-       contentAlignment = Alignment.Center
-      ) {
-       Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-       ) {
-        Icon(
-         imageVector = Icons.Default.SportsEsports,
-         contentDescription = null,
-         tint = Color.White
-        )
-        Text(
-         text = "Open Steam Client",
-         style = MaterialTheme.typography.titleMedium.copy(
-          fontWeight = FontWeight.Bold
-         ),
-         color = Color.White
-        )
-       }
-      }
-     }
-
-     // Big Picture Mode Toggle
-     Spacer(modifier = Modifier.height(16.dp))
-     Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.CenterVertically
-     ) {
-      Column(modifier = Modifier.weight(1f)) {
-       Text(
-        text = stringResource(R.string.setting_steam_big_picture_mode_title),
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurface
-       )
-       Text(
-        text = stringResource(R.string.setting_steam_big_picture_mode_description),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-       )
-      }
-
-      var bigPictureModeEnabled by remember { mutableStateOf(true) }
-
-      // Load current preference on first composition
-      LaunchedEffect(Unit) {
-       bigPictureModeEnabled = viewModel.getSteamBigPictureMode()
-      }
-
-      Switch(
-       checked = bigPictureModeEnabled,
-       onCheckedChange = { enabled ->
-        bigPictureModeEnabled = enabled
-        viewModel.setSteamBigPictureMode(enabled)
-       },
-       colors = SwitchDefaults.colors(
-        checkedThumbColor = SteamColorPalette.BrightBlue,
-        checkedTrackColor = SteamColorPalette.BrightBlue.copy(alpha = 0.5f)
-       )
+     } else {
+      // Not authenticated: Guide user to complete authentication
+      SteamInstalledUnauthenticatedContent(
+       installPath = state.installPath,
+       containerId = state.containerId,
+       onNavigateToAuth = onNavigateToAuth,
+       onOpen = onOpen,
+       onUninstall = onUninstall
       )
-     }
-
-     Spacer(modifier = Modifier.height(16.dp))
-
-     // Uninstall button
-     OutlinedButton(
-      onClick = { onUninstall(state.containerId) },
-      modifier = Modifier.fillMaxWidth(),
-      colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-       contentColor = SteamColorPalette.Gray
-      ),
-      border = BorderStroke(1.dp, SteamColorPalette.Gray),
-      shape = RoundedCornerShape(4.dp)
-     ) {
-      Icon(
-       imageVector = Icons.Default.Clear,
-       contentDescription = null,
-       modifier = Modifier.size(18.dp)
-      )
-      Spacer(modifier = Modifier.width(6.dp))
-      Text("Uninstall")
      }
     }
 
@@ -1218,11 +1187,516 @@ private fun SteamClientContent(
  }
 }
 
+/**
+ * Sync Success Summary Card
+ *
+ * Persistent success feedback showing sync results with navigation to game library.
+ * Replaces ephemeral snackbar for better UX.
+ */
+@Composable
+private fun SyncSuccessSummary(
+ syncedGamesCount: Int,
+ onViewGames: () -> Unit,
+ onDismiss: () -> Unit
+) {
+ Card(
+  modifier = Modifier.fillMaxWidth(),
+  colors = CardDefaults.cardColors(
+   containerColor = SteamColorPalette.Green.copy(alpha = 0.1f)
+  ),
+  shape = RoundedCornerShape(8.dp)
+ ) {
+  Column(
+   modifier = Modifier
+    .fillMaxWidth()
+    .padding(20.dp),
+   verticalArrangement = Arrangement.spacedBy(16.dp)
+  ) {
+   // Success header
+   Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(12.dp)
+   ) {
+    Icon(
+     imageVector = Icons.Default.CheckCircle,
+     contentDescription = null,
+     tint = SteamColorPalette.Green,
+     modifier = Modifier.size(32.dp)
+    )
+    Column {
+     Text(
+      text = stringResource(R.string.sync_success_title),
+      style = MaterialTheme.typography.titleMedium,
+      fontWeight = FontWeight.Bold,
+      color = MaterialTheme.colorScheme.onSurface
+     )
+     Text(
+      text = stringResource(R.string.sync_games_synced_count, syncedGamesCount),
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant
+     )
+    }
+   }
+
+   // Divider
+   Box(
+    modifier = Modifier
+     .fillMaxWidth()
+     .height(1.dp)
+     .background(SteamColorPalette.Medium.copy(alpha = 0.3f))
+   )
+
+   // Next steps guidance
+   Text(
+    text = stringResource(R.string.sync_success_message),
+    style = MaterialTheme.typography.bodyMedium,
+    color = MaterialTheme.colorScheme.onSurfaceVariant
+   )
+
+   // View Games button (PRIMARY CTA)
+   Button(
+    onClick = onViewGames,
+    modifier = Modifier
+     .fillMaxWidth()
+     .height(48.dp),
+    colors = ButtonDefaults.buttonColors(
+     containerColor = Color.Transparent
+    ),
+    shape = RoundedCornerShape(4.dp),
+    contentPadding = PaddingValues(0.dp)
+   ) {
+    Box(
+     modifier = Modifier
+      .fillMaxSize()
+      .background(
+       brush = Brush.linearGradient(
+        colors = listOf(
+         SteamColorPalette.BrightBlue,
+         SteamColorPalette.DeepBlue
+        )
+       )
+      ),
+     contentAlignment = Alignment.Center
+    ) {
+     Row(
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      verticalAlignment = Alignment.CenterVertically
+     ) {
+      Icon(
+       imageVector = Icons.Default.SportsEsports,
+       contentDescription = null,
+       tint = Color.White
+      )
+      Text(
+       text = stringResource(R.string.button_view_games),
+       style = MaterialTheme.typography.titleMedium.copy(
+        fontWeight = FontWeight.Bold
+       ),
+       color = Color.White
+      )
+     }
+    }
+   }
+
+   // Dismiss button
+   OutlinedButton(
+    onClick = onDismiss,
+    modifier = Modifier.align(Alignment.End)
+   ) {
+    Icon(
+     imageVector = Icons.Default.Close,
+     contentDescription = null,
+     modifier = Modifier.size(16.dp)
+    )
+    Spacer(modifier = Modifier.width(4.dp))
+    Text(stringResource(R.string.button_dismiss))
+   }
+  }
+ }
+}
+
+/**
+ * Sync Error Card
+ *
+ * Expandable error display with troubleshooting tips.
+ * Provides persistent error feedback unlike ephemeral snackbar.
+ */
+@Composable
+private fun SyncErrorCard(
+ errorMessage: String,
+ onDismiss: () -> Unit
+) {
+ var expanded by remember { mutableStateOf(true) }
+
+ Card(
+  modifier = Modifier.fillMaxWidth(),
+  colors = CardDefaults.cardColors(
+   containerColor = MaterialTheme.colorScheme.errorContainer
+  ),
+  shape = RoundedCornerShape(8.dp)
+ ) {
+  Column(
+   modifier = Modifier
+    .fillMaxWidth()
+    .padding(20.dp),
+   verticalArrangement = Arrangement.spacedBy(12.dp)
+  ) {
+   // Error header with expand/collapse
+   Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.SpaceBetween,
+    verticalAlignment = Alignment.CenterVertically
+   ) {
+    Row(
+     verticalAlignment = Alignment.CenterVertically,
+     horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+     Icon(
+      imageVector = Icons.Default.Warning,
+      contentDescription = null,
+      tint = MaterialTheme.colorScheme.error,
+      modifier = Modifier.size(28.dp)
+     )
+     Text(
+      text = stringResource(R.string.sync_failed_title),
+      style = MaterialTheme.typography.titleMedium,
+      fontWeight = FontWeight.Bold,
+      color = MaterialTheme.colorScheme.error
+     )
+    }
+    IconButton(onClick = { expanded = !expanded }) {
+     Icon(
+      imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+      contentDescription = if (expanded) stringResource(R.string.content_desc_collapse_details)
+                           else stringResource(R.string.content_desc_expand_details),
+      tint = MaterialTheme.colorScheme.error
+     )
+    }
+   }
+
+   // Error details (expandable)
+   if (expanded) {
+    Surface(
+     shape = RoundedCornerShape(6.dp),
+     color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+    ) {
+     Column(
+      modifier = Modifier
+       .fillMaxWidth()
+       .padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp)
+     ) {
+      Text(
+       text = stringResource(R.string.sync_error_details_label),
+       style = MaterialTheme.typography.labelMedium,
+       fontWeight = FontWeight.Bold,
+       color = MaterialTheme.colorScheme.error
+      )
+      Text(
+       text = errorMessage,
+       style = MaterialTheme.typography.bodyMedium,
+       color = MaterialTheme.colorScheme.onErrorContainer,
+       lineHeight = 20.sp
+      )
+     }
+    }
+
+    // Troubleshooting tips
+    Text(
+     text = stringResource(R.string.sync_troubleshooting_tip),
+     style = MaterialTheme.typography.bodySmall,
+     color = MaterialTheme.colorScheme.onErrorContainer,
+     fontStyle = FontStyle.Italic
+    )
+   }
+
+   // Dismiss button
+   OutlinedButton(
+    onClick = onDismiss,
+    modifier = Modifier.align(Alignment.End)
+   ) {
+    Icon(
+     imageVector = Icons.Default.Close,
+     contentDescription = null,
+     modifier = Modifier.size(16.dp)
+    )
+    Spacer(modifier = Modifier.width(4.dp))
+    Text(stringResource(R.string.button_dismiss))
+   }
+  }
+ }
+}
+
+/**
+ * Clear Settings Confirmation Dialog
+ *
+ * Shows a warning dialog before executing the destructive "Clear All Settings" action.
+ * Prevents accidental deletion of Steam ID, API Key, and all preferences.
+ *
+ * @param onConfirm Callback when user confirms deletion
+ * @param onDismiss Callback when user cancels
+ */
+@Composable
+private fun ClearSettingsConfirmationDialog(
+ onConfirm: () -> Unit,
+ onDismiss: () -> Unit
+) {
+ AlertDialog(
+  onDismissRequest = onDismiss,
+  icon = {
+   Icon(
+    imageVector = Icons.Default.Warning,
+    contentDescription = null,
+    tint = MaterialTheme.colorScheme.error,
+    modifier = Modifier.size(32.dp)
+   )
+  },
+  title = {
+   Text(
+    text = stringResource(R.string.dialog_clear_settings_title),
+    style = MaterialTheme.typography.titleLarge,
+    fontWeight = FontWeight.Bold,
+    color = MaterialTheme.colorScheme.error
+   )
+  },
+  text = {
+   Column(
+    verticalArrangement = Arrangement.spacedBy(16.dp)
+   ) {
+    Text(
+     text = stringResource(R.string.dialog_clear_settings_message),
+     style = MaterialTheme.typography.bodyMedium
+    )
+
+    Surface(
+     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+     shape = RoundedCornerShape(8.dp)
+    ) {
+     Column(
+      modifier = Modifier
+       .fillMaxWidth()
+       .padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp)
+     ) {
+      Text(
+       text = "• ${stringResource(R.string.dialog_clear_settings_item_steam_id)}",
+       style = MaterialTheme.typography.bodyMedium,
+       color = MaterialTheme.colorScheme.onErrorContainer
+      )
+      Text(
+       text = "• ${stringResource(R.string.dialog_clear_settings_item_api_key)}",
+       style = MaterialTheme.typography.bodyMedium,
+       color = MaterialTheme.colorScheme.onErrorContainer
+      )
+      Text(
+       text = "• ${stringResource(R.string.dialog_clear_settings_item_sync_history)}",
+       style = MaterialTheme.typography.bodyMedium,
+       color = MaterialTheme.colorScheme.onErrorContainer
+      )
+      Text(
+       text = "• ${stringResource(R.string.dialog_clear_settings_item_all_prefs)}",
+       style = MaterialTheme.typography.bodyMedium,
+       color = MaterialTheme.colorScheme.onErrorContainer
+      )
+     }
+    }
+
+    Text(
+     text = stringResource(R.string.dialog_clear_settings_warning),
+     style = MaterialTheme.typography.bodySmall,
+     fontWeight = FontWeight.Bold,
+     color = MaterialTheme.colorScheme.error
+    )
+   }
+  },
+  confirmButton = {
+   Button(
+    onClick = {
+     onConfirm()
+     onDismiss()
+    },
+    colors = ButtonDefaults.buttonColors(
+     containerColor = MaterialTheme.colorScheme.error
+    )
+   ) {
+    Text(stringResource(R.string.dialog_clear_settings_confirm))
+   }
+  },
+  dismissButton = {
+   TextButton(onClick = onDismiss) {
+    Text(stringResource(R.string.button_cancel))
+   }
+  }
+ )
+}
+
+/**
+ * Login Success Card
+ *
+ * Displays after successful QR authentication to guide user to the next step.
+ * Shows welcome message and directs user to Library Sync.
+ *
+ * @param username Steam account name
+ * @param onNavigateToSync Callback to navigate to Library Sync section
+ * @param onDismiss Callback to dismiss the card
+ */
+@Composable
+private fun LoginSuccessCard(
+ username: String,
+ onNavigateToSync: () -> Unit,
+ onDismiss: () -> Unit
+) {
+ Card(
+  modifier = Modifier.fillMaxWidth(),
+  colors = CardDefaults.cardColors(
+   containerColor = SteamColorPalette.Green.copy(alpha = 0.1f)
+  ),
+  shape = RoundedCornerShape(8.dp)
+ ) {
+  Column(
+   modifier = Modifier
+    .fillMaxWidth()
+    .padding(20.dp),
+   verticalArrangement = Arrangement.spacedBy(16.dp)
+  ) {
+   // Success header with icon
+   Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(12.dp)
+   ) {
+    Icon(
+     imageVector = Icons.Default.CheckCircle,
+     contentDescription = null,
+     tint = SteamColorPalette.Green,
+     modifier = Modifier.size(32.dp)
+    )
+    Column {
+     Text(
+      text = stringResource(R.string.login_success_title, username),
+      style = MaterialTheme.typography.titleMedium,
+      fontWeight = FontWeight.Bold,
+      color = MaterialTheme.colorScheme.onSurface
+     )
+     Text(
+      text = stringResource(R.string.login_success_subtitle),
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant
+     )
+    }
+   }
+
+   // Divider
+   HorizontalDivider(
+    thickness = 1.dp,
+    color = SteamColorPalette.Medium.copy(alpha = 0.3f)
+   )
+
+   // Next steps guidance
+   Column(
+    verticalArrangement = Arrangement.spacedBy(8.dp)
+   ) {
+    Text(
+     text = stringResource(R.string.login_success_next_steps),
+     style = MaterialTheme.typography.labelLarge,
+     fontWeight = FontWeight.Bold,
+     color = MaterialTheme.colorScheme.onSurface
+    )
+
+    Row(
+     verticalAlignment = Alignment.CenterVertically,
+     horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+     Surface(
+      color = SteamColorPalette.Green,
+      shape = RoundedCornerShape(4.dp),
+      modifier = Modifier.size(24.dp)
+     ) {
+      Box(contentAlignment = Alignment.Center) {
+       Text(
+        text = "1",
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = Color.White
+       )
+      }
+     }
+     Text(
+      text = stringResource(R.string.login_success_step_1),
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant
+     )
+    }
+
+    Row(
+     verticalAlignment = Alignment.CenterVertically,
+     horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+     Surface(
+      color = SteamColorPalette.DeepBlue,
+      shape = RoundedCornerShape(4.dp),
+      modifier = Modifier.size(24.dp)
+     ) {
+      Box(contentAlignment = Alignment.Center) {
+       Text(
+        text = "2",
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = Color.White
+       )
+      }
+     }
+     Text(
+      text = stringResource(R.string.login_success_step_2),
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant
+     )
+    }
+   }
+
+   // Navigate to Sync button
+   Button(
+    onClick = onNavigateToSync,
+    modifier = Modifier.fillMaxWidth(),
+    colors = ButtonDefaults.buttonColors(
+     containerColor = SteamColorPalette.Green
+    )
+   ) {
+    Icon(
+     imageVector = Icons.Default.Refresh,
+     contentDescription = null
+    )
+    Spacer(modifier = Modifier.width(8.dp))
+    Text(
+     text = stringResource(R.string.button_go_to_library_sync),
+     style = MaterialTheme.typography.titleMedium,
+     fontWeight = FontWeight.Bold
+    )
+   }
+
+   // Dismiss button
+   TextButton(
+    onClick = onDismiss,
+    modifier = Modifier.align(Alignment.End)
+   ) {
+    Icon(
+     imageVector = Icons.Default.Close,
+     contentDescription = null,
+     modifier = Modifier.size(16.dp)
+    )
+    Spacer(modifier = Modifier.width(4.dp))
+    Text(stringResource(R.string.button_dismiss))
+   }
+  }
+ }
+}
+
 @Composable
 private fun LibrarySyncContent(
  data: com.steamdeck.mobile.presentation.viewmodel.SettingsData,
  syncState: SyncState,
  onSync: () -> Unit,
+ onNavigateToHome: () -> Unit,
+ onDismissSyncState: () -> Unit,
  enabled: Boolean = true
 ) {
  Card(
@@ -1245,47 +1719,75 @@ private fun LibrarySyncContent(
     color = MaterialTheme.colorScheme.onSurfaceVariant
    )
 
-   // Sync state display
-   when (val state = syncState) {
-    is SyncState.Syncing -> {
-     Column(
-      verticalArrangement = Arrangement.spacedBy(8.dp)
-     ) {
-      LinearProgressIndicator(
-       modifier = Modifier.fillMaxWidth()
-      )
-      Text(
-       text = state.message,
-       style = MaterialTheme.typography.bodyMedium,
-       color = MaterialTheme.colorScheme.primary
-      )
-     }
+   // Sync progress (only during syncing)
+   if (syncState is SyncState.Syncing) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+     Text(
+      text = syncState.message,
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.primary
+     )
     }
-    else -> {}
    }
 
-   // Sync button
+   // Enhanced sync button with state-based icons
    FilledTonalButton(
-    onClick = onSync,
+    onClick = {
+     // Auto-dismiss previous result before new sync
+     if (syncState is SyncState.Success || syncState is SyncState.Error) {
+      onDismissSyncState()
+     }
+     onSync()
+    },
     enabled = enabled && data.isSteamConfigured && syncState !is SyncState.Syncing,
     modifier = Modifier.fillMaxWidth()
    ) {
-    Icon(
-     imageVector = Icons.Default.Refresh,
-     contentDescription = stringResource(R.string.content_desc_sync)
-    )
-    Spacer(modifier = Modifier.width(8.dp))
-    Text(
-     text = if (syncState is SyncState.Syncing) "Syncing..." else "Library Sync"
-    )
+    when (syncState) {
+     is SyncState.Syncing -> {
+      CircularProgressIndicator(
+       modifier = Modifier.size(20.dp),
+       strokeWidth = 2.dp,
+       color = MaterialTheme.colorScheme.onPrimaryContainer
+      )
+      Spacer(modifier = Modifier.width(12.dp))
+      Text("Syncing...")
+     }
+     is SyncState.Success -> {
+      Icon(
+       imageVector = Icons.Default.CheckCircle,
+       contentDescription = null
+      )
+      Spacer(modifier = Modifier.width(8.dp))
+      Text(stringResource(R.string.button_sync_again))
+     }
+     else -> {
+      Icon(
+       imageVector = Icons.Default.Refresh,
+       contentDescription = stringResource(R.string.content_desc_sync)
+      )
+      Spacer(modifier = Modifier.width(8.dp))
+      Text("Sync Library")
+     }
+    }
    }
 
-   if (!enabled || !data.isSteamConfigured) {
-    Text(
-     text = if (!enabled) "※ Please complete Step 1 and Step 2 first" else "※ Steam authentication required",
-     style = MaterialTheme.typography.bodySmall,
-     color = MaterialTheme.colorScheme.error
-    )
+   // Persistent result cards (Success/Error)
+   when (val state = syncState) {
+    is SyncState.Success -> {
+     SyncSuccessSummary(
+      syncedGamesCount = state.syncedGamesCount,
+      onViewGames = onNavigateToHome,
+      onDismiss = onDismissSyncState
+     )
+    }
+    is SyncState.Error -> {
+     SyncErrorCard(
+      errorMessage = state.message,
+      onDismiss = onDismissSyncState
+     )
+    }
+    else -> {}
    }
   }
  }
@@ -2015,5 +2517,605 @@ private fun SteamApiKeySection(
     )
    }
   }
+ }
+}
+
+/**
+ * Steam Auto-Launch Progress Display (NEW - 2025-12-23)
+ *
+ * Shows real-time progress of automatic Steam client launch after QR login
+ */
+@Composable
+private fun SteamAutoLaunchProgress(
+ autoLaunchState: AutoLaunchState
+) {
+ when (autoLaunchState) {
+  is AutoLaunchState.LaunchingSteam -> {
+   Card(
+    modifier = Modifier.fillMaxWidth(),
+    colors = CardDefaults.cardColors(
+     containerColor = SteamColorPalette.Blue.copy(alpha = 0.1f)
+    ),
+    shape = RoundedCornerShape(8.dp)
+   ) {
+    Row(
+     modifier = Modifier
+      .fillMaxWidth()
+      .padding(16.dp),
+     horizontalArrangement = Arrangement.spacedBy(12.dp),
+     verticalAlignment = Alignment.CenterVertically
+    ) {
+     CircularProgressIndicator(
+      modifier = Modifier.size(24.dp),
+      color = SteamColorPalette.Blue
+     )
+     Text(
+      text = stringResource(R.string.steam_auto_launching),
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurface
+     )
+    }
+   }
+  }
+  is AutoLaunchState.SteamRunning -> {
+   Card(
+    modifier = Modifier.fillMaxWidth(),
+    colors = CardDefaults.cardColors(
+     containerColor = Color(0xFF4CAF50).copy(alpha = 0.1f)
+    ),
+    shape = RoundedCornerShape(8.dp)
+   ) {
+    Row(
+     modifier = Modifier
+      .fillMaxWidth()
+      .padding(16.dp),
+     horizontalArrangement = Arrangement.spacedBy(12.dp),
+     verticalAlignment = Alignment.CenterVertically
+    ) {
+     Icon(
+      imageVector = Icons.Default.CheckCircle,
+      contentDescription = null,
+      tint = Color(0xFF4CAF50),
+      modifier = Modifier.size(24.dp)
+     )
+     Text(
+      text = stringResource(R.string.steam_auto_launch_success),
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurface
+     )
+    }
+   }
+  }
+  is AutoLaunchState.LaunchError -> {
+   Card(
+    modifier = Modifier.fillMaxWidth(),
+    colors = CardDefaults.cardColors(
+     containerColor = Color(0xFFFF9800).copy(alpha = 0.1f)
+    ),
+    shape = RoundedCornerShape(8.dp)
+   ) {
+    Column(
+     modifier = Modifier
+      .fillMaxWidth()
+      .padding(16.dp),
+     verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+     Row(
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      verticalAlignment = Alignment.CenterVertically
+     ) {
+      Icon(
+       imageVector = Icons.Default.Warning,
+       contentDescription = null,
+       tint = Color(0xFFFF9800),
+       modifier = Modifier.size(24.dp)
+      )
+      Text(
+       text = stringResource(R.string.steam_auto_launch_failed),
+       style = MaterialTheme.typography.bodyMedium,
+       fontWeight = FontWeight.Bold,
+       color = MaterialTheme.colorScheme.onSurface
+      )
+     }
+     Text(
+      text = autoLaunchState.message,
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant
+     )
+    }
+   }
+  }
+  is AutoLaunchState.Idle -> {
+   // No display when idle
+  }
+ }
+}
+
+/**
+ * Steam Client - Installed but Not Authenticated State
+ *
+ * Displays when Steam is installed but user hasn't authenticated yet.
+ * Guides user to complete Step 2 (Authentication) before using Steam.
+ *
+ * Design: 3-tier action hierarchy
+ * - PRIMARY: Navigate to Authentication step (green button)
+ * - ADVANCED: Collapsible section with manual Steam launch (requires manual QR login)
+ * - DESTRUCTIVE: Uninstall button
+ */
+@Composable
+private fun SteamInstalledUnauthenticatedContent(
+ installPath: String,
+ containerId: String,
+ onNavigateToAuth: () -> Unit,
+ onOpen: (String) -> Unit,
+ onUninstall: (String) -> Unit
+) {
+ var showAdvancedOptions by remember { mutableStateOf(false) }
+
+ // Header with success icon
+ Row(
+  modifier = Modifier.fillMaxWidth(),
+  verticalAlignment = Alignment.CenterVertically,
+  horizontalArrangement = Arrangement.spacedBy(16.dp)
+ ) {
+  Surface(
+   shape = RoundedCornerShape(12.dp),
+   color = SteamColorPalette.Green.copy(alpha = 0.2f)
+  ) {
+   Icon(
+    imageVector = Icons.Default.CheckCircle,
+    contentDescription = null,
+    modifier = Modifier
+     .size(56.dp)
+     .padding(12.dp),
+    tint = SteamColorPalette.Green
+   )
+  }
+  Column(modifier = Modifier.weight(1f)) {
+   Text(
+    text = stringResource(R.string.steam_client_title),
+    style = MaterialTheme.typography.titleLarge.copy(
+     fontWeight = FontWeight.Bold
+    ),
+    color = Color.White
+   )
+   Text(
+    text = stringResource(R.string.steam_status_installed),
+    style = MaterialTheme.typography.bodyMedium,
+    color = SteamColorPalette.Green
+   )
+  }
+ }
+
+ // Divider
+ Box(
+  modifier = Modifier
+   .fillMaxWidth()
+   .height(1.dp)
+   .background(SteamColorPalette.Medium)
+ )
+
+ // Next step guidance
+ Surface(
+  shape = RoundedCornerShape(6.dp),
+  color = SteamColorPalette.Blue.copy(alpha = 0.15f)
+ ) {
+  Column(
+   modifier = Modifier
+    .fillMaxWidth()
+    .padding(16.dp),
+   verticalArrangement = Arrangement.spacedBy(12.dp)
+  ) {
+   Row(
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+    verticalAlignment = Alignment.CenterVertically
+   ) {
+    Icon(
+     imageVector = Icons.Default.Info,
+     contentDescription = null,
+     tint = SteamColorPalette.Blue,
+     modifier = Modifier.size(24.dp)
+    )
+    Text(
+     text = stringResource(R.string.steam_next_step_auth),
+     style = MaterialTheme.typography.titleSmall.copy(
+      fontWeight = FontWeight.Bold
+     ),
+     color = SteamColorPalette.Blue
+    )
+   }
+   Text(
+    text = stringResource(R.string.steam_auth_required_description),
+    style = MaterialTheme.typography.bodyMedium,
+    color = SteamColorPalette.LightText,
+    lineHeight = 20.sp
+   )
+  }
+ }
+
+ // PRIMARY: Next step button (Navigate to Authentication)
+ Button(
+  onClick = onNavigateToAuth,
+  modifier = Modifier
+   .fillMaxWidth()
+   .height(48.dp),
+  colors = ButtonDefaults.buttonColors(
+   containerColor = Color.Transparent
+  ),
+  shape = RoundedCornerShape(4.dp),
+  contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+ ) {
+  Box(
+   modifier = Modifier
+    .fillMaxSize()
+    .background(
+     brush = Brush.linearGradient(
+      colors = listOf(
+       SteamColorPalette.Green,
+       SteamColorPalette.Green.copy(alpha = 0.8f)
+      )
+     )
+    ),
+   contentAlignment = Alignment.Center
+  ) {
+   Row(
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    verticalAlignment = Alignment.CenterVertically
+   ) {
+    Text(
+     text = stringResource(R.string.button_next_authenticate),
+     style = MaterialTheme.typography.titleMedium.copy(
+      fontWeight = FontWeight.Bold
+     ),
+     color = Color.White
+    )
+    Icon(
+     imageVector = Icons.Default.KeyboardArrowRight,
+     contentDescription = null,
+     tint = Color.White
+    )
+   }
+  }
+ }
+
+ // ADVANCED: Collapsible section
+ Column(
+  modifier = Modifier.fillMaxWidth(),
+  verticalArrangement = Arrangement.spacedBy(12.dp)
+ ) {
+  // Divider with text
+  Row(
+   modifier = Modifier.fillMaxWidth(),
+   verticalAlignment = Alignment.CenterVertically,
+   horizontalArrangement = Arrangement.spacedBy(8.dp)
+  ) {
+   Box(
+    modifier = Modifier
+     .weight(1f)
+     .height(1.dp)
+     .background(SteamColorPalette.Medium)
+   )
+   TextButton(
+    onClick = { showAdvancedOptions = !showAdvancedOptions }
+   ) {
+    Text(
+     text = if (showAdvancedOptions)
+      stringResource(R.string.button_hide_advanced)
+     else
+      stringResource(R.string.button_advanced_options),
+     style = MaterialTheme.typography.labelMedium,
+     color = SteamColorPalette.Gray
+    )
+    Spacer(modifier = Modifier.width(4.dp))
+    Icon(
+     imageVector = if (showAdvancedOptions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+     contentDescription = null,
+     tint = SteamColorPalette.Gray,
+     modifier = Modifier.size(18.dp)
+    )
+   }
+   Box(
+    modifier = Modifier
+     .weight(1f)
+     .height(1.dp)
+     .background(SteamColorPalette.Medium)
+   )
+  }
+
+  // Advanced options content
+  if (showAdvancedOptions) {
+   Column(
+    verticalArrangement = Arrangement.spacedBy(12.dp)
+   ) {
+    // Warning box
+    Surface(
+     shape = RoundedCornerShape(6.dp),
+     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+    ) {
+     Row(
+      modifier = Modifier
+       .fillMaxWidth()
+       .padding(12.dp),
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      verticalAlignment = Alignment.CenterVertically
+     ) {
+      Icon(
+       imageVector = Icons.Default.Warning,
+       contentDescription = null,
+       tint = MaterialTheme.colorScheme.error,
+       modifier = Modifier.size(20.dp)
+      )
+      Text(
+       text = stringResource(R.string.steam_manual_login_warning),
+       style = MaterialTheme.typography.bodySmall,
+       color = MaterialTheme.colorScheme.onErrorContainer
+      )
+     }
+    }
+
+    // Install path
+    Surface(
+     shape = RoundedCornerShape(6.dp),
+     color = SteamColorPalette.Medium.copy(alpha = 0.3f)
+    ) {
+     Text(
+      text = "Install path:\n$installPath",
+      style = MaterialTheme.typography.bodySmall.copy(
+       fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+      ),
+      color = SteamColorPalette.Gray,
+      modifier = Modifier
+       .fillMaxWidth()
+       .padding(12.dp)
+     )
+    }
+
+    // Manual open button (no auto-login)
+    OutlinedButton(
+     onClick = { onOpen(containerId) },
+     modifier = Modifier.fillMaxWidth(),
+     colors = ButtonDefaults.outlinedButtonColors(
+      contentColor = SteamColorPalette.Blue
+     ),
+     border = BorderStroke(1.dp, SteamColorPalette.Blue),
+     shape = RoundedCornerShape(4.dp)
+    ) {
+     Icon(
+      imageVector = Icons.Default.SportsEsports,
+      contentDescription = null,
+      modifier = Modifier.size(18.dp)
+     )
+     Spacer(modifier = Modifier.width(6.dp))
+     Text(
+      text = stringResource(R.string.steam_open_client),
+      style = MaterialTheme.typography.titleSmall
+     )
+    }
+
+    Text(
+     text = stringResource(R.string.steam_manual_login_note),
+     style = MaterialTheme.typography.bodySmall,
+     color = SteamColorPalette.Gray,
+     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+    )
+   }
+  }
+ }
+
+ Spacer(modifier = Modifier.height(8.dp))
+
+ // DESTRUCTIVE: Uninstall button
+ OutlinedButton(
+  onClick = { onUninstall(containerId) },
+  modifier = Modifier.fillMaxWidth(),
+  colors = ButtonDefaults.outlinedButtonColors(
+   contentColor = SteamColorPalette.Gray
+  ),
+  border = BorderStroke(1.dp, SteamColorPalette.Gray),
+  shape = RoundedCornerShape(4.dp)
+ ) {
+  Icon(
+   imageVector = Icons.Default.Clear,
+   contentDescription = null,
+   modifier = Modifier.size(18.dp)
+  )
+  Spacer(modifier = Modifier.width(6.dp))
+  Text(stringResource(R.string.button_uninstall))
+ }
+}
+
+/**
+ * Steam Client - Installed and Authenticated State
+ *
+ * Displays when Steam is installed AND user has authenticated.
+ * Auto-login is configured, ready to launch Steam directly.
+ *
+ * Design: Simplified UI with emphasis on primary action
+ * - Shows auto-login status with username
+ * - PRIMARY: Open Steam Client (blue gradient button)
+ * - SECONDARY: Uninstall button
+ */
+@Composable
+private fun SteamInstalledAuthenticatedContent(
+ installPath: String,
+ containerId: String,
+ steamUsername: String,
+ onOpen: (String) -> Unit,
+ onUninstall: (String) -> Unit
+) {
+ // Header with success icon
+ Row(
+  modifier = Modifier.fillMaxWidth(),
+  verticalAlignment = Alignment.CenterVertically,
+  horizontalArrangement = Arrangement.spacedBy(16.dp)
+ ) {
+  Surface(
+   shape = RoundedCornerShape(12.dp),
+   color = SteamColorPalette.Green.copy(alpha = 0.2f)
+  ) {
+   Icon(
+    imageVector = Icons.Default.CheckCircle,
+    contentDescription = null,
+    modifier = Modifier
+     .size(56.dp)
+     .padding(12.dp),
+    tint = SteamColorPalette.Green
+   )
+  }
+  Column(modifier = Modifier.weight(1f)) {
+   Text(
+    text = stringResource(R.string.steam_client_title),
+    style = MaterialTheme.typography.titleLarge.copy(
+     fontWeight = FontWeight.Bold
+    ),
+    color = Color.White
+   )
+   Text(
+    text = stringResource(R.string.steam_status_installed_authenticated),
+    style = MaterialTheme.typography.bodyMedium,
+    color = SteamColorPalette.Green
+   )
+  }
+ }
+
+ // Divider
+ Box(
+  modifier = Modifier
+   .fillMaxWidth()
+   .height(1.dp)
+   .background(SteamColorPalette.Medium)
+ )
+
+ // Auto-login configured status
+ Surface(
+  shape = RoundedCornerShape(6.dp),
+  color = SteamColorPalette.Green.copy(alpha = 0.1f)
+ ) {
+  Column(
+   modifier = Modifier
+    .fillMaxWidth()
+    .padding(16.dp),
+   verticalArrangement = Arrangement.spacedBy(8.dp)
+  ) {
+   Row(
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+    verticalAlignment = Alignment.CenterVertically
+   ) {
+    Icon(
+     imageVector = Icons.Default.CheckCircle,
+     contentDescription = null,
+     tint = SteamColorPalette.Green,
+     modifier = Modifier.size(20.dp)
+    )
+    Text(
+     text = stringResource(R.string.steam_autologin_configured),
+     style = MaterialTheme.typography.titleSmall.copy(
+      fontWeight = FontWeight.Bold
+     ),
+     color = SteamColorPalette.Green
+    )
+   }
+   Row(
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    verticalAlignment = Alignment.CenterVertically
+   ) {
+    Text(
+     text = stringResource(R.string.steam_account_label),
+     style = MaterialTheme.typography.bodySmall,
+     color = SteamColorPalette.Gray
+    )
+    Text(
+     text = steamUsername,
+     style = MaterialTheme.typography.bodySmall.copy(
+      fontWeight = FontWeight.Bold,
+      fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+     ),
+     color = SteamColorPalette.LightText
+    )
+   }
+  }
+ }
+
+ // Install path
+ Surface(
+  shape = RoundedCornerShape(6.dp),
+  color = SteamColorPalette.Medium.copy(alpha = 0.3f)
+ ) {
+  Text(
+   text = "Install path:\n$installPath",
+   style = MaterialTheme.typography.bodySmall.copy(
+    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+   ),
+   color = SteamColorPalette.Gray,
+   modifier = Modifier
+    .fillMaxWidth()
+    .padding(12.dp)
+  )
+ }
+
+ // PRIMARY: Open Steam Client button (with auto-login)
+ Button(
+  onClick = { onOpen(containerId) },
+  modifier = Modifier
+   .fillMaxWidth()
+   .height(48.dp),
+  colors = ButtonDefaults.buttonColors(
+   containerColor = Color.Transparent
+  ),
+  shape = RoundedCornerShape(4.dp),
+  contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+ ) {
+  Box(
+   modifier = Modifier
+    .fillMaxSize()
+    .background(
+     brush = Brush.linearGradient(
+      colors = listOf(
+       SteamColorPalette.BrightBlue,
+       SteamColorPalette.DeepBlue
+      )
+     )
+    ),
+   contentAlignment = Alignment.Center
+  ) {
+   Row(
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    verticalAlignment = Alignment.CenterVertically
+   ) {
+    Icon(
+     imageVector = Icons.Default.SportsEsports,
+     contentDescription = null,
+     tint = Color.White
+    )
+    Text(
+     text = stringResource(R.string.steam_open_client),
+     style = MaterialTheme.typography.titleMedium.copy(
+      fontWeight = FontWeight.Bold
+     ),
+     color = Color.White
+    )
+   }
+  }
+ }
+
+ Spacer(modifier = Modifier.height(16.dp))
+
+ // Uninstall button
+ OutlinedButton(
+  onClick = { onUninstall(containerId) },
+  modifier = Modifier.fillMaxWidth(),
+  colors = ButtonDefaults.outlinedButtonColors(
+   contentColor = SteamColorPalette.Gray
+  ),
+  border = BorderStroke(1.dp, SteamColorPalette.Gray),
+  shape = RoundedCornerShape(4.dp)
+ ) {
+  Icon(
+   imageVector = Icons.Default.Clear,
+   contentDescription = null,
+   modifier = Modifier.size(18.dp)
+  )
+  Spacer(modifier = Modifier.width(6.dp))
+  Text(stringResource(R.string.button_uninstall))
  }
 }

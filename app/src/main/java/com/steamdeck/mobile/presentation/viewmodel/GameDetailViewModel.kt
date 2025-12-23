@@ -383,6 +383,14 @@ class GameDetailViewModel @Inject constructor(
     if (steamId != null) {
      AppLogger.i(TAG, "Configuring Steam auto-login before launch: SteamID=$steamId")
 
+     // Get Steam username for auto-login (NOT SteamID64)
+     val steamUsername = try {
+      securePreferences.getSteamUsername().first()
+     } catch (e: Exception) {
+      AppLogger.w(TAG, "Failed to get Steam username: ${e.message}")
+      null
+     }
+
      // Create loginusers.vdf
      val authResult = steamAuthManager.createLoginUsersVdf(containerDir)
      if (authResult.isFailure) {
@@ -390,7 +398,8 @@ class GameDetailViewModel @Inject constructor(
      }
 
      // Create config.vdf with CDN servers + auto-login
-     val configResult = steamConfigManager.createConfigVdf(containerDir, steamId)
+     // CRITICAL: Use Steam account name, NOT SteamID64
+     val configResult = steamConfigManager.createConfigVdf(containerDir, steamUsername)
      if (configResult.isFailure) {
       AppLogger.w(TAG, "Failed to create config.vdf (non-fatal): ${configResult.exceptionOrNull()?.message}")
      }

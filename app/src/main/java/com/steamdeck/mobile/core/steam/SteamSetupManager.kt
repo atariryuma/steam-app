@@ -614,9 +614,11 @@ class SteamSetupManager @Inject constructor(
    AppLogger.d(TAG, "Steam.exe found: ${steamExeFile.absolutePath} (${steamExeFile.length()} bytes)")
 
    // 2. Launch Steam.exe with initialization flags
-   // -silent: Run without UI
-   // -noreactlogin: Disable React-based login UI (Wine compatibility)
-   val arguments = listOf("-silent", "-noreactlogin")
+   // -silent: Run in background mode without UI (keeps process alive)
+   //
+   // REMOVED: -noreactlogin (causes kernel32.dll load failure in WoW64 mode)
+   // See: wine: could not load kernel32.dll, status c0000135
+   val arguments = listOf("-silent")
    AppLogger.i(TAG, "Launching: $steamExePath ${arguments.joinToString(" ")}")
 
    val launchResult = winlatorEmulator.launchExecutable(

@@ -110,10 +110,6 @@ fun SteamDeckApp() {
        closeDrawer()
        navController.navigate(Screen.ControllerSettings.route)
       },
-      onNavigateToContainerManagement = {
-       closeDrawer()
-       navController.navigate(Screen.ContainerManagement.route)
-      },
       onNavigateToWineTest = {
        closeDrawer()
        navController.navigate(Screen.Settings.createRoute(section = 4))

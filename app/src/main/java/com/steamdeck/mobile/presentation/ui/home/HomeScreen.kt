@@ -496,7 +496,6 @@ fun NavigationDrawerContent(
  onNavigateToSyncLibrary: () -> Unit,
  onNavigateToSteamClient: () -> Unit,
  onNavigateToController: () -> Unit,
- onNavigateToContainerManagement: () -> Unit,
  onNavigateToWineTest: () -> Unit,
  onNavigateToAppSettings: () -> Unit,
  onAddGame: () -> Unit,
@@ -753,12 +752,6 @@ fun NavigationDrawerContent(
     icon = Icons.Default.Warning,
     selected = currentRoute.startsWith("settings") && currentRoute.contains("section=4"),
     onClick = onNavigateToWineTest
-   )
-   DrawerChildItem(
-    label = stringResource(R.string.drawer_item_container_management),
-    icon = Icons.Default.Storage,
-    selected = currentRoute == "settings/containers",
-    onClick = onNavigateToContainerManagement
    )
    DrawerChildItem(
     label = stringResource(R.string.drawer_item_app_settings),

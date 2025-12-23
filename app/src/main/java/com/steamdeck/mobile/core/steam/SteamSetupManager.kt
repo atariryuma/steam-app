@@ -5,9 +5,9 @@ import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.R
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
-import com.steamdeck.mobile.data.local.database.entity.Box64Preset
 import com.steamdeck.mobile.data.local.database.entity.SteamInstallStatus
 import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
+import com.steamdeck.mobile.data.local.database.entity.Box64Preset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex

@@ -40,7 +40,8 @@ class WinlatorEmulator @Inject constructor(
  private val zstdDecompressor: ZstdDecompressor,
  private val processMonitor: ProcessMonitor,
  private val wineMonoInstaller: WineMonoInstaller,
- private val wineGeckoInstaller: com.steamdeck.mobile.core.wine.WineGeckoInstaller
+ private val wineGeckoInstaller: com.steamdeck.mobile.core.wine.WineGeckoInstaller,
+ private val gpuDetector: com.steamdeck.mobile.core.util.GpuDetector
 ) : WindowsEmulator {
 
  override val name: String = "Winlator"
@@ -67,6 +68,10 @@ class WinlatorEmulator @Inject constructor(
   val process: Process,
   val startTime: Long
  )
+
+ private enum class GameEngine {
+  UNITY, UNREAL, UNKNOWN
+ }
 
  companion object {
   private const val TAG = "WinlatorEmulator"
@@ -813,6 +818,18 @@ class WinlatorEmulator @Inject constructor(
    // 3. Build environment variables
    val environmentVars = buildEnvironmentVariables(container).toMutableMap()
    val rootfsLibraryPath = buildRootfsLibraryPath()
+
+   // Auto-detect game engine for Box64 optimization
+   when (detectGameEngine(executable)) {
+    GameEngine.UNITY -> {
+     environmentVars["BOX64_DYNAREC_BIGBLOCK"] = "0"
+     environmentVars["BOX64_DYNAREC_STRONGMEM"] = "1"
+    }
+    GameEngine.UNREAL -> {
+     environmentVars["BOX64_DYNAREC_BIGBLOCK"] = "3"
+    }
+    else -> {}  // Use defaults
+   }
 
    // STEAM-SPECIFIC ENVIRONMENT VARIABLES
    // Research shows Steam requires special configuration on Wine+Box64
@@ -2262,10 +2279,15 @@ REGEDIT4
    // DO NOT set WINESERVER - let Wine find it via PATH (same reason as wineboot)
    // put("WINESERVER", wineserverBinary.absolutePath)
 
-   // X11/Display configuration (critical for Steam UI rendering)
-   // Based on Wine/Box64/Winlator community best practices
-   put("LIBGL_ALWAYS_INDIRECT", "1")  // Use indirect rendering (software fallback)
-   put("GALLIUM_DRIVER", "softpipe")  // Force software renderer (avoid GPU driver issues)
+   // X11/Display configuration - Auto GPU detection
+   if (gpuDetector.shouldUseTurnip()) {
+    put("GALLIUM_DRIVER", "freedreno")  // Adreno: Turnip (fast)
+    put("LIBGL_ALWAYS_INDIRECT", "0")
+    put("MESA_LOADER_DRIVER_OVERRIDE", "zink")
+   } else {
+    put("GALLIUM_DRIVER", "virpipe")    // Others: VirGL (safe)
+    put("LIBGL_ALWAYS_INDIRECT", "1")
+   }
 
    // Graphics configuration
    when (config.directXWrapper) {
@@ -2874,6 +2896,20 @@ REGEDIT4
   } catch (e: Exception) {
    AppLogger.e(TAG, "Failed to open Winlator app", e)
    Result.failure(e)
+  }
+ }
+
+ /**
+  * Detect game engine (Unity/Unreal) for Box64 optimization
+  */
+ private fun detectGameEngine(executable: File): GameEngine {
+  val dir = executable.parentFile ?: return GameEngine.UNKNOWN
+  return when {
+   File(dir, "UnityPlayer.dll").exists() -> GameEngine.UNITY
+   File(dir, "MonoBleedingEdge").isDirectory -> GameEngine.UNITY
+   executable.name.startsWith("UE4", ignoreCase = true) -> GameEngine.UNREAL
+   File(dir.parentFile ?: dir, "Engine").isDirectory -> GameEngine.UNREAL
+   else -> GameEngine.UNKNOWN
   }
  }
 

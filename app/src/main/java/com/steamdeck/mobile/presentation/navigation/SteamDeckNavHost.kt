@@ -21,10 +21,8 @@ import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.presentation.ui.download.DownloadScreen
 import com.steamdeck.mobile.presentation.ui.game.GameDetailScreen
 import com.steamdeck.mobile.presentation.ui.home.HomeScreen
-import com.steamdeck.mobile.presentation.ui.container.ContainerScreen
 import com.steamdeck.mobile.presentation.ui.settings.ControllerSettingsScreen
 import com.steamdeck.mobile.presentation.ui.settings.SettingsScreen
-import com.steamdeck.mobile.presentation.viewmodel.ContainerViewModel
 import com.steamdeck.mobile.presentation.viewmodel.SettingsViewModel
 import com.steamdeck.mobile.presentation.viewmodel.SteamLoginViewModel
 
@@ -253,46 +251,6 @@ fun SteamDeckNavHost(
   ) {
    ControllerSettingsScreen(
     onBackClick = { navController.popBackStack() }
-   )
-  }
-
-  // Settings sub-screen: Container Management
-  composable(
-   route = Screen.ContainerManagement.route,
-   enterTransition = {
-    slideIntoContainer(
-     towards = AnimatedContentTransitionScope.SlideDirection.Start,
-     animationSpec = tween(300, easing = FastOutSlowInEasing)
-    ) + fadeIn(animationSpec = tween(300))
-   },
-   exitTransition = {
-    slideOutOfContainer(
-     towards = AnimatedContentTransitionScope.SlideDirection.Start,
-     animationSpec = tween(300, easing = FastOutSlowInEasing)
-    ) + fadeOut(animationSpec = tween(300))
-   },
-   popEnterTransition = {
-    slideIntoContainer(
-     towards = AnimatedContentTransitionScope.SlideDirection.End,
-     animationSpec = tween(300, easing = FastOutSlowInEasing)
-    ) + fadeIn(animationSpec = tween(300))
-   },
-   popExitTransition = {
-    slideOutOfContainer(
-     towards = AnimatedContentTransitionScope.SlideDirection.End,
-     animationSpec = tween(300, easing = FastOutSlowInEasing)
-    ) + fadeOut(animationSpec = tween(300))
-   }
-  ) {
-   val containerViewModel: ContainerViewModel = hiltViewModel()
-
-   ContainerScreen(
-    viewModel = containerViewModel,
-    onNavigateBack = {
-     if (navController.previousBackStackEntry != null) {
-      navController.popBackStack()
-     }
-    }
    )
   }
 

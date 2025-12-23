@@ -9,7 +9,6 @@ import com.steamdeck.mobile.core.winlator.LaunchResult
 import com.steamdeck.mobile.core.winlator.WinlatorEngine
 import com.steamdeck.mobile.domain.emulator.WindowsEmulator
 import com.steamdeck.mobile.domain.repository.GameRepository
-import com.steamdeck.mobile.domain.repository.WinlatorContainerRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -34,7 +33,6 @@ import javax.inject.Inject
 class LaunchGameUseCase @Inject constructor(
  @ApplicationContext private val context: Context,
  private val gameRepository: GameRepository,
- private val containerRepository: WinlatorContainerRepository,
  private val winlatorEngine: WinlatorEngine,
  private val windowsEmulator: WindowsEmulator,
  private val validateGameInstallationUseCase: ValidateGameInstallationUseCase,
@@ -52,11 +50,6 @@ class LaunchGameUseCase @Inject constructor(
     ?: return DataResult.Error(
      AppError.DatabaseError("Game not found", null)
     )
-
-   // Get container information (if configured)
-   val container = game.winlatorContainerId?.let { containerId ->
-    containerRepository.getContainerById(containerId)
-   }
 
    AppLogger.i(TAG, "Launching game: ${game.name} (ID: $gameId)")
 
@@ -101,8 +94,8 @@ class LaunchGameUseCase @Inject constructor(
    AppLogger.i(TAG, "Starting controller input routing")
    controllerInputRouter.startRouting(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO))
 
-   // Launch game
-   when (val result = winlatorEngine.launchGame(gameToLaunch, container)) {
+   // Launch game (container is managed internally by WinlatorEngine)
+   when (val result = winlatorEngine.launchGame(gameToLaunch, null)) {
     is LaunchResult.Success -> {
      val startTime = System.currentTimeMillis()
 

@@ -2,7 +2,6 @@ package com.steamdeck.mobile.di.module
 
 import android.content.Context
 import com.steamdeck.mobile.core.download.DownloadManager
-import com.steamdeck.mobile.core.steam.ProtonManager
 import com.steamdeck.mobile.core.steam.SteamGameScanner
 import com.steamdeck.mobile.core.steam.SteamInstallerService
 import com.steamdeck.mobile.core.steam.SteamLauncher
@@ -85,23 +84,6 @@ object SteamAuthModule {
   return SteamLauncher(
    context = context,
    winlatorEmulator = winlatorEmulator
-  )
- }
-
- /**
-  * Proton Manager
-  *
-  * Manages Steam Play (Proton) settings
-  */
- @Provides
- @Singleton
- fun provideProtonManager(
-  @ApplicationContext context: Context,
-  database: SteamDeckDatabase
- ): ProtonManager {
-  return ProtonManager(
-   context = context,
-   database = database
   )
  }
 

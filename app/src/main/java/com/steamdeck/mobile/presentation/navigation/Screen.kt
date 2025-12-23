@@ -39,7 +39,6 @@ sealed class Screen(val route: String) {
  data object ControllerSettings : Screen("settings/controller")
  data object WineTest : Screen("settings/wine_test")
  data object SteamLogin : Screen("settings/steam_login")
- data object ContainerManagement : Screen("settings/containers")
 
  // Steam XServer Display
  data object SteamDisplay : Screen("steam/display?containerId={containerId}") {

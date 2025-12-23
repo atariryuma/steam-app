@@ -203,12 +203,6 @@ dependencies {
     implementation(libs.xz) // XZ-Java for .txz decompression
     implementation(libs.sevenzipjbinding) // 7-Zip-JBinding-4Android for NSIS extraction (ARM64 compatible)
 
-    // File Import
-    // TODO: Re-enable when libaums v0.10.0 migration is complete
-    // implementation(libs.libaums) // USB Mass Storage
-    implementation(libs.jcifs.ng) // SMB/CIFS (SMB2/3 support)
-    implementation(libs.commons.net) // FTP/FTPS
-
     // Kotlinx Serialization (Steam API JSON)
     implementation(libs.kotlinx.serialization.json)
 

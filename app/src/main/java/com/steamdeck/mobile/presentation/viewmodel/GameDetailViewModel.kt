@@ -12,7 +12,6 @@ import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.model.InstallationStatus
 import com.steamdeck.mobile.domain.repository.GameRepository
 import com.steamdeck.mobile.domain.usecase.DeleteGameUseCase
-import com.steamdeck.mobile.domain.usecase.GetGameByIdUseCase
 import com.steamdeck.mobile.domain.usecase.LaunchGameUseCase
 import com.steamdeck.mobile.domain.usecase.ScanInstalledGamesUseCase
 import com.steamdeck.mobile.domain.usecase.ToggleFavoriteUseCase
@@ -42,7 +41,6 @@ import javax.inject.Inject
 @HiltViewModel
 class GameDetailViewModel @Inject constructor(
  @ApplicationContext private val context: Context,
- private val getGameByIdUseCase: GetGameByIdUseCase,
  private val launchGameUseCase: LaunchGameUseCase,
  private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
  private val deleteGameUseCase: DeleteGameUseCase,
@@ -115,7 +113,7 @@ class GameDetailViewModel @Inject constructor(
  fun loadGame(gameId: Long) {
   viewModelScope.launch {
    try {
-    val game = getGameByIdUseCase(gameId)
+    val game = gameRepository.getGameById(gameId)
     _uiState.value = if (game != null) {
      GameDetailUiState.Success(game)
     } else {

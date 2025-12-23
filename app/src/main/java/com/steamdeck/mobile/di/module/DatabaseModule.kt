@@ -380,6 +380,7 @@ object DatabaseModule {
 
  /**
   * Provide WinlatorContainerDao
+  * NOTE: Used directly by SteamSetupManager (Repository layer removed per YAGNI)
   */
  @Provides
  @Singleton

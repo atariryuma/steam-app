@@ -2,9 +2,9 @@ package com.steamdeck.mobile.core.winlator
 
 import android.content.Context
 import com.steamdeck.mobile.core.logging.AppLogger
-import com.steamdeck.mobile.domain.model.Box64Preset
+
 import com.steamdeck.mobile.domain.model.Game
-import com.steamdeck.mobile.domain.model.WinlatorContainer
+
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -452,7 +452,7 @@ class WinlatorEngineImpl @Inject constructor(
    }
    GameEngine.UNKNOWN -> {
     // Default configuration
-    WinlatorContainer.createDefault()
+    WinlatorContainer.default()
    }
   }
  }

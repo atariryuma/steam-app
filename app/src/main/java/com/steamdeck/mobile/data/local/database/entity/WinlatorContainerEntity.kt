@@ -5,50 +5,56 @@ import androidx.room.PrimaryKey
 
 /**
  * Winlator container configuration storage entity
+ *
+ * NOTE: This entity is used internally by SteamSetupManager for container persistence.
+ * Repository layer (WinlatorContainerRepository) was removed per YAGNI, but entity remains
+ * as it's actively used by Steam installation logic.
  */
 @Entity(tableName = "winlator_containers")
 data class WinlatorContainerEntity(
- @PrimaryKey(autoGenerate = true)
- val id: Long = 0,
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
 
- /** Container name */
- val name: String,
+    /** Container name */
+    val name: String,
 
- /** Box64 preset (PERFORMANCE / STABILITY) */
- val box64Preset: Box64Preset,
+    /** Box64 preset (PERFORMANCE / STABILITY / CUSTOM) */
+    val box64Preset: Box64Preset,
 
- /** Wine version */
- val wineVersion: String,
+    /** Wine version */
+    val wineVersion: String,
 
- /** Environment variables (JSON format) */
- val environmentVars: String = "{}",
+    /** Environment variables (JSON format) */
+    val environmentVars: String = "{}",
 
- /** Screen resolution (Example: "1920x1080") */
- val screenResolution: String = "1280x720",
+    /** Screen resolution (Example: "1920x1080") */
+    val screenResolution: String = "1280x720",
 
- /** Enable DXVK */
- val enableDXVK: Boolean = true,
+    /** Enable DXVK */
+    val enableDXVK: Boolean = true,
 
- /** Enable D3D Extras */
- val enableD3DExtras: Boolean = false,
+    /** Enable D3D Extras */
+    val enableD3DExtras: Boolean = false,
 
- /** Custom command line arguments */
- val customArgs: String = "",
+    /** Custom command line arguments */
+    val customArgs: String = "",
 
- /** Created date/time (Unix timestamp) */
- val createdTimestamp: Long = System.currentTimeMillis()
+    /** Created date/time (Unix timestamp) */
+    val createdTimestamp: Long = System.currentTimeMillis()
 )
 
 /**
  * Box64 performance preset
+ *
+ * NOTE: Also defined in core.winlator.Box64Preset - kept separate for database layer isolation
  */
 enum class Box64Preset {
- /** Performance-focused */
- PERFORMANCE,
+    /** Performance-focused */
+    PERFORMANCE,
 
- /** Stability-focused (recommended for Unity Engine etc.) */
- STABILITY,
+    /** Stability-focused (recommended for Unity Engine etc.) */
+    STABILITY,
 
- /** Custom configuration */
- CUSTOM
+    /** Custom configuration */
+    CUSTOM
 }

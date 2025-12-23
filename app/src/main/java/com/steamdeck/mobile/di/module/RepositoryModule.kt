@@ -5,17 +5,13 @@ import com.steamdeck.mobile.data.remote.steam.SteamRepository
 import com.steamdeck.mobile.data.remote.steam.SteamRepositoryImpl
 import com.steamdeck.mobile.data.repository.ControllerRepositoryImpl
 import com.steamdeck.mobile.data.repository.DownloadRepositoryImpl
-import com.steamdeck.mobile.data.repository.FileImportRepositoryImpl
 import com.steamdeck.mobile.data.repository.GameRepositoryImpl
 import com.steamdeck.mobile.data.repository.SteamRepositoryAdapter
-import com.steamdeck.mobile.data.repository.WinlatorContainerRepositoryImpl
 import com.steamdeck.mobile.domain.repository.ControllerRepository
 import com.steamdeck.mobile.domain.repository.DownloadRepository
-import com.steamdeck.mobile.domain.repository.FileImportRepository
 import com.steamdeck.mobile.domain.repository.GameRepository
 import com.steamdeck.mobile.domain.repository.ISecurePreferences
 import com.steamdeck.mobile.domain.repository.ISteamRepository
-import com.steamdeck.mobile.domain.repository.WinlatorContainerRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -39,15 +35,6 @@ abstract class RepositoryModule {
  ): GameRepository
 
  /**
-  * Bind WinlatorContainerRepository implementation
-  */
- @Binds
- @Singleton
- abstract fun bindWinlatorContainerRepository(
-  winlatorContainerRepositoryImpl: WinlatorContainerRepositoryImpl
- ): WinlatorContainerRepository
-
- /**
   * Bind DownloadRepository implementation
   */
  @Binds
@@ -55,15 +42,6 @@ abstract class RepositoryModule {
  abstract fun bindDownloadRepository(
   downloadRepositoryImpl: DownloadRepositoryImpl
  ): DownloadRepository
-
- /**
-  * Bind FileImportRepository implementation
-  */
- @Binds
- @Singleton
- abstract fun bindFileImportRepository(
-  fileImportRepositoryImpl: FileImportRepositoryImpl
- ): FileImportRepository
 
  // ControllerRepository binding removed - provided by ControllerModule
 

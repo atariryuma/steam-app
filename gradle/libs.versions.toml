@@ -92,15 +92,6 @@ androidx-activity-compose = { group = "androidx.activity", name = "activity-comp
 # Browser (Custom Tabs for OAuth/OpenID - RFC 8252 compliant)
 androidx-browser = { group = "androidx.browser", name = "browser", version = "1.8.0" }
 
-# USB Mass Storage (using latest core module)
-libaums = { group = "me.jahnen.libaums", name = "core", version = "0.10.0" }
-
-# SMB/CIFS (jcifs-ng supports SMB2/3 for Windows 10/11 compatibility)
-jcifs-ng = { group = "eu.agno3.jcifs", name = "jcifs-ng", version = "2.1.10" }
-
-# Apache Commons Net (FTP)
-commons-net = { group = "commons-net", name = "commons-net", version = "3.11.1" }
-
 # Kotlinx Serialization (JSON for Steam API)
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 retrofit-converter-kotlinx-serialization = { group = "com.jakewharton.retrofit", name = "retrofit2-kotlinx-serialization-converter", version = "1.0.0" }

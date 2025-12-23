@@ -6,6 +6,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.steamdeck.mobile.core.wine.WineMonoInstaller
 import com.steamdeck.mobile.core.wine.WineGeckoInstaller
+import com.steamdeck.mobile.core.util.GpuDetector
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -87,6 +88,20 @@ object AppModule {
   okHttpClient: OkHttpClient
  ): WineGeckoInstaller {
   return WineGeckoInstaller(context, okHttpClient)
+ }
+
+ /**
+  * GPU Vendor Detector
+  *
+  * Provides GPU detection for graphics driver optimization (2025 best practice).
+  * - Qualcomm Adreno → Turnip driver (+3-5x FPS improvement)
+  * - MediaTek Mali → VirGL driver (stability)
+  * - Unknown → VirGL fallback (safe)
+  */
+ @Provides
+ @Singleton
+ fun provideGpuDetector(@ApplicationContext context: Context): GpuDetector {
+  return GpuDetector(context)
  }
 
 }

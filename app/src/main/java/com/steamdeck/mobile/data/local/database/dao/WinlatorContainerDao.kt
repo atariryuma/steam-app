@@ -6,48 +6,51 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Winlator container configuration data access object
+ *
+ * NOTE: Used directly by SteamSetupManager for container persistence.
+ * Repository layer removed per YAGNI, but DAO retained as it's actively used.
  */
 @Dao
 interface WinlatorContainerDao {
- /**
-  * Get all containers
-  */
- @Query("SELECT * FROM winlator_containers ORDER BY createdTimestamp DESC")
- fun getAllContainers(): Flow<List<WinlatorContainerEntity>>
+    /**
+     * Get all containers
+     */
+    @Query("SELECT * FROM winlator_containers ORDER BY createdTimestamp DESC")
+    fun getAllContainers(): Flow<List<WinlatorContainerEntity>>
 
- /**
-  * Get container by container ID
-  */
- @Query("SELECT * FROM winlator_containers WHERE id = :containerId")
- suspend fun getContainerById(containerId: Long): WinlatorContainerEntity?
+    /**
+     * Get container by container ID
+     */
+    @Query("SELECT * FROM winlator_containers WHERE id = :containerId")
+    suspend fun getContainerById(containerId: Long): WinlatorContainerEntity?
 
- /**
-  * Search containers by container name
-  */
- @Query("SELECT * FROM winlator_containers WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
- fun searchContainers(query: String): Flow<List<WinlatorContainerEntity>>
+    /**
+     * Search containers by container name
+     */
+    @Query("SELECT * FROM winlator_containers WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
+    fun searchContainers(query: String): Flow<List<WinlatorContainerEntity>>
 
- /**
-  * Insert container
-  */
- @Insert(onConflict = OnConflictStrategy.REPLACE)
- suspend fun insertContainer(container: WinlatorContainerEntity): Long
+    /**
+     * Insert container
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertContainer(container: WinlatorContainerEntity): Long
 
- /**
-  * Update container
-  */
- @Update
- suspend fun updateContainer(container: WinlatorContainerEntity)
+    /**
+     * Update container
+     */
+    @Update
+    suspend fun updateContainer(container: WinlatorContainerEntity)
 
- /**
-  * Delete container
-  */
- @Delete
- suspend fun deleteContainer(container: WinlatorContainerEntity)
+    /**
+     * Delete container
+     */
+    @Delete
+    suspend fun deleteContainer(container: WinlatorContainerEntity)
 
- /**
-  * Delete all containers
-  */
- @Query("DELETE FROM winlator_containers")
- suspend fun deleteAllContainers()
+    /**
+     * Delete all containers
+     */
+    @Query("DELETE FROM winlator_containers")
+    suspend fun deleteAllContainers()
 }

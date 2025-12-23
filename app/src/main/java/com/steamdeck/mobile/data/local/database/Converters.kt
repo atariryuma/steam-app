@@ -1,7 +1,7 @@
 package com.steamdeck.mobile.data.local.database
 
 import androidx.room.TypeConverter
-import com.steamdeck.mobile.data.local.database.entity.Box64Preset
+import com.steamdeck.mobile.core.winlator.Box64Preset
 import com.steamdeck.mobile.data.local.database.entity.DownloadStatus
 import com.steamdeck.mobile.data.local.database.entity.GameSource
 import com.steamdeck.mobile.data.local.database.entity.SteamInstallStatus

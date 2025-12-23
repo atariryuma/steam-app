@@ -41,10 +41,10 @@ import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
 @Database(
  entities = [
   GameEntity::class,
-  WinlatorContainerEntity::class,
   DownloadEntity::class,
   ControllerProfileEntity::class,
-  SteamInstallEntity::class
+  SteamInstallEntity::class,
+  WinlatorContainerEntity::class
  ],
  version = 9,
  exportSchema = true
@@ -58,6 +58,7 @@ abstract class SteamDeckDatabase : RoomDatabase() {
 
  /**
   * Winlator container configuration DAO
+  * NOTE: Used directly by SteamSetupManager (Repository layer removed per YAGNI)
   */
  abstract fun winlatorContainerDao(): WinlatorContainerDao
 

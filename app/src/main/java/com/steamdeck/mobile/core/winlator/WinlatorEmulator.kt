@@ -649,6 +649,18 @@ class WinlatorEmulator @Inject constructor(
     AppLogger.i(TAG, "Windows 10 registry configuration completed successfully (direct edit)")
    }
 
+   // CRITICAL: Configure Wine DNS registry settings
+   // Wine requires its own DNS configuration in registry for network name resolution
+   // Without this, Wine applications may fail to resolve domain names
+   AppLogger.i(TAG, "Configuring Wine DNS registry settings...")
+   val dnsResult = setWineDnsConfiguration(containerDir)
+   if (dnsResult.isFailure) {
+    AppLogger.w(TAG, "Wine DNS configuration failed (non-fatal): ${dnsResult.exceptionOrNull()?.message}")
+    AppLogger.w(TAG, "Network name resolution may be degraded")
+   } else {
+    AppLogger.i(TAG, "Wine DNS registry configured successfully")
+   }
+
    // NEW: Install Wine Mono for .NET Framework compatibility
    // Required for 32-bit applications (e.g., SteamSetup.exe NSIS installer)
    try {
@@ -1890,6 +1902,164 @@ REGEDIT4
    AppLogger.e(TAG, "Failed to set Windows version", e)
    Result.failure(EmulatorException("Failed to set Windows version: ${e.message}", e))
   }
+ }
+
+ /**
+  * Configure Wine DNS settings in registry
+  *
+  * Wine uses its own registry DNS configuration for network name resolution.
+  * Without this, Wine applications may fail to resolve domain names even when
+  * /etc/resolv.conf is correctly configured.
+  *
+  * Sets HKLM\System\CurrentControlSet\Services\Tcpip\Parameters\DhcpNameServer
+  *
+  * Based on: https://wine-users.winehq.narkive.com/5paipVKk/wine-dns-name-server-under-wine
+  *
+  * @param containerDir Wine prefix directory
+  * @param nameservers List of DNS server IPs (default: Google DNS 8.8.8.8, 8.8.4.4)
+  * @return Result indicating success or failure (non-fatal)
+  */
+ private suspend fun setWineDnsConfiguration(
+     containerDir: File,
+     nameservers: List<String> = listOf("8.8.8.8", "8.8.4.4")
+ ): Result<Unit> = withContext(Dispatchers.IO) {
+     try {
+         AppLogger.i(TAG, "Configuring Wine DNS registry: ${nameservers.joinToString()}")
+
+         // Create .reg file with DNS configuration
+         val regFile = File(context.cacheDir, "set_wine_dns.reg")
+         regFile.writeText("""
+REGEDIT4
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Tcpip\Parameters]
+"DhcpNameServer"="${nameservers.joinToString(" ")}"
+"NameServer"="${nameservers.joinToString(",")}"
+"Domain"=""
+"SearchList"=""
+
+[HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{00000000-0000-0000-0000-000000000000}]
+"DhcpNameServer"="${nameservers.joinToString(" ")}"
+"NameServer"="${nameservers.joinToString(",")}"
+
+         """.trimIndent())
+
+         // Build Wine environment
+         val wineEnv = buildMap {
+             put("WINEPREFIX", containerDir.absolutePath)
+             put("WINEARCH", "win64")
+             put("WINEDEBUG", "-all")
+         }
+
+         // Get Box64 binary
+         val box64Binary = getBox64Binary()
+         if (!box64Binary.exists()) {
+             regFile.delete()
+             AppLogger.w(TAG, "Box64 binary not found, skipping DNS registry configuration")
+             return@withContext Result.failure(Box64BinaryNotFoundException())
+         }
+
+         if (!wineBinary.exists()) {
+             regFile.delete()
+             AppLogger.w(TAG, "Wine binary not found, skipping DNS registry configuration")
+             return@withContext Result.failure(WineBinaryNotFoundException())
+         }
+
+         if (!prootBinary.exists()) {
+             regFile.delete()
+             AppLogger.w(TAG, "Proot binary not found, skipping DNS registry configuration")
+             return@withContext Result.failure(
+                 EmulatorException("Proot binary not found at ${prootBinary.absolutePath}")
+             )
+         }
+
+         // Execute: proot wine regedit /S set_wine_dns.reg
+         val command = buildList {
+             add(prootBinary.absolutePath)
+             add("-b")
+             add("${rootfsDir.absolutePath}:/data/data/com.winlator/files/rootfs")
+             add(box64Binary.absolutePath)
+             add(wineBinary.absolutePath)
+             add("regedit")
+             add("/S") // Silent mode
+             add(regFile.absolutePath)
+         }
+
+         AppLogger.d(TAG, "Executing DNS regedit command: ${command.joinToString(" ")}")
+
+         val processBuilder = ProcessBuilder(command)
+
+         // Add Wine environment with library paths
+         val fullEnv = wineEnv.toMutableMap().apply {
+             put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:/usr/bin:/bin")
+             put("LD_LIBRARY_PATH",
+                 "${rootfsDir.absolutePath}/usr/lib:" +
+                 "${rootfsDir.absolutePath}/lib:" +
+                 "${wineDir.absolutePath}/lib:" +
+                 "${wineDir.absolutePath}/lib/wine/x86_64-unix"
+             )
+             put("BOX64_LD_LIBRARY_PATH",
+                 "${rootfsDir.absolutePath}/usr/lib:" +
+                 "${rootfsDir.absolutePath}/lib:" +
+                 "${rootfsDir.absolutePath}/usr/lib/x86_64-linux-gnu:" +
+                 "${wineDir.absolutePath}/lib/wine/x86_64-unix"
+             )
+             put("BOX64_PATH", "${wineDir.absolutePath}/bin")
+             put("BOX64_EMULATED_LIBS", "libc.so.6:libpthread.so.0:libdl.so.2:librt.so.1:libm.so.6")
+             put("BOX64_ALLOWMISSINGLIBS", "1")
+             put("BOX64_LOG", "0")
+             put("BOX64_NOBANNER", "1")
+             put("TMPDIR", context.cacheDir.absolutePath)
+             put("PROOT_TMP_DIR", context.cacheDir.absolutePath)
+             put("PROOT_NO_SECCOMP", "1")
+         }
+
+         processBuilder.environment().putAll(fullEnv)
+         processBuilder.redirectErrorStream(true)
+
+         val process = processBuilder.start()
+
+         // Wait for regedit to complete (max 30 seconds)
+         val completed = withTimeoutOrNull(30_000L) {
+             process.waitFor()
+             true
+         } ?: false
+
+         // Read output
+         val output = try {
+             process.inputStream.bufferedReader().readText()
+         } catch (e: Exception) {
+             "Failed to read output: ${e.message}"
+         }
+
+         if (!completed) {
+             process.destroy()
+             regFile.delete()
+             AppLogger.w(TAG, "DNS regedit timeout after 30s. Output: $output")
+             return@withContext Result.failure(
+                 EmulatorException("DNS regedit timeout after 30 seconds")
+             )
+         }
+
+         val exitCode = process.exitValue()
+         AppLogger.d(TAG, "DNS regedit exit code: $exitCode")
+         AppLogger.d(TAG, "DNS regedit output: $output")
+
+         regFile.delete()
+
+         if (exitCode != 0) {
+             AppLogger.w(TAG, "DNS regedit failed with exit code $exitCode (non-fatal)")
+             return@withContext Result.failure(
+                 EmulatorException("DNS regedit failed with exit code $exitCode: $output")
+             )
+         }
+
+         AppLogger.i(TAG, "Successfully configured Wine DNS registry: ${nameservers.joinToString()}")
+         Result.success(Unit)
+
+     } catch (e: Exception) {
+         AppLogger.e(TAG, "Failed to set Wine DNS configuration (non-fatal)", e)
+         Result.failure(EmulatorException("Failed to set Wine DNS configuration: ${e.message}", e))
+     }
  }
 
  /**

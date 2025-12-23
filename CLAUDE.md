@@ -632,7 +632,8 @@ suspend fun launchGame(gameId: Long): DataResult<Unit> = withContext(Dispatchers
 - [core/auth/SteamOpenIdAuthenticator.kt](app/src/main/java/com/steamdeck/mobile/core/auth/SteamOpenIdAuthenticator.kt) - OpenID 2.0 auth
 - [core/steam/SteamSetupManager.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamSetupManager.kt) - Steam installation orchestration
 - [core/steam/SteamInstallerService.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamInstallerService.kt) - SteamCMD download & extraction
-- [core/steam/SteamCredentialManager.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamCredentialManager.kt) - VDF credential file generator
+- [core/steam/SteamAuthManager.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamAuthManager.kt) - loginusers.vdf generator for auto-login
+- [core/steam/SteamConfigManager.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamConfigManager.kt) - config.vdf generator with CDN servers
 - [core/download/DownloadManager.kt](app/src/main/java/com/steamdeck/mobile/core/download/DownloadManager.kt) - WorkManager downloads
 - [core/error/AppError.kt](app/src/main/java/com/steamdeck/mobile/core/error/AppError.kt) - Error hierarchy
 
@@ -684,13 +685,15 @@ android {
 
 **Implementation:**
 
-- `SteamCredentialManager.kt` - Write-only VDF file generator
-  - No external dependencies (uses Kotlin string templates)
+- `SteamAuthManager.kt` - loginusers.vdf generator for auto-login
   - Generates `loginusers.vdf` with user account info (RememberPassword, AllowAutoLogin)
-  - Generates `config.vdf` with AutoLoginUser setting
-  - Tab-indented format (Steam convention)
-  - Atomic file writes (temp → rename)
   - SteamID64 validation (17 digits, starts with 7656119)
+  - No external dependencies (uses Kotlin string templates)
+- `SteamConfigManager.kt` - config.vdf generator with CDN optimization
+  - Pre-configures 7 CDN servers (valve500-560.steamcontent.com)
+  - Pre-configures 4 CM servers (162.254.197.40:27017-27019)
+  - Sets AutoLoginUser if SteamID provided
+  - Bypasses Steam bootstrap manifest download (fixes 9-second timeout)
 - `SettingsViewModel.syncAfterQrLogin()` - Integrated VDF writing
   - Flow: QR auth → Write VDF files → Sync library
   - Non-fatal error handling (continues sync on VDF write failure)
@@ -721,8 +724,9 @@ android {
 
 **References:**
 
-- [SteamCredentialManager.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamCredentialManager.kt) - VDF generator
-- [SettingsViewModel.kt:148-180](app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/SettingsViewModel.kt#L148-L180) - Integration
+- [SteamAuthManager.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamAuthManager.kt) - loginusers.vdf generator
+- [SteamConfigManager.kt](app/src/main/java/com/steamdeck/mobile/core/steam/SteamConfigManager.kt) - config.vdf generator with CDN servers
+- [SettingsViewModel.kt:193-233](app/src/main/java/com/steamdeck/mobile/presentation/viewmodel/SettingsViewModel.kt#L193-L233) - Integration
 - [VDF Format - Valve Developer Community](https://developer.valvesoftware.com/wiki/VDF)
 - [KeyValues Specification](https://developer.valvesoftware.com/wiki/KeyValues)
 

@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.result.DataResult
-import com.steamdeck.mobile.core.steam.SteamCredentialManager
 import com.steamdeck.mobile.core.steam.SteamLauncher
 import com.steamdeck.mobile.core.steam.SteamSetupManager
 import com.steamdeck.mobile.domain.repository.ISecurePreferences
@@ -41,7 +40,8 @@ class SettingsViewModel @Inject constructor(
  private val syncSteamLibraryUseCase: SyncSteamLibraryUseCase,
  private val steamLauncher: SteamLauncher,
  private val steamSetupManager: SteamSetupManager,
- private val steamCredentialManager: SteamCredentialManager
+ private val steamAuthManager: com.steamdeck.mobile.core.steam.SteamAuthManager,
+ private val steamConfigManager: com.steamdeck.mobile.core.steam.SteamConfigManager
 ) : ViewModel() {
 
  companion object {
@@ -177,11 +177,17 @@ class SettingsViewModel @Inject constructor(
   *
   * Automatically syncs library after successful QR authentication
   *
-  * Flow:
-  * 1. Write Steam credentials to VDF files (loginusers.vdf, config.vdf)
+  * Flow (2025-12-23 OPTIMIZED):
+  * 1. Write Steam credentials to VDF files using SteamAuthManager + SteamConfigManager
+  *    - loginusers.vdf: User account info for auto-login
+  *    - config.vdf: CDN servers + AutoLoginUser setting
   * 2. Sync Steam library via Web API
   *
-  * This ensures Steam client can auto-login after QR authentication
+  * This ensures Steam client can auto-login AND connect to CDN servers properly
+  *
+  * CRITICAL IMPROVEMENT: Uses SteamAuthManager + SteamConfigManager instead of SteamCredentialManager
+  * - Includes 7 CDN servers + 4 CM servers for reliable Steam bootstrap
+  * - Prevents "Content Servers Unreachable" errors in Wine/PRoot environments
   */
  fun syncAfterQrLogin() {
   viewModelScope.launch {
@@ -193,20 +199,28 @@ class SettingsViewModel @Inject constructor(
    val steamId = steamIdFlow.first()
    val containerId = getSteamContainerId()
 
-   // Write Steam credentials to VDF files (loginusers.vdf, config.vdf)
+   // Write Steam credentials to VDF files
    if (steamId != null && containerId != null) {
     AppLogger.i(TAG, "Writing Steam credentials after QR login: steamId=$steamId, containerId=$containerId")
 
-    val credentialResult = steamCredentialManager.writeSteamCredentials(
-     containerId = containerId.toString(),
-     steamId = steamId
-    )
+    val containerDir = java.io.File(context.filesDir, "winlator/containers/$containerId")
 
-    if (credentialResult.isSuccess) {
-     AppLogger.i(TAG, "✅ Steam credentials written successfully")
+    // 1. Create loginusers.vdf (user account info for auto-login)
+    val authResult = steamAuthManager.createLoginUsersVdf(containerDir)
+    if (authResult.isFailure) {
+     AppLogger.w(TAG, "Failed to create loginusers.vdf: ${authResult.exceptionOrNull()?.message}")
+     // Non-fatal error - continue with config.vdf
     } else {
-     AppLogger.w(TAG, "Failed to write Steam credentials: ${credentialResult.exceptionOrNull()?.message}")
-     // Non-fatal error - continue with sync anyway
+     AppLogger.i(TAG, "✅ loginusers.vdf created successfully")
+    }
+
+    // 2. Create config.vdf (CDN servers + auto-login settings)
+    val configResult = steamConfigManager.createConfigVdf(containerDir, steamId)
+    if (configResult.isFailure) {
+     AppLogger.w(TAG, "Failed to create config.vdf: ${configResult.exceptionOrNull()?.message}")
+     // Non-fatal error - continue with sync
+    } else {
+     AppLogger.i(TAG, "✅ config.vdf created with CDN servers + auto-login")
     }
    } else {
     AppLogger.w(TAG, "Cannot write Steam credentials: steamId=$steamId, containerId=$containerId")

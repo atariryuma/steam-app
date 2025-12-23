@@ -3,7 +3,6 @@ package com.steamdeck.mobile.di.module
 import android.content.Context
 import com.steamdeck.mobile.core.download.DownloadManager
 import com.steamdeck.mobile.core.steam.ProtonManager
-import com.steamdeck.mobile.core.steam.SteamCredentialManager
 import com.steamdeck.mobile.core.steam.SteamGameScanner
 import com.steamdeck.mobile.core.steam.SteamInstallerService
 import com.steamdeck.mobile.core.steam.SteamLauncher
@@ -122,15 +121,12 @@ object SteamAuthModule {
  }
 
  /**
-  * Steam Credential Manager
+  * Steam Authentication Managers
   *
-  * Generates Steam VDF files (loginusers.vdf, config.vdf)
-  * to enable auto-login functionality after QR authentication
+  * SteamAuthManager and SteamConfigManager use @Inject constructor,
+  * so Hilt automatically generates instances. No explicit @Provides needed.
   *
-  * Note: Uses @Inject constructor, so Hilt automatically generates instance.
-  * No explicit @Provides needed.
+  * - SteamAuthManager: Generates loginusers.vdf for auto-login
+  * - SteamConfigManager: Generates config.vdf with CDN servers
   */
- // SteamCredentialManager uses @Inject constructor,
- // so Hilt automatically generates the instance.
- // No explicit @Provides is required.
 }

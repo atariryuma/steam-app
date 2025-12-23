@@ -25,6 +25,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.steamdeck.mobile.core.winlator.WinlatorEngine
 import com.steamdeck.mobile.core.xserver.XServer
@@ -52,7 +53,10 @@ class GameDetailViewModel @Inject constructor(
  private val gameRepository: GameRepository,
  private val winlatorEngine: WinlatorEngine,
  private val controllerInputRouter: com.steamdeck.mobile.core.input.ControllerInputRouter,
- private val gameControllerManager: com.steamdeck.mobile.core.input.GameControllerManager
+ private val gameControllerManager: com.steamdeck.mobile.core.input.GameControllerManager,
+ private val steamAuthManager: com.steamdeck.mobile.core.steam.SteamAuthManager,
+ private val steamConfigManager: com.steamdeck.mobile.core.steam.SteamConfigManager,
+ private val securePreferences: com.steamdeck.mobile.domain.repository.ISecurePreferences
 ) : ViewModel() {
 
  companion object {
@@ -337,6 +341,16 @@ class GameDetailViewModel @Inject constructor(
  /**
   * Open Steam Client
   */
+ /**
+  * Open Steam Client (2025-12-23 OPTIMIZED with Auto-Login)
+  *
+  * Improvements:
+  * 1. Ensures Steam credentials (loginusers.vdf + config.vdf) are configured before launch
+  * 2. Uses SteamAuthManager + SteamConfigManager for complete VDF setup
+  * 3. Includes CDN servers to prevent "Content Servers Unreachable" errors
+  *
+  * This guarantees Steam will auto-login if user has completed QR authentication
+  */
  fun openSteamClient(gameId: Long) {
   viewModelScope.launch {
    try {
@@ -357,6 +371,33 @@ class GameDetailViewModel @Inject constructor(
       "Winlator container is not configured. Please create a container in Settings."
      )
      return@launch
+    }
+
+    // 🔧 NEW: Ensure Steam credentials are configured before launch
+    val containerDir = java.io.File(context.filesDir, "winlator/containers/${game.winlatorContainerId}")
+    val steamId = try {
+     securePreferences.getSteamId().first()
+    } catch (e: Exception) {
+     AppLogger.w(TAG, "Failed to get Steam ID: ${e.message}")
+     null
+    }
+
+    if (steamId != null) {
+     AppLogger.i(TAG, "Configuring Steam auto-login before launch: SteamID=$steamId")
+
+     // Create loginusers.vdf
+     val authResult = steamAuthManager.createLoginUsersVdf(containerDir)
+     if (authResult.isFailure) {
+      AppLogger.w(TAG, "Failed to create loginusers.vdf (non-fatal): ${authResult.exceptionOrNull()?.message}")
+     }
+
+     // Create config.vdf with CDN servers + auto-login
+     val configResult = steamConfigManager.createConfigVdf(containerDir, steamId)
+     if (configResult.isFailure) {
+      AppLogger.w(TAG, "Failed to create config.vdf (non-fatal): ${configResult.exceptionOrNull()?.message}")
+     }
+    } else {
+     AppLogger.i(TAG, "No Steam ID found - Steam will require manual login")
     }
 
     // Launch Steam Big Picture mode

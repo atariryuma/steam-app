@@ -173,7 +173,8 @@
       "Bash(./adb.exe pull:*)",
       "Bash(while true)",
       "Bash(call gradlew.bat assembleDebug --console=plain)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Bash(call C:/Projects/steam-app/gradlew.bat assembleDebug --no-configuration-cache)"
     ]
   }
 }

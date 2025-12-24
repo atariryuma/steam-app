@@ -883,6 +883,44 @@ class WinlatorEmulator @Inject constructor(
     AppLogger.d(TAG, "Set WINEDLLPATH: $combinedPath")
    }
 
+   // Steam.exe detection and Box64/Wine optimizations (2025 Best Practice)
+   val isSteam = executable.name.equals("Steam.exe", ignoreCase = true)
+   if (isSteam) {
+    AppLogger.i(TAG, "Detected Steam.exe - applying Box64/Wine optimizations (2025 Best Practice)")
+
+    // === Box64 DynaRec Optimizations (Stability-focused) ===
+    environmentVars["BOX64_DYNAREC"] = "1"
+    environmentVars["BOX64_DYNAREC_BIGBLOCK"] = "2"  // Wine compatibility (official recommendation)
+    environmentVars["BOX64_DYNAREC_FORWARD"] = "512"  // Moderate forward optimization
+    environmentVars["BOX64_DYNAREC_CALLRET"] = "0"  // Compatibility over performance (Steam auto-config)
+    environmentVars["BOX64_DYNAREC_STRONGMEM"] = "1"  // Default safety
+    environmentVars["BOX64_DYNAREC_SAFEFLAGS"] = "1"  // Safe flag processing
+    environmentVars["BOX64_DYNACACHE"] = "1"  // v0.3.8 new feature: CPU load reduction
+    environmentVars["BOX64_NOGTK"] = "1"  // GTK disabled (Android)
+
+    // === Wine Optimizations ===
+    // CRITICAL: Extend base WINEDEBUG instead of overwriting
+    // Base has +err,+process,+loaddll (line 2060) - preserve for DLL/process diagnostics
+    environmentVars["WINEDEBUG"] = "+err,+warn,+process,+loaddll,+x11drv,+steam"
+
+    // WINEESYNC: Commented out - requires Android kernel eventfd support verification
+    // TODO: Test on target device before enabling
+    // environmentVars["WINEESYNC"] = "1"
+
+    // === Steam Runtime ===
+    environmentVars["STEAM_RUNTIME"] = "0"  // Use Wine libraries
+
+    // === OpenGL/Mesa Optimizations (Android) ===
+    environmentVars["LIBGL_ALWAYS_INDIRECT"] = "1"  // Software rendering
+    environmentVars["GALLIUM_DRIVER"] = "softpipe"  // Avoid GPU driver issues
+    // MESA_GL_VERSION_OVERRIDE and MESA_GLSL_VERSION_OVERRIDE already set in base config (line 2094-2095)
+    // Only add Steam-specific MESA settings
+    environmentVars["MESA_DEBUG"] = "silent"
+    environmentVars["MESA_NO_ERROR"] = "1"
+
+    AppLogger.d(TAG, "Box64/Wine optimizations applied: DynaRec=stability, Cache enabled, enhanced logging")
+   }
+
    // 4. Build command - wrap with proot for hardcoded path virtualization
    // CRITICAL FIX: Do NOT pass linker as proot argument
    // Box64 binary already has PT_INTERP set to linker path - ELF loader handles it automatically

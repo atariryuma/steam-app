@@ -8,6 +8,7 @@ import com.steamdeck.mobile.core.winlator.WinlatorEmulator
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
@@ -168,6 +169,11 @@ class SteamLauncher @Inject constructor(
 
  /**
   * Launch Steam Client
+  *
+  * Two-stage launch process:
+  * 1. Launch explorer.exe (desktop environment) - initializes Wine graphics driver
+  * 2. Wait 3 seconds for desktop initialization
+  * 3. Launch Steam.exe on top of desktop
   */
  suspend fun launchSteamClient(containerId: String): Result<Unit> =
   withContext(Dispatchers.IO) {
@@ -188,31 +194,54 @@ class SteamLauncher @Inject constructor(
      )
     }
 
-    // 2. Build Steam.exe path (case-sensitive on Android)
-    val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/Steam.exe")
+    // 2. Verify explorer.exe exists
+    val explorerExe = File(emulatorContainer.rootPath, "drive_c/windows/explorer.exe")
+    if (!explorerExe.exists()) {
+     return@withContext Result.failure(
+      Exception("Explorer not found at ${explorerExe.absolutePath}")
+     )
+    }
 
+    // 3. Verify Steam.exe exists
+    val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/Steam.exe")
     if (!steamExe.exists()) {
      return@withContext Result.failure(
       Exception("Steam not found at ${steamExe.absolutePath}. Please install Steam first.")
      )
     }
 
-    AppLogger.i(TAG, "Launching Steam from: ${steamExe.absolutePath}")
+    // STAGE 1: Launch desktop environment (explorer.exe)
+    AppLogger.i(TAG, "STAGE 1: Launching Windows desktop (explorer.exe)...")
+    val explorerResult = winlatorEmulator.launchExecutable(
+     container = emulatorContainer,
+     executable = explorerExe,
+     arguments = emptyList()
+    )
 
-    // 3. Launch Steam Client via Wine
-    val processResult = winlatorEmulator.launchExecutable(
+    if (explorerResult.isFailure) {
+     return@withContext Result.failure(
+      Exception("Failed to launch desktop: ${explorerResult.exceptionOrNull()?.message}")
+     )
+    }
+
+    AppLogger.i(TAG, "Desktop launched, waiting 3 seconds for initialization...")
+    delay(3000) // Wait for desktop and Wine graphics driver to initialize
+
+    // STAGE 2: Launch Steam Client
+    AppLogger.i(TAG, "STAGE 2: Launching Steam Client on desktop...")
+    val steamResult = winlatorEmulator.launchExecutable(
      container = emulatorContainer,
      executable = steamExe,
      arguments = emptyList()
     )
 
-    if (processResult.isFailure) {
+    if (steamResult.isFailure) {
      return@withContext Result.failure(
-      Exception("Failed to launch Steam Client: ${processResult.exceptionOrNull()?.message}")
+      Exception("Failed to launch Steam Client: ${steamResult.exceptionOrNull()?.message}")
      )
     }
 
-    val process = processResult.getOrElse {
+    val process = steamResult.getOrElse {
      return@withContext Result.failure(
       Exception("Failed to get process handle: ${it.message}")
      )

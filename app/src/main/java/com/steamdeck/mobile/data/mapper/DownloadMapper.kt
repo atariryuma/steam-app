@@ -9,12 +9,13 @@ import com.steamdeck.mobile.data.local.database.entity.InstallationStatus as Ent
 
 /**
  * DownloadEntity <-> Download mapper
+ * Implements BaseMapper to reduce boilerplate for list conversions
  */
-object DownloadMapper {
+object DownloadMapper : BaseMapper<DownloadEntity, Download> {
  /**
   * EntityDomain model conversion
   */
- fun toDomain(entity: DownloadEntity): Download {
+ override fun toDomain(entity: DownloadEntity): Download {
   return Download(
    id = entity.id,
    gameId = entity.gameId,
@@ -35,7 +36,7 @@ object DownloadMapper {
  /**
   * Domain modelEntity conversion
   */
- fun toEntity(domain: Download): DownloadEntity {
+ override fun toEntity(domain: Download): DownloadEntity {
   return DownloadEntity(
    id = domain.id,
    gameId = domain.gameId,
@@ -53,47 +54,19 @@ object DownloadMapper {
   )
  }
 
- /**
-  * Entity listDomain model list conversion
-  */
- fun toDomainList(entities: List<DownloadEntity>): List<Download> {
-  return entities.map { toDomain(it) }
- }
-
- /**
-  * Domain model listEntity list conversion
-  */
- fun toEntityList(domains: List<Download>): List<DownloadEntity> {
-  return domains.map { toEntity(it) }
- }
+ // toDomainList and toEntityList are inherited from BaseMapper
 
  /**
   * EntityDownloadStatusDomainDownloadStatus conversion
+  * Uses generic enum mapper to reduce boilerplate
   */
- private fun EntityDownloadStatus.toDomain(): DomainDownloadStatus {
-  return when (this) {
-   EntityDownloadStatus.PENDING -> DomainDownloadStatus.PENDING
-   EntityDownloadStatus.DOWNLOADING -> DomainDownloadStatus.DOWNLOADING
-   EntityDownloadStatus.PAUSED -> DomainDownloadStatus.PAUSED
-   EntityDownloadStatus.COMPLETED -> DomainDownloadStatus.COMPLETED
-   EntityDownloadStatus.FAILED -> DomainDownloadStatus.FAILED
-   EntityDownloadStatus.CANCELLED -> DomainDownloadStatus.CANCELLED
-  }
- }
+ private fun EntityDownloadStatus.toDomain(): DomainDownloadStatus = mapByName()
 
  /**
   * DomainDownloadStatusEntityDownloadStatus conversion
+  * Uses generic enum mapper to reduce boilerplate
   */
- private fun DomainDownloadStatus.toEntity(): EntityDownloadStatus {
-  return when (this) {
-   DomainDownloadStatus.PENDING -> EntityDownloadStatus.PENDING
-   DomainDownloadStatus.DOWNLOADING -> EntityDownloadStatus.DOWNLOADING
-   DomainDownloadStatus.PAUSED -> EntityDownloadStatus.PAUSED
-   DomainDownloadStatus.COMPLETED -> EntityDownloadStatus.COMPLETED
-   DomainDownloadStatus.FAILED -> EntityDownloadStatus.FAILED
-   DomainDownloadStatus.CANCELLED -> EntityDownloadStatus.CANCELLED
-  }
- }
+ private fun DomainDownloadStatus.toEntity(): EntityDownloadStatus = mapByName()
 
  /**
   * EntityInstallationStatusDomainInstallationStatus conversion

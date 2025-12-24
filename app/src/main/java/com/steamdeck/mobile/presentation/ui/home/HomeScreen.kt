@@ -19,6 +19,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import com.steamdeck.mobile.presentation.ui.common.ScreenTransitions
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -196,9 +197,7 @@ fun HomeScreen(
   ) {
    AnimatedContent(
     targetState = uiState,
-    transitionSpec = {
-     fadeIn(tween(300)) togetherWith fadeOut(tween(300))
-    },
+    transitionSpec = ScreenTransitions.standardFade,
     label = "HomeUiStateTransition"
    ) { state ->
     when (state) {

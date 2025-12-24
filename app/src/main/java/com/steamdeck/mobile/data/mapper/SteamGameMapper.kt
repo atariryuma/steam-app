@@ -40,7 +40,5 @@ object SteamGameMapper {
   * @param steamGames List of Steam API game data
   * @return List of Game domain models
   */
- fun toDomainList(steamGames: List<SteamGame>): List<Game> {
-  return steamGames.map { toDomain(it) }
- }
+ fun toDomainList(steamGames: List<SteamGame>): List<Game> = steamGames.map(::toDomain)
 }

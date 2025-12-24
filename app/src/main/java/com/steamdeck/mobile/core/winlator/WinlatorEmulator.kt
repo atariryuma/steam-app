@@ -883,10 +883,9 @@ class WinlatorEmulator @Inject constructor(
     AppLogger.d(TAG, "Set WINEDLLPATH: $combinedPath")
    }
 
-   // Steam.exe detection and Box64/Wine optimizations (2025 Best Practice)
-   val isSteam = executable.name.equals("Steam.exe", ignoreCase = true)
+   // Additional Box64/Wine optimizations for Steam (merged from both implementations)
    if (isSteam) {
-    AppLogger.i(TAG, "Detected Steam.exe - applying Box64/Wine optimizations (2025 Best Practice)")
+    AppLogger.i(TAG, "Applying additional Box64/Wine optimizations (2025 Best Practice)")
 
     // === Box64 DynaRec Optimizations (Stability-focused) ===
     environmentVars["BOX64_DYNAREC"] = "1"

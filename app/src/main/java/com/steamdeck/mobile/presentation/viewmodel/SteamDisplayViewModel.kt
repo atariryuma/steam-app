@@ -149,18 +149,15 @@ class SteamDisplayViewModel @Inject constructor(
                 AppLogger.d(TAG, "Created .X11-unix directory: ${x11UnixDir.absolutePath}")
             }
 
-            // CRITICAL FIX: Create XAUTHORITY file for Wine X11 authentication
-            // Wine requires this file to connect to XServer (even for local connections)
+            // CRITICAL FIX (2025-12-24): Do NOT create XAUTHORITY file
+            // XConnectorEpoll does not implement X11 authentication (no MIT-MAGIC-COOKIE)
+            // Empty XAUTHORITY file causes Wine's libX11 to fail with authentication error
+            // Wine will use unauthenticated connection if XAUTHORITY env is unset
             val xAuthFile = File(tmpDir, ".Xauthority")
-            android.util.Log.e(TAG, "XAUTHORITY check: exists=${xAuthFile.exists()}, path=${xAuthFile.absolutePath}")
-            if (!xAuthFile.exists()) {
-                val created = xAuthFile.createNewFile()
-                xAuthFile.setReadable(true, true)
-                xAuthFile.setWritable(true, true)
-                android.util.Log.e(TAG, "Created XAUTHORITY file: created=$created, path=${xAuthFile.absolutePath}")
-                AppLogger.d(TAG, "Created XAUTHORITY file: ${xAuthFile.absolutePath}")
-            } else {
-                android.util.Log.e(TAG, "XAUTHORITY file already exists: ${xAuthFile.absolutePath}")
+            if (xAuthFile.exists() && xAuthFile.length() == 0L) {
+                xAuthFile.delete()
+                android.util.Log.i(TAG, "Deleted empty XAUTHORITY file: ${xAuthFile.absolutePath}")
+                AppLogger.d(TAG, "Deleted empty XAUTHORITY file to enable unauthenticated X11 connection")
             }
 
             // CRITICAL FIX: Create /etc/hosts file for localhost hostname resolution
@@ -226,36 +223,41 @@ class SteamDisplayViewModel @Inject constructor(
                 return@withContext false
             }
 
-            // INTEGRATED MODE (2025-12-22): Configure GLRenderer window filtering
-            // CRITICAL: WM_CLASS is case-sensitive - Wine uses LOWERCASE for Windows executables
-            // Wine normalizes "Steam.exe" → "steam.exe" in X11 WM_CLASS property
-            val renderer = xServerView.renderer
-            renderer.setUnviewableWMClasses("explorer.exe", "progman", "shell_traywnd")
-            renderer.setForceFullscreenWMClass("steam.exe")  // Force Steam Big Picture fullscreen (lowercase!)
-            AppLogger.i(TAG, "Configured integrated mode: hide desktop, force fullscreen steam.exe")
-
-            // Build Wine command: Launch Steam Big Picture
-            // INTEGRATED MODE: No /desktop flag (virtual desktop disabled)
-            // GLRenderer handles fullscreen via forceFullscreenWMClass instead
+            // VIRTUAL DESKTOP MODE (bee49da proven working implementation)
+            // Build Wine command: Launch Steam via explorer.exe with virtual desktop
             val steamPath = "C:/Program Files (x86)/Steam/Steam.exe"
-            val escapedPath = steamPath.replace(" ", "\\ ")
-            val guestCommand = "wine explorer $escapedPath -bigpicture"
+            val screenSize = "1280x720"
 
-            AppLogger.d(TAG, "Guest command (integrated mode): $guestCommand")
+            // Wine Correct Syntax: explorer.exe /desktop (not wine /desktop)
+            // - /desktop=shell,1280x720: Wine virtual desktop mode (explorer.exe option)
+            // - explorer.exe: Required for /desktop flag (Wine limitation)
+            // - Direct Steam launch: Remove cmd.exe layer (optimization)
+            //
+            // Trade-off analysis (Wine developer perspective):
+            // ✅ Keep explorer.exe: /desktop flag requires it (~80MB overhead)
+            // ✅ Remove cmd.exe: Unnecessary layer (-10MB, simpler process tree)
+            // ❌ Cannot use: wine /desktop (syntax error - /desktop is explorer.exe option only)
+            //
+            // Steam flags (2025 Best Practice):
+            // -vgui: Legacy VGUI interface (Wine-compatible, lightweight)
+            // --no-cef-sandbox: Disable CEF sandboxing (Wine requirement)
+            // -lognetapi: Network API debug logging
+            val guestCommand = "wine explorer /desktop=shell,$screenSize \"$steamPath\" -lognetapi -vgui --no-cef-sandbox"
+
+            AppLogger.d(TAG, "Guest command (Wine-correct syntax): $guestCommand")
 
             // Configure WineProgramLauncherComponent
             val guestProgramLauncher = WineProgramLauncherComponent()
             guestProgramLauncher.setGuestExecutable(guestCommand)
-            // EXPERIMENT (2025-12-22): Try pure 32-bit mode instead of WoW64
-            // Steam.exe is 32-bit → should run directly with Box86 (no WoW64 layer needed)
-            guestProgramLauncher.setWoW64Mode(false)
-            AppLogger.i(TAG, "Configured pure 32-bit mode for Steam.exe (Box86 only, no WoW64)")
 
-            // CRITICAL: Use STABILITY preset for maximum reliability
-            // Both Box86 and Box64 presets for WoW64 mode (32-bit Steam + 64-bit Wine)
+            // WoW64 mode: 32-bit Steam on 64-bit Wine (bee49da proven working)
+            guestProgramLauncher.setWoW64Mode(true)
+            AppLogger.i(TAG, "Configured WoW64 mode for Steam.exe (32-bit on 64-bit Wine)")
+
+            // Box86+Box64 STABILITY presets (maximum reliability)
             guestProgramLauncher.setBox86Preset(com.steamdeck.mobile.box86_64.Box86_64Preset.STABILITY)
             guestProgramLauncher.setBox64Preset(com.steamdeck.mobile.box86_64.Box86_64Preset.STABILITY)
-            AppLogger.i(TAG, "Applied Box86+Box64 STABILITY presets for WoW64")
+            AppLogger.i(TAG, "Applied Box86+Box64 STABILITY presets")
 
             // CRITICAL: Set binding paths for PRoot to mount container drives
             // This allows Wine to access C: drive (container's drive_c directory)

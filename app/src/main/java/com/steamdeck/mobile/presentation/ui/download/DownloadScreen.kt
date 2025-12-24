@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import com.steamdeck.mobile.presentation.ui.common.ScreenTransitions
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -113,9 +114,7 @@ fun DownloadScreen(
    // Download list
    AnimatedContent(
     targetState = downloads.isEmpty(),
-    transitionSpec = {
-     fadeIn(tween(300)) togetherWith fadeOut(tween(300))
-    },
+    transitionSpec = ScreenTransitions.standardFade,
     label = "DownloadListTransition"
    ) { isEmpty ->
     if (isEmpty) {

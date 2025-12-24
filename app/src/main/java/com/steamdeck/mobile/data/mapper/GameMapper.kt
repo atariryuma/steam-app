@@ -9,12 +9,13 @@ import com.steamdeck.mobile.data.local.database.entity.GameSource as EntityGameS
 
 /**
  * GameEntity <-> Game mapper
+ * Implements BaseMapper to reduce boilerplate for list conversions
  */
-object GameMapper {
+object GameMapper : BaseMapper<GameEntity, Game> {
  /**
   * EntityDomain model conversion
   */
- fun toDomain(entity: GameEntity): Game {
+ override fun toDomain(entity: GameEntity): Game {
   return Game(
    id = entity.id,
    name = entity.name,
@@ -43,7 +44,7 @@ object GameMapper {
  /**
   * Domain modelEntity conversion
   */
- fun toEntity(domain: Game): GameEntity {
+ override fun toEntity(domain: Game): GameEntity {
   return GameEntity(
    id = domain.id,
    name = domain.name,
@@ -64,37 +65,17 @@ object GameMapper {
   )
  }
 
- /**
-  * Entity listDomain model list conversion
-  */
- fun toDomainList(entities: List<GameEntity>): List<Game> {
-  return entities.map { toDomain(it) }
- }
-
- /**
-  * Domain model listEntity list conversion
-  */
- fun toEntityList(domains: List<Game>): List<GameEntity> {
-  return domains.map { toEntity(it) }
- }
+ // toDomainList and toEntityList are inherited from BaseMapper
 
  /**
   * EntityGameSourceDomainGameSource conversion
+  * Uses generic enum mapper to reduce boilerplate
   */
- private fun EntityGameSource.toDomain(): DomainGameSource {
-  return when (this) {
-   EntityGameSource.STEAM -> DomainGameSource.STEAM
-   EntityGameSource.IMPORTED -> DomainGameSource.IMPORTED
-  }
- }
+ private fun EntityGameSource.toDomain(): DomainGameSource = mapByName()
 
  /**
   * DomainGameSourceEntityGameSource conversion
+  * Uses generic enum mapper to reduce boilerplate
   */
- private fun DomainGameSource.toEntity(): EntityGameSource {
-  return when (this) {
-   DomainGameSource.STEAM -> EntityGameSource.STEAM
-   DomainGameSource.IMPORTED -> EntityGameSource.IMPORTED
-  }
- }
+ private fun DomainGameSource.toEntity(): EntityGameSource = mapByName()
 }

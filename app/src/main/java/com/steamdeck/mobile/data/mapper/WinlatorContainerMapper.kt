@@ -7,12 +7,13 @@ import com.steamdeck.mobile.data.local.database.entity.Box64Preset as EntityBox6
 
 /**
  * WinlatorContainerEntity <-> WinlatorContainer mapper
+ * Implements BaseMapper to reduce boilerplate for list conversions
  */
-object WinlatorContainerMapper {
+object WinlatorContainerMapper : BaseMapper<WinlatorContainerEntity, WinlatorContainer> {
  /**
   * EntityDomain model conversion
   */
- fun toDomain(entity: WinlatorContainerEntity): WinlatorContainer {
+ override fun toDomain(entity: WinlatorContainerEntity): WinlatorContainer {
   return WinlatorContainer(
    id = entity.id,
    name = entity.name,
@@ -30,7 +31,7 @@ object WinlatorContainerMapper {
  /**
   * Domain modelEntity conversion
   */
- fun toEntity(domain: WinlatorContainer): WinlatorContainerEntity {
+ override fun toEntity(domain: WinlatorContainer): WinlatorContainerEntity {
   return WinlatorContainerEntity(
    id = domain.id,
    name = domain.name,
@@ -45,39 +46,17 @@ object WinlatorContainerMapper {
   )
  }
 
- /**
-  * Entity listDomain model list conversion
-  */
- fun toDomainList(entities: List<WinlatorContainerEntity>): List<WinlatorContainer> {
-  return entities.map { toDomain(it) }
- }
-
- /**
-  * Domain model listEntity list conversion
-  */
- fun toEntityList(domains: List<WinlatorContainer>): List<WinlatorContainerEntity> {
-  return domains.map { toEntity(it) }
- }
+ // toDomainList and toEntityList are inherited from BaseMapper
 
  /**
   * EntityBox64PresetDomainBox64Preset conversion
+  * Uses generic enum mapper to reduce boilerplate
   */
- private fun EntityBox64Preset.toDomain(): DomainBox64Preset {
-  return when (this) {
-   EntityBox64Preset.PERFORMANCE -> DomainBox64Preset.PERFORMANCE
-   EntityBox64Preset.STABILITY -> DomainBox64Preset.STABILITY
-   EntityBox64Preset.CUSTOM -> DomainBox64Preset.CUSTOM
-  }
- }
+ private fun EntityBox64Preset.toDomain(): DomainBox64Preset = mapByName()
 
  /**
   * DomainBox64PresetEntityBox64Preset conversion
+  * Uses generic enum mapper to reduce boilerplate
   */
- private fun DomainBox64Preset.toEntity(): EntityBox64Preset {
-  return when (this) {
-   DomainBox64Preset.PERFORMANCE -> EntityBox64Preset.PERFORMANCE
-   DomainBox64Preset.STABILITY -> EntityBox64Preset.STABILITY
-   DomainBox64Preset.CUSTOM -> EntityBox64Preset.CUSTOM
-  }
- }
+ private fun DomainBox64Preset.toEntity(): EntityBox64Preset = mapByName()
 }

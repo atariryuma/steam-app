@@ -6,6 +6,7 @@ import com.steamdeck.mobile.core.steam.NsisExtractor
 import com.steamdeck.mobile.core.steam.SteamGameScanner
 import com.steamdeck.mobile.core.steam.SteamInstallerService
 import com.steamdeck.mobile.core.steam.SteamLauncher
+import com.steamdeck.mobile.core.steam.SteamManifestDownloader
 import com.steamdeck.mobile.core.steam.SteamSetupManager
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
@@ -41,14 +42,16 @@ object SteamAuthModule {
   downloadManager: DownloadManager,
   database: SteamDeckDatabase,
   okHttpClient: OkHttpClient,
-  nsisExtractor: NsisExtractor
+  nsisExtractor: NsisExtractor,
+  steamManifestDownloader: SteamManifestDownloader
  ): SteamInstallerService {
   return SteamInstallerService(
    context = context,
    downloadManager = downloadManager,
    database = database,
    okHttpClient = okHttpClient,
-   nsisExtractor = nsisExtractor
+   nsisExtractor = nsisExtractor,
+   steamManifestDownloader = steamManifestDownloader
   )
  }
 

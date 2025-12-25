@@ -106,10 +106,12 @@ class SettingsViewModel @Inject constructor(
  /**
   * Get Steam container ID (the container where Steam client is installed)
   * Returns null if Steam is not installed
+  *
+  * FIXED (2025-12-25): Returns String type (matches Container ID unification)
   */
- fun getSteamContainerId(): Long? {
+ fun getSteamContainerId(): String? {
   return when (val state = _steamInstallState.value) {
-   is SteamInstallState.Installed -> state.containerId.toLongOrNull()
+   is SteamInstallState.Installed -> state.containerId
    else -> null
   }
  }
@@ -253,7 +255,7 @@ class SettingsViewModel @Inject constructor(
    _autoLaunchSteamState.value = AutoLaunchState.LaunchingSteam
    try {
     AppLogger.i(TAG, "Auto-launching Steam client after QR login")
-    val launchResult = steamLauncher.launchSteamClient(containerId.toString())
+    val launchResult = steamLauncher.launchSteamClient(containerId)
 
     if (launchResult.isSuccess) {
      _autoLaunchSteamState.value = AutoLaunchState.SteamRunning

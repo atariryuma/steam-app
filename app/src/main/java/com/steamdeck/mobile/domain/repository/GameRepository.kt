@@ -110,4 +110,15 @@ interface GameRepository {
   * @param executablePath New executable file path
   */
  suspend fun updateGameExecutablePath(gameId: Long, executablePath: String)
+
+ /**
+  * Update game container ID
+  *
+  * FIXED (2025-12-25): Container ID stored as String type (matches Winlator implementation)
+  * No type conversion needed - direct String storage
+  *
+  * @param gameId Game ID
+  * @param containerId Container ID string (e.g., "default_shared_container" or timestamp)
+  */
+ suspend fun updateGameContainer(gameId: Long, containerId: String)
 }

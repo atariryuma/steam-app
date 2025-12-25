@@ -9,10 +9,13 @@ import androidx.compose.runtime.Immutable
  * Not exposed through repository layer (removed WinlatorContainerRepository as per YAGNI).
  *
  * @Immutable enables Compose performance optimization.
+ *
+ * FIXED (2025-12-25): id changed from Long to String (matches Game.winlatorContainerId)
+ * Container IDs are now Strings like "default_shared_container" or timestamp-based
  */
 @Immutable
 data class WinlatorContainer(
-    val id: Long = 0,
+    val id: String = "default_shared_container",
     val name: String,
     val box64Preset: Box64Preset = Box64Preset.COMPATIBILITY,
     val wineVersion: String = "9.0",

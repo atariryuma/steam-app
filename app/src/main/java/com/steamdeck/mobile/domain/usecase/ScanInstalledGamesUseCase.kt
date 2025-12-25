@@ -57,8 +57,9 @@ class ScanInstalledGamesUseCase @Inject constructor(
    }
 
    // 5. Execute scan
+   // FIXED (2025-12-25): Container ID is String type - no conversion needed
    val scanResult = steamGameScanner.findGameExecutable(
-    containerId = game.winlatorContainerId.toString(),
+    containerId = game.winlatorContainerId ?: "default_shared_container",
     steamAppId = game.steamAppId
    )
 

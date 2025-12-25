@@ -7,12 +7,10 @@ import com.steamdeck.mobile.data.local.database.dao.ControllerProfileDao
 import com.steamdeck.mobile.data.local.database.dao.DownloadDao
 import com.steamdeck.mobile.data.local.database.dao.GameDao
 import com.steamdeck.mobile.data.local.database.dao.SteamInstallDao
-import com.steamdeck.mobile.data.local.database.dao.WinlatorContainerDao
 import com.steamdeck.mobile.data.local.database.entity.ControllerProfileEntity
 import com.steamdeck.mobile.data.local.database.entity.DownloadEntity
 import com.steamdeck.mobile.data.local.database.entity.GameEntity
 import com.steamdeck.mobile.data.local.database.entity.SteamInstallEntity
-import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
 
 /**
  * SteamDeck Mobile application main database
@@ -37,16 +35,21 @@ import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
  * Version 9 changes (2025-12-22):
  * - Performance improvements branch
  * - Network retry logic, Compose optimizations, Room migration tests
+ *
+ * Version 1 (2025-12-25 Production-Ready):
+ * - Container ID type: String (matches Winlator 10.1 implementation)
+ * - Filesystem-based container management (removed WinlatorContainerEntity/Dao)
+ * - Eliminates 10 type conversion bugs across codebase
+ * - No destructive migrations (user data protection)
  */
 @Database(
  entities = [
   GameEntity::class,
   DownloadEntity::class,
   ControllerProfileEntity::class,
-  SteamInstallEntity::class,
-  WinlatorContainerEntity::class
+  SteamInstallEntity::class
  ],
- version = 9,
+ version = 1,
  exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -55,12 +58,6 @@ abstract class SteamDeckDatabase : RoomDatabase() {
   * Game information DAO
   */
  abstract fun gameDao(): GameDao
-
- /**
-  * Winlator container configuration DAO
-  * NOTE: Used directly by SteamSetupManager (Repository layer removed per YAGNI)
-  */
- abstract fun winlatorContainerDao(): WinlatorContainerDao
 
  /**
   * Download history DAO

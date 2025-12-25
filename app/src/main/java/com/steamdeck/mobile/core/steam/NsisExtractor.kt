@@ -3,11 +3,15 @@ package com.steamdeck.mobile.core.steam
 import com.steamdeck.mobile.core.logging.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import net.sf.sevenzipjbinding.ExtractOperationResult
 import net.sf.sevenzipjbinding.IInArchive
+import net.sf.sevenzipjbinding.ISequentialOutStream
 import net.sf.sevenzipjbinding.SevenZip
+import net.sf.sevenzipjbinding.SevenZipException
 import net.sf.sevenzipjbinding.impl.RandomAccessFileInStream
 import net.sf.sevenzipjbinding.simple.ISimpleInArchiveItem
 import java.io.File
+import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -103,6 +107,7 @@ class NsisExtractor @Inject constructor() {
 
  /**
   * Extract a single item from archive
+  * Uses streaming extraction to avoid OutOfMemoryError on large files (e.g., 281MB bins_cef_win32.zip)
   */
  private fun extractItem(item: ISimpleInArchiveItem, targetDir: File) {
   val itemPath = item.path ?: return
@@ -117,15 +122,25 @@ class NsisExtractor @Inject constructor() {
   // Create parent directories
   targetFile.parentFile?.mkdirs()
 
-  // Extract file
-  item.extractSlow { data ->
-   targetFile.outputStream().use { output ->
-    output.write(data)
+  // Extract file using streaming ISequentialOutStream (memory-efficient, 64KB chunks)
+  val outputStream = FileOutputStream(targetFile)
+  try {
+   val sequentialOutStream = object : ISequentialOutStream {
+    override fun write(data: ByteArray): Int {
+     outputStream.write(data)
+     return data.size
+    }
    }
-   data.size
-  }
 
-  AppLogger.d(TAG, "Extracted: $itemPath (${targetFile.length()} bytes)")
+   val result = item.extractSlow(sequentialOutStream)
+   if (result != ExtractOperationResult.OK) {
+    throw Exception("Extraction failed with result: $result")
+   }
+
+   AppLogger.d(TAG, "Extracted: $itemPath (${targetFile.length()} bytes)")
+  } finally {
+   outputStream.close()
+  }
  }
 
  /**

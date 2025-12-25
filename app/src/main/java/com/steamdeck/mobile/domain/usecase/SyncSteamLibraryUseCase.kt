@@ -42,10 +42,10 @@ class SyncSteamLibraryUseCase @Inject constructor(
   * Sync Steam library
   *
   * @param steamId Steam ID (from QR authentication)
-  * @param steamContainerId Steam container ID (where Steam client is installed)
+  * @param steamContainerId Steam container ID (String type: where Steam client is installed)
   * @return Sync result (number of games synced on success)
   */
- suspend operator fun invoke(steamId: String, steamContainerId: Long): DataResult<Int> {
+ suspend operator fun invoke(steamId: String, steamContainerId: String): DataResult<Int> {
   return try {
    // Get API Key (required: user must provide their own API Key)
    val apiKey = securePreferences.getSteamApiKey()
@@ -92,6 +92,7 @@ class SyncSteamLibraryUseCase @Inject constructor(
         iconPath = iconPath,
         bannerPath = bannerPath,
         // Automatically assign Steam container ID to enable download functionality
+        // FIXED (2025-12-25): String → String (no conversion)
         winlatorContainerId = steamContainerId
        )
 

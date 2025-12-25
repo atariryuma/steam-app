@@ -152,11 +152,12 @@ fun GameDetailScreen(
      game = state.game,
      isSteamInstalled = isSteamInstalled,
      isScanning = isScanning,
+     launchState = launchState,
      steamLaunchState = steamLaunchState,
      onLaunchGame = { viewModel.launchGame(gameId, xServer, xServerView) },
      onLaunchViaSteam = { viewModel.launchGameViaSteam(gameId) },
      onOpenSteamClient = { viewModel.openSteamClient(gameId) },
-     onOpenSteamInstallPage = { viewModel.triggerGameDownload(gameId) },
+     onLaunchOrDownloadGame = { viewModel.launchOrDownloadGame(gameId, xServer, xServerView) },
      onScanForInstalledGame = { viewModel.scanForInstalledGame(gameId) },
      onNavigateBack = onNavigateBack,
      onNavigateToSettings = onNavigateToSettings,
@@ -317,11 +318,12 @@ fun GameDetailContent(
  game: Game,
  isSteamInstalled: Boolean,
  isScanning: Boolean,
+ launchState: LaunchState,
  steamLaunchState: SteamLaunchState,
  onLaunchGame: () -> Unit,
  onLaunchViaSteam: () -> Unit,
  onOpenSteamClient: () -> Unit,
- onOpenSteamInstallPage: () -> Unit,
+ onLaunchOrDownloadGame: () -> Unit,
  onScanForInstalledGame: () -> Unit,
  onNavigateBack: () -> Unit,
  onNavigateToSettings: () -> Unit,
@@ -486,32 +488,60 @@ fun GameDetailContent(
        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
       )
 
-      // Simplified description
+      // UPDATED (2025): One-button UX description
       Text(
-       "Open Steam in Big Picture mode to download this game.",
+       "Press 'Launch Game' to automatically download and install this game through Steam.",
        style = MaterialTheme.typography.bodyMedium,
        color = MaterialTheme.colorScheme.onPrimaryContainer
       )
 
-      // Single action button - Open Steam Big Picture
+      // Single action button - Launch or Download Game
       Button(
        onClick = {
-        android.util.Log.d("GameDetailScreen", "Open Steam Big Picture button clicked")
-        onOpenSteamInstallPage()
+        android.util.Log.d("GameDetailScreen", "Launch/Download button clicked")
+        onLaunchOrDownloadGame()
        },
+       // FIXED (2025): Add LaunchState.Launching check to prevent double-clicks during launch
+       enabled = launchState !is LaunchState.Launching &&
+                 steamLaunchState !is SteamLaunchState.InstallingSteam &&
+                 steamLaunchState !is SteamLaunchState.Downloading &&
+                 steamLaunchState !is SteamLaunchState.Installing &&
+                 steamLaunchState !is SteamLaunchState.InitiatingDownload,
        modifier = Modifier.fillMaxWidth(),
        colors = ButtonDefaults.buttonColors(
         containerColor = MaterialTheme.colorScheme.primary
        )
       ) {
-       Icon(
-        Icons.Default.SportsEsports,
-        contentDescription = null,
-        modifier = Modifier.size(20.dp)
-       )
+       // FIXED (2025-12-25): Show proper loading indicator when actually processing
+       if (steamLaunchState is SteamLaunchState.Launching ||
+           steamLaunchState is SteamLaunchState.InitiatingDownload) {
+        CircularProgressIndicator(
+         modifier = Modifier.size(20.dp),
+         strokeWidth = 2.dp,
+         color = MaterialTheme.colorScheme.onPrimary
+        )
+       } else {
+        Icon(
+         imageVector = when (steamLaunchState) {
+          is SteamLaunchState.InstallingSteam -> Icons.Default.CloudDownload
+          is SteamLaunchState.Downloading -> Icons.Default.Download
+          is SteamLaunchState.Installing -> Icons.Default.Settings
+          else -> Icons.Default.PlayArrow
+         },
+         contentDescription = null,
+         modifier = Modifier.size(20.dp)
+        )
+       }
        Spacer(modifier = Modifier.width(8.dp))
        Text(
-        "Open Steam Big Picture",
+        text = when (steamLaunchState) {
+         is SteamLaunchState.InstallingSteam -> "Preparing Steam ${(steamLaunchState.progress * 100).toInt()}%"
+         is SteamLaunchState.Downloading -> "Downloading ${steamLaunchState.progress}%"
+         is SteamLaunchState.Installing -> "Installing ${steamLaunchState.progress}%"
+         is SteamLaunchState.InitiatingDownload -> "Starting Download..."
+         is SteamLaunchState.Launching -> "Launching..."
+         else -> "Launch Game"
+        },
         style = MaterialTheme.typography.titleSmall
        )
       }
@@ -519,21 +549,8 @@ fun GameDetailContent(
     }
    }
 
-   // Simplified launch button - Always use direct launch if executable exists
-   if (game.executablePath.isNotBlank()) {
-    Button(
-     onClick = onLaunchGame,
-     modifier = Modifier.fillMaxWidth(),
-     shape = RoundedCornerShape(20.dp)
-    ) {
-     Icon(
-      imageVector = Icons.Default.PlayArrow,
-      contentDescription = "Launch game"
-     )
-     Spacer(modifier = Modifier.width(8.dp))
-     Text("Launch Game")
-    }
-   }
+   // REMOVED (2025): Old standalone "Launch Game" button
+   // Now unified into single "Launch or Download" button above for one-button UX
 
    // Game info card
    InfoCard(

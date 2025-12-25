@@ -57,6 +57,7 @@ class GameDetailViewModelIntegrationTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
+    // FIXED (2025-12-25): Container ID is String type (matches Container ID unification)
     private val mockGame = Game(
         id = 1L,
         name = "Portal 2",
@@ -64,11 +65,11 @@ class GameDetailViewModelIntegrationTest {
         executablePath = "/games/portal2/portal2.exe",
         installPath = "/games/portal2",
         source = GameSource.STEAM,
-        winlatorContainerId = 10L
+        winlatorContainerId = "default_shared_container"  // String type
     )
 
     private val mockContainer = WinlatorContainer(
-        id = 10L,
+        id = "default_shared_container",  // String type (matches game container ID)
         name = "Portal 2 Container",
         box64Preset = Box64Preset.PERFORMANCE,
         wineVersion = "9.0",

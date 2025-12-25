@@ -283,7 +283,7 @@ class WinlatorEmulator @Inject constructor(
     val box64TxzFile = File(box64Dir, "box64-0.3.4.txz")
     if (!box64TxzFile.exists()) {
      extractAsset(BOX64_ASSET, box64TxzFile)
-     // Asset copy progress (約13% of Box64 range: 0.15->0.17 は 13%)
+     // Asset copy progress (approx. 13% of Box64 range: 0.15->0.17 is 13%)
      val assetCopyProgress = mapProgress(0.13f, ProgressRanges.BOX64_START, ProgressRanges.BOX64_END)
      progressCallback?.invoke(assetCopyProgress, "Box64 asset copied")
     }

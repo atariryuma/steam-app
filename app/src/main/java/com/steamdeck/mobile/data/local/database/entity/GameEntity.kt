@@ -45,8 +45,8 @@ data class GameEntity(
  /** Game source (STEAM / IMPORTED) */
  val source: GameSource,
 
- /** Related Winlator container ID */
- val winlatorContainerId: Long? = null,
+ /** Related Winlator container ID (String type: "default_shared_container" or timestamp) */
+ val winlatorContainerId: String? = null,
 
  /** Play time (minutes) */
  val playTimeMinutes: Long = 0,

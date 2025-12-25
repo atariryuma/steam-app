@@ -51,7 +51,7 @@ class GameDetailViewModelTest {
         executablePath = "/games/portal2/portal2.exe",
         installPath = "/games/portal2",
         source = GameSource.STEAM,
-        winlatorContainerId = 10L,
+        winlatorContainerId = "default_shared_container",  // FIXED (2025-12-25): String type
         playTimeMinutes = 180L,
         lastPlayedTimestamp = System.currentTimeMillis() - 3600_000,
         iconPath = "/icons/portal2.png",

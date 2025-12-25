@@ -118,4 +118,10 @@ class GameRepositoryImpl @Inject constructor(
  override suspend fun updateGameExecutablePath(gameId: Long, executablePath: String) {
   gameDao.updateGameExecutablePath(gameId, executablePath)
  }
+
+ override suspend fun updateGameContainer(gameId: Long, containerId: String) {
+  // FIXED (2025-12-25): Store as String type without conversion
+  // Container ID matches Winlator implementation - no type conversion needed
+  gameDao.updateGameContainer(gameId, containerId)
+ }
 }

@@ -24,7 +24,8 @@ class SteamInstallerService @Inject constructor(
  private val downloadManager: DownloadManager,
  private val database: SteamDeckDatabase,
  private val okHttpClient: OkHttpClient,
- private val nsisExtractor: NsisExtractor
+ private val nsisExtractor: NsisExtractor,
+ private val steamManifestDownloader: SteamManifestDownloader
 ) {
  companion object {
   private const val TAG = "SteamInstallerService"
@@ -200,31 +201,34 @@ class SteamInstallerService @Inject constructor(
  }
 
  /**
-  * Extract Steam files from NSIS installer
+  * Extract Steam files from NSIS installer (bootstrapper only)
+  * Then download full Steam client packages from Valve CDN
   *
-  * Uses 7-Zip-JBinding-4Android to extract all files from SteamSetup.exe.
-  * This bypasses Wine WoW64 limitations.
+  * Two-stage installation process:
+  * 1. Extract SteamSetup.exe (40 files, ~7MB) - Steam.exe bootstrapper
+  * 2. Download Steam client packages from Valve CDN (248MB) - steamclient.dll, libcef.dll, etc.
   *
-  * Extracted files include:
-  * - Steam.exe (~180KB) - Main Steam client
-  * - steamclient.dll (~2.5MB) - Steam API library
-  * - tier0_s.dll, vstdlib_s.dll (~300KB total) - Valve foundation libraries
-  * - libcef.dll (~124MB) - Chromium Embedded Framework
-  * - steamwebhelper.exe (~3MB) - Web content renderer
-  * - And ~127 other files (total ~180MB)
+  * Why two-stage?
+  * - SteamSetup.exe only contains Steam.exe bootstrapper (40 files)
+  * - Steam.exe downloads additional files on first run (doesn't work in Wine/Android)
+  * - We manually download those files from Valve's official CDN
   *
   * @param setupFile SteamSetup.exe file (NSIS installer)
   * @param targetDir Target directory (e.g., C:\Program Files (x86)\Steam in Wine container)
-  * @param onProgress Optional progress callback (filesExtracted, totalFiles)
-  * @return Result containing extracted file count or error
+  * @param onNsisProgress NSIS extraction progress callback (filesExtracted, totalFiles)
+  * @param onCdnProgress CDN download progress (currentPackage, totalPackages, bytesDownloaded, totalBytes)
+  * @return Result containing total extracted file count or error
   */
  suspend fun extractSteamFromNSIS(
   setupFile: File,
   targetDir: File,
-  onProgress: ((filesExtracted: Int, totalFiles: Int) -> Unit)? = null
+  onNsisProgress: ((filesExtracted: Int, totalFiles: Int) -> Unit)? = null,
+  onCdnProgress: ((currentPackage: Int, totalPackages: Int, bytesDownloaded: Long, totalBytes: Long) -> Unit)? = null
  ): Result<Int> = withContext(Dispatchers.IO) {
   try {
-   AppLogger.i(TAG, "Extracting Steam from NSIS installer: ${setupFile.absolutePath}")
+   AppLogger.i(TAG, "=== Starting 2-stage Steam installation ===")
+   AppLogger.i(TAG, "Stage 1: Extract NSIS bootstrapper (40 files)")
+   AppLogger.i(TAG, "Stage 2: Download Steam client packages from CDN (248MB)")
    AppLogger.i(TAG, "Target directory: ${targetDir.absolutePath}")
 
    if (!setupFile.exists()) {
@@ -233,43 +237,79 @@ class SteamInstallerService @Inject constructor(
     )
    }
 
-   // Extract using 7-Zip-JBinding-4Android
-   val extractionResult = nsisExtractor.extractAll(setupFile, targetDir, onProgress)
+   // STAGE 1: Extract NSIS bootstrapper (Steam.exe + language files)
+   AppLogger.i(TAG, "STAGE 1: Extracting NSIS bootstrapper")
+   val nsisResult = nsisExtractor.extractAll(setupFile, targetDir, onNsisProgress)
 
-   if (extractionResult.isFailure) {
-    val error = extractionResult.exceptionOrNull()
+   if (nsisResult.isFailure) {
+    val error = nsisResult.exceptionOrNull()
     AppLogger.e(TAG, "NSIS extraction failed", error)
     return@withContext Result.failure(
      error ?: Exception("NSIS extraction failed")
     )
    }
 
-   val filesExtracted = extractionResult.getOrNull() ?: 0
-   AppLogger.i(TAG, "NSIS extraction completed: $filesExtracted files extracted to ${targetDir.absolutePath}")
+   val nsisFilesExtracted = nsisResult.getOrNull() ?: 0
+   AppLogger.i(TAG, "STAGE 1 completed: $nsisFilesExtracted files extracted (bootstrapper)")
 
-   // Verify critical files exist
+   // Verify Steam.exe exists
    val steamExe = File(targetDir, "Steam.exe")
-   val steamclientDll = File(targetDir, "steamclient.dll")
-
    if (!steamExe.exists()) {
     return@withContext Result.failure(
-     Exception("Steam.exe not found after extraction - NSIS extraction may have failed")
+     Exception("Steam.exe not found after NSIS extraction")
     )
    }
 
-   if (!steamclientDll.exists()) {
-    AppLogger.w(TAG, "steamclient.dll not found - Steam may not launch properly")
+   AppLogger.i(TAG, "Steam.exe verified: ${steamExe.length() / 1024}KB")
+
+   // STAGE 2: Download Steam client packages from Valve CDN
+   AppLogger.i(TAG, "STAGE 2: Downloading Steam client packages from Valve CDN")
+   val cdnResult = steamManifestDownloader.downloadAndExtractSteamPackages(
+    targetDir = targetDir,
+    progressCallback = onCdnProgress
+   )
+
+   if (cdnResult.isFailure) {
+    val error = cdnResult.exceptionOrNull()
+    AppLogger.e(TAG, "CDN download failed", error)
+    return@withContext Result.failure(
+     error ?: Exception("CDN download failed")
+    )
    }
 
-   AppLogger.i(TAG, "Extraction verified: Steam.exe (${steamExe.length() / 1024}KB)")
-   if (steamclientDll.exists()) {
-    AppLogger.i(TAG, "  steamclient.dll: ${steamclientDll.length() / 1024}KB")
+   val cdnFilesExtracted = cdnResult.getOrNull() ?: 0
+   AppLogger.i(TAG, "STAGE 2 completed: $cdnFilesExtracted files extracted (CDN packages)")
+
+   // Verify critical DLLs now exist
+   val steamclientDll = File(targetDir, "steamclient.dll")
+   val tier0Dll = File(targetDir, "tier0_s.dll")
+   val vstdlibDll = File(targetDir, "vstdlib_s.dll")
+
+   val missingFiles = mutableListOf<String>()
+   if (!steamclientDll.exists()) missingFiles.add("steamclient.dll")
+   if (!tier0Dll.exists()) missingFiles.add("tier0_s.dll")
+   if (!vstdlibDll.exists()) missingFiles.add("vstdlib_s.dll")
+
+   if (missingFiles.isNotEmpty()) {
+    return@withContext Result.failure(
+     Exception("Critical DLLs missing after CDN download: ${missingFiles.joinToString()}")
+    )
    }
 
-   Result.success(filesExtracted)
+   // Log verification
+   AppLogger.i(TAG, "=== Steam installation verification ===")
+   AppLogger.i(TAG, "Steam.exe: ${steamExe.length() / 1024}KB")
+   AppLogger.i(TAG, "steamclient.dll: ${steamclientDll.length() / 1024}KB")
+   AppLogger.i(TAG, "tier0_s.dll: ${tier0Dll.length() / 1024}KB")
+   AppLogger.i(TAG, "vstdlib_s.dll: ${vstdlibDll.length() / 1024}KB")
+
+   val totalFilesExtracted = nsisFilesExtracted + cdnFilesExtracted
+   AppLogger.i(TAG, "=== Installation completed: $totalFilesExtracted total files ===")
+
+   Result.success(totalFilesExtracted)
 
   } catch (e: Exception) {
-   AppLogger.e(TAG, "Steam NSIS extraction failed", e)
+   AppLogger.e(TAG, "Steam installation failed", e)
    Result.failure(e)
   }
  }

@@ -25,7 +25,8 @@ data class Game(
  val executablePath: String,
  val installPath: String,
  val source: GameSource,
- val winlatorContainerId: Long? = null,
+ /** Related Winlator container ID (String type: "default_shared_container" or timestamp) */
+ val winlatorContainerId: String? = null,
  val playTimeMinutes: Long = 0,
  val lastPlayedTimestamp: Long? = null,
  val iconPath: String? = null,
@@ -75,7 +76,7 @@ data class Game(
     hours < 24 -> "${hours}h ago"
     days < 30 -> "${days}d ago"
     else -> {
-     val date = java.text.SimpleDateFormat("yyyy/MM/dd", java.util.Locale.JAPAN)
+     val date = java.text.SimpleDateFormat("yyyy/MM/dd", java.util.Locale.getDefault())
       .format(java.util.Date(lastPlayedTimestamp))
      date
     }

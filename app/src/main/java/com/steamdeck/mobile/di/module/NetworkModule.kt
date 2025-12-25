@@ -75,9 +75,10 @@ object NetworkModule {
 
     // Enable logging only for debug builds (disabled in production)
     // Security best practice: Prevent API keys/tokens from appearing in logs
+    // NOTE: Using HEADERS instead of BODY to prevent OOM on large file downloads (130MB+)
     if (com.steamdeck.mobile.BuildConfig.DEBUG) {
      val loggingInterceptor = HttpLoggingInterceptor().apply {
-      level = HttpLoggingInterceptor.Level.BODY
+      level = HttpLoggingInterceptor.Level.HEADERS
      }
      addInterceptor(loggingInterceptor)
     }

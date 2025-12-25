@@ -13,9 +13,10 @@ import com.steamdeck.mobile.domain.model.InstallationStatus
 import com.steamdeck.mobile.domain.repository.GameRepository
 import com.steamdeck.mobile.domain.usecase.DeleteGameUseCase
 import com.steamdeck.mobile.domain.usecase.LaunchGameUseCase
+import com.steamdeck.mobile.domain.usecase.LaunchOrDownloadGameUseCase
+import com.steamdeck.mobile.domain.usecase.LaunchOrDownloadResult
 import com.steamdeck.mobile.domain.usecase.ScanInstalledGamesUseCase
 import com.steamdeck.mobile.domain.usecase.ToggleFavoriteUseCase
-import com.steamdeck.mobile.domain.usecase.TriggerGameDownloadUseCase
 import com.steamdeck.mobile.presentation.util.toUserMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.takeWhile
@@ -42,19 +43,17 @@ import javax.inject.Inject
 class GameDetailViewModel @Inject constructor(
  @ApplicationContext private val context: Context,
  private val launchGameUseCase: LaunchGameUseCase,
+ private val launchOrDownloadGameUseCase: LaunchOrDownloadGameUseCase,
  private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
  private val deleteGameUseCase: DeleteGameUseCase,
+ private val openSteamClientUseCase: com.steamdeck.mobile.domain.usecase.OpenSteamClientUseCase,
  private val steamLauncher: SteamLauncher,
  private val steamSetupManager: SteamSetupManager,
  private val scanInstalledGamesUseCase: ScanInstalledGamesUseCase,
- private val triggerGameDownloadUseCase: TriggerGameDownloadUseCase,
  private val gameRepository: GameRepository,
  private val winlatorEngine: WinlatorEngine,
  private val controllerInputRouter: com.steamdeck.mobile.core.input.ControllerInputRouter,
- private val gameControllerManager: com.steamdeck.mobile.core.input.GameControllerManager,
- private val steamAuthManager: com.steamdeck.mobile.core.steam.SteamAuthManager,
- private val steamConfigManager: com.steamdeck.mobile.core.steam.SteamConfigManager,
- private val securePreferences: com.steamdeck.mobile.domain.repository.ISecurePreferences
+ private val gameControllerManager: com.steamdeck.mobile.core.input.GameControllerManager
 ) : ViewModel() {
 
  companion object {
@@ -310,8 +309,9 @@ class GameDetailViewModel @Inject constructor(
     }
 
     // Launch via Steam Client
+    // FIXED (2025-12-25): Container ID is String type - no conversion needed
     val result = steamLauncher.launchGameViaSteam(
-     containerId = game.winlatorContainerId.toString(),
+     containerId = game.winlatorContainerId ?: "default_shared_container",
      appId = game.steamAppId
     )
 
@@ -337,90 +337,30 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * Open Steam Client
-  */
- /**
-  * Open Steam Client (2025-12-23 OPTIMIZED with Auto-Login)
+  * Open Steam Client (2025-12-25 REFACTORED)
   *
-  * Improvements:
-  * 1. Ensures Steam credentials (loginusers.vdf + config.vdf) are configured before launch
-  * 2. Uses SteamAuthManager + SteamConfigManager for complete VDF setup
-  * 3. Includes CDN servers to prevent "Content Servers Unreachable" errors
-  *
-  * This guarantees Steam will auto-login if user has completed QR authentication
+  * Delegates to OpenSteamClientUseCase for better separation of concerns.
+  * This reduces ViewModel dependencies and improves testability.
   */
  fun openSteamClient(gameId: Long) {
   viewModelScope.launch {
    try {
     _steamLaunchState.value = SteamLaunchState.Launching
 
-    // Get current game information
-    val currentState = _uiState.value
-    if (currentState !is GameDetailUiState.Success) {
-     _steamLaunchState.value = SteamLaunchState.Error("Failed to get game information")
-     return@launch
-    }
-
-    val game = currentState.game
-
-    // Check Container ID
-    if (game.winlatorContainerId == null) {
-     _steamLaunchState.value = SteamLaunchState.Error(
-      "Winlator container is not configured. Please create a container in Settings."
-     )
-     return@launch
-    }
-
-    // 🔧 NEW: Ensure Steam credentials are configured before launch
-    val containerDir = java.io.File(context.filesDir, "winlator/containers/${game.winlatorContainerId}")
-    val steamId = try {
-     securePreferences.getSteamId().first()
-    } catch (e: Exception) {
-     AppLogger.w(TAG, "Failed to get Steam ID: ${e.message}")
-     null
-    }
-
-    if (steamId != null) {
-     AppLogger.i(TAG, "Configuring Steam auto-login before launch: SteamID=$steamId")
-
-     // Get Steam username for auto-login (NOT SteamID64)
-     val steamUsername = try {
-      securePreferences.getSteamUsername().first()
-     } catch (e: Exception) {
-      AppLogger.w(TAG, "Failed to get Steam username: ${e.message}")
-      null
-     }
-
-     // Create loginusers.vdf
-     val authResult = steamAuthManager.createLoginUsersVdf(containerDir)
-     if (authResult.isFailure) {
-      AppLogger.w(TAG, "Failed to create loginusers.vdf (non-fatal): ${authResult.exceptionOrNull()?.message}")
-     }
-
-     // Create config.vdf with CDN servers + auto-login
-     // CRITICAL: Use Steam account name, NOT SteamID64
-     val configResult = steamConfigManager.createConfigVdf(containerDir, steamUsername)
-     if (configResult.isFailure) {
-      AppLogger.w(TAG, "Failed to create config.vdf (non-fatal): ${configResult.exceptionOrNull()?.message}")
-     }
-    } else {
-     AppLogger.i(TAG, "No Steam ID found - Steam will require manual login")
-    }
-
-    // Launch Steam Big Picture mode
-    val result = steamLauncher.launchSteamBigPicture(game.winlatorContainerId.toString())
-
-    result
-     .onSuccess {
+    when (val result = openSteamClientUseCase(gameId)) {
+     is DataResult.Success -> {
       _steamLaunchState.value = SteamLaunchState.Running(0)
       AppLogger.i(TAG, "Steam Big Picture opened successfully")
      }
-     .onFailure { error ->
-      _steamLaunchState.value = SteamLaunchState.Error(
-       error.message ?: "Steam Big Picture launch failed"
-      )
-      AppLogger.e(TAG, "Failed to open Steam Big Picture", error)
+     is DataResult.Error -> {
+      val errorMessage = result.error.toUserMessage(context)
+      _steamLaunchState.value = SteamLaunchState.Error(errorMessage)
+      AppLogger.e(TAG, "Failed to open Steam Big Picture: $errorMessage")
      }
+     is DataResult.Loading -> {
+      // Handled by Launching state
+     }
+    }
 
    } catch (e: Exception) {
     _steamLaunchState.value = SteamLaunchState.Error(
@@ -533,43 +473,189 @@ class GameDetailViewModel @Inject constructor(
   }
  }
 
+
  /**
-  * Trigger game download via Steam Client
+  * Unified launch/download method - handles all scenarios
   *
-  * NEW 2025: Automatic download/install through Wine Steam client
-  * - Starts FileObserver monitoring service
-  * - Launches steam.exe -applaunch <appId> (auto-triggers download)
-  * - Monitors installation progress in real-time
+  * NEW 2025: One-button game launch UX
+  * Automatically:
+  * 1. Installs Steam if needed (fully hidden from user)
+  * 2. Launches Big Picture if game not installed
+  * 3. Monitors download/install progress
+  * 4. Auto-launches game when installation completes
+  * 5. Launches game directly if already installed
+  *
+  * Technical constraint: Big Picture UI will be displayed for downloads
+  * (Steam -applaunch does not guarantee auto-download for uninstalled games)
   */
- fun triggerGameDownload(gameId: Long) {
+ fun launchOrDownloadGame(
+  gameId: Long,
+  xServer: XServer?,
+  xServerView: com.steamdeck.mobile.presentation.widget.XServerView?
+ ) {
   viewModelScope.launch {
    try {
-    _steamLaunchState.value = SteamLaunchState.InitiatingDownload
-    AppLogger.i(TAG, "Triggering game download for gameId=$gameId")
+    _launchState.value = LaunchState.Launching
+    AppLogger.i(TAG, "Starting unified launch/download for gameId=$gameId")
 
-    when (val result = triggerGameDownloadUseCase(gameId)) {
-     is DataResult.Success -> {
-      _steamLaunchState.value = SteamLaunchState.Downloading(0)
-      AppLogger.i(TAG, "Download initiated successfully")
-
-      // Start observing installation progress
-      observeInstallationProgress(gameId)
+    when (val result = launchOrDownloadGameUseCase(
+     gameId = gameId,
+     steamInstallProgressCallback = { progress, message, detail ->
+      // Update Steam installation progress in real-time (2025 Fix)
+      _steamLaunchState.value = SteamLaunchState.InstallingSteam(progress)
+      AppLogger.d(TAG, "Steam install progress: ${(progress * 100).toInt()}% - $message")
      }
+    )) {
+     is DataResult.Success -> {
+      when (val data = result.data) {
+       is LaunchOrDownloadResult.Launched -> {
+        // Game launched directly (already installed)
+        _launchState.value = LaunchState.Running(data.processId)
+        AppLogger.i(TAG, "Game launched directly: processId=${data.processId}")
+
+        // Start controller routing
+        startControllerRouting()
+
+        // Monitor game process
+        monitorGameProcess(gameId, data.processId)
+       }
+
+       is LaunchOrDownloadResult.DownloadStarted -> {
+        // Big Picture launched for download
+        if (data.autoTrackingEnabled) {
+         _steamLaunchState.value = SteamLaunchState.Downloading(0)
+         AppLogger.i(TAG, "Big Picture launched for download: downloadId=${data.downloadId}")
+        } else {
+         // FileObserver monitoring failed - show manual tracking message
+         _steamLaunchState.value = SteamLaunchState.DownloadStartedManualTracking
+         AppLogger.w(TAG, "Big Picture launched, but automatic tracking unavailable: downloadId=${data.downloadId}")
+        }
+        _launchState.value = LaunchState.Idle
+
+        // Start observing installation progress (will auto-launch when complete)
+        observeInstallationProgressWithAutoLaunch(gameId, xServer, xServerView)
+       }
+
+       is LaunchOrDownloadResult.InProgress -> {
+        // Already downloading/installing
+        _steamLaunchState.value = when (data.status) {
+         InstallationStatus.DOWNLOADING ->
+          SteamLaunchState.Downloading(data.progress)
+         InstallationStatus.INSTALLING ->
+          SteamLaunchState.Installing(data.progress)
+         else -> SteamLaunchState.Idle
+        }
+        _launchState.value = LaunchState.Idle
+        AppLogger.i(TAG, "Game already in progress: status=${data.status}, progress=${data.progress}%")
+       }
+
+       is LaunchOrDownloadResult.SteamInstalling -> {
+        // Steam installation in progress (first-time setup)
+        _steamLaunchState.value = SteamLaunchState.InstallingSteam(data.progress)
+        _launchState.value = LaunchState.Idle
+        AppLogger.i(TAG, "Steam installation in progress: ${(data.progress * 100).toInt()}%")
+       }
+      }
+     }
+
      is DataResult.Error -> {
       val errorMessage = result.error.toUserMessage(context)
+      _launchState.value = LaunchState.Error(errorMessage)
       _steamLaunchState.value = SteamLaunchState.Error(errorMessage)
-      AppLogger.e(TAG, "Failed to trigger download: $errorMessage")
+      AppLogger.e(TAG, "Launch/download failed: $errorMessage")
      }
+
      is DataResult.Loading -> {
-      // Handled by InitiatingDownload state
+      // Handled by LaunchState.Launching
      }
     }
 
    } catch (e: Exception) {
-    _steamLaunchState.value = SteamLaunchState.Error(
-     e.message ?: "An unexpected error occurred while starting download"
+    _launchState.value = LaunchState.Error(
+     e.message ?: "An unexpected error occurred"
     )
-    AppLogger.e(TAG, "Exception during download trigger", e)
+    _steamLaunchState.value = SteamLaunchState.Error(
+     e.message ?: "An unexpected error occurred"
+    )
+    AppLogger.e(TAG, "Exception during launch/download", e)
+   }
+  }
+ }
+
+ /**
+  * Observe installation progress with automatic game launch when complete
+  *
+  * NEW 2025: Auto-launch enhancement
+  * When download/installation completes, automatically launches the game
+  */
+ private fun observeInstallationProgressWithAutoLaunch(
+  gameId: Long,
+  xServer: XServer?,
+  xServerView: com.steamdeck.mobile.presentation.widget.XServerView?
+ ) {
+  viewModelScope.launch {
+   try {
+    gameRepository.observeGame(gameId)
+     .takeWhile { game ->
+      // Stop observing when installation completes or fails
+      game?.installationStatus !in listOf(
+       InstallationStatus.INSTALLED,
+       InstallationStatus.VALIDATION_FAILED
+      )
+     }
+     .collect { game ->
+      if (game == null) {
+       AppLogger.w(TAG, "Game not found during progress monitoring")
+       return@collect
+      }
+
+      AppLogger.d(TAG, "Installation status: ${game.installationStatus}, progress: ${game.installProgress}%")
+
+      when (game.installationStatus) {
+       InstallationStatus.DOWNLOADING -> {
+        _steamLaunchState.value = SteamLaunchState.Downloading(game.installProgress)
+       }
+       InstallationStatus.INSTALLING -> {
+        _steamLaunchState.value = SteamLaunchState.Installing(game.installProgress)
+       }
+       InstallationStatus.INSTALLED -> {
+        _steamLaunchState.value = SteamLaunchState.InstallComplete(game.name)
+        AppLogger.i(TAG, "Installation complete: ${game.name}, auto-launching in 1 second...")
+
+        // Brief delay for user to see completion message
+        kotlinx.coroutines.delay(1000)
+
+        // Reload game information
+        loadGame(gameId)
+
+        // Auto-launch game (FIXED 2025: Handle null XServer)
+        AppLogger.i(TAG, "Auto-launching game: ${game.name}")
+        if (xServer != null && xServerView != null) {
+         launchGame(gameId, xServer, xServerView)
+        } else {
+         // XServer not initialized - skip auto-launch (user must manually launch)
+         AppLogger.w(TAG, "XServer not available for auto-launch")
+         _steamLaunchState.value = SteamLaunchState.InstallComplete(game.name)
+        }
+       }
+       InstallationStatus.VALIDATION_FAILED -> {
+        _steamLaunchState.value = SteamLaunchState.ValidationFailed(
+         listOf("Installation validation failed. Please check game files.")
+        )
+       }
+       else -> {
+        // Other statuses - no action needed
+       }
+      }
+     }
+
+    AppLogger.i(TAG, "Finished observing installation progress for gameId=$gameId")
+
+   } catch (e: Exception) {
+    AppLogger.e(TAG, "Error observing installation progress", e)
+    _steamLaunchState.value = SteamLaunchState.Error(
+     e.message ?: "Error monitoring installation progress"
+    )
    }
   }
  }
@@ -630,6 +716,30 @@ class GameDetailViewModel @Inject constructor(
     AppLogger.e(TAG, "Exception during installation progress monitoring", e)
    }
   }
+ }
+
+ /**
+  * Start controller input routing (FIXED: Restored missing method with scope parameter)
+  */
+ private fun startControllerRouting() {
+  try {
+   controllerInputRouter.startRouting(viewModelScope)
+   AppLogger.d(TAG, "Controller input routing started")
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Failed to start controller routing", e)
+  }
+ }
+
+ /**
+  * Monitor game process and handle termination (FIXED: Simplified implementation)
+  *
+  * Note: Process monitoring is handled by LaunchGameUseCase's monitoringFlow.
+  * This method is kept for backward compatibility but doesn't actively monitor.
+  */
+ private fun monitorGameProcess(gameId: Long, processId: Int) {
+  // Process monitoring is now handled by LaunchGameUseCase
+  // The monitoringFlow in LaunchInfo handles play time tracking
+  AppLogger.d(TAG, "Game process monitoring delegated to LaunchGameUseCase (processId=$processId)")
  }
 
 }
@@ -697,9 +807,17 @@ sealed class SteamLaunchState {
  @Immutable
  data object InitiatingDownload : SteamLaunchState()
 
+ /** Installing Steam client (first-time setup) */
+ @Immutable
+ data class InstallingSteam(val progress: Float) : SteamLaunchState()
+
  /** Downloading game files */
  @Immutable
  data class Downloading(val progress: Int) : SteamLaunchState()
+
+ /** Download started but automatic tracking unavailable (manual check required) */
+ @Immutable
+ data object DownloadStartedManualTracking : SteamLaunchState()
 
  /** Installing/extracting game files */
  @Immutable

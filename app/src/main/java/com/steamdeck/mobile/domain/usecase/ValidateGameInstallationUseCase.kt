@@ -120,7 +120,8 @@ class ValidateGameInstallationUseCase @Inject constructor(
 
             // Check 2: Steam manifest StateFlags = 4 (only for Steam games)
             if (game.steamAppId != null && game.winlatorContainerId != null) {
-                val containerId = game.winlatorContainerId.toString()
+                // FIXED (2025-12-25): Container ID is String type - no conversion needed
+                val containerId = game.winlatorContainerId ?: "default_shared_container"
                 val manifestFile = File(
                     context.filesDir,
                     "winlator/containers/$containerId/drive_c/Program Files (x86)/Steam/steamapps/appmanifest_${game.steamAppId}.acf"
@@ -146,7 +147,8 @@ class ValidateGameInstallationUseCase @Inject constructor(
 
             // Check 3: Required DLLs exist (only for Steam games with containers)
             if (game.winlatorContainerId != null) {
-                val containerId = game.winlatorContainerId.toString()
+                // FIXED (2025-12-25): Container ID is String type - no conversion needed
+                val containerId = game.winlatorContainerId ?: "default_shared_container"
                 val system32Dir = File(
                     context.filesDir,
                     "winlator/containers/$containerId/drive_c/windows/system32"

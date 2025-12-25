@@ -76,6 +76,27 @@ class WinlatorEngineImpl @Inject constructor(
   cachedDefaultContainer.set(null) // Clear container cache (thread-safe)
  }
 
+ /**
+  * Validate if container exists on filesystem
+  *
+  * Cache Validation Strategy (2025-12-25):
+  * - Check filesystem directly to prevent stale cache usage
+  * - Returns false if container was deleted externally
+  * - Non-blocking: Simple directory existence check
+  *
+  * @param containerId Container ID to validate
+  * @return true if container directory exists, false otherwise
+  */
+ private fun validateContainerExists(containerId: String): Boolean {
+  return try {
+   val containerDir = java.io.File(context.filesDir, "winlator/containers/$containerId")
+   containerDir.exists() && containerDir.isDirectory
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Failed to validate container existence: $containerId", e)
+   false
+  }
+ }
+
  override suspend fun launchGame(game: Game, container: WinlatorContainer?): LaunchResult {
   return try {
    AppLogger.d(TAG, "=== GAME LAUNCH START ===")
@@ -102,7 +123,7 @@ class WinlatorEngineImpl @Inject constructor(
    if (!available) {
     AppLogger.i(TAG, ">>> Starting Winlator initialization (30-60s expected)...")
     val initResult = winlatorEmulator.initialize { progress, status ->
-     // CRITICAL: 初期化進捗を必ずログ出力
+     // CRITICAL: Always log initialization progress for debugging
      AppLogger.i(TAG, ">>> Init: ${(progress * 100).toInt()}% - $status")
     }
     if (initResult.isFailure) {
@@ -246,17 +267,26 @@ class WinlatorEngineImpl @Inject constructor(
   }
  }
 
- override suspend fun deleteContainer(containerId: Long): Result<Unit> {
+ /**
+  * Delete container
+  * FIXED (2025-12-25): Changed parameter type from Long to String (matches Container ID unification)
+  */
+ override suspend fun deleteContainer(containerId: String): Result<Unit> {
   return try {
    AppLogger.d(TAG, "Deleting container: $containerId")
-   // TODO: Delete Winlator container
 
-   // Invalidate cache when container is deleted
-   cachedDefaultContainer.set(null)
+   // Delete via WinlatorEmulator (actual implementation)
+   val result = winlatorEmulator.deleteContainer(containerId)
 
-   Result.success(Unit)
+   if (result.isSuccess) {
+    // Invalidate cache when container is deleted
+    cachedDefaultContainer.set(null)
+    AppLogger.i(TAG, "Container deleted successfully: $containerId")
+   }
+
+   result
   } catch (e: Exception) {
-   AppLogger.e(TAG, "Failed to delete container", e)
+   AppLogger.e(TAG, "Failed to delete container: $containerId", e)
    Result.failure(e)
   }
  }
@@ -297,11 +327,18 @@ class WinlatorEngineImpl @Inject constructor(
   * - Custom containers used only when explicitly assigned to a game
   * - OPTIMIZATION: Cache default container to avoid repeated file system scans
   *
+  * Container Metadata Management:
+  * - Storage: Filesystem-based (`containers/<id>/metadata.json` - managed by WinlatorEmulator)
+  * - Settings: Wine version, Box64 preset, screen resolution, DXVK enabled, etc.
+  * - Persistence: Automatically saved by WinlatorEmulator on creation/update
+  * - NO Database: Removed WinlatorContainerEntity/Dao to eliminate sync issues
+  *
   * Benefits:
   * - Disk usage: 500MB × 10 games = 5GB → 500MB (single shared container)
   * - First launch time: 60s × 10 games → 60s once (10x faster)
   * - Launch overhead: Multiple file scans → Single cached lookup (instant)
   * - Simpler UX: Users don't need to manage containers manually
+  * - Single Source of Truth: Filesystem only (no Database sync bugs)
   */
  private suspend fun getOrCreateEmulatorContainer(
   game: Game,
@@ -313,8 +350,9 @@ class WinlatorEngineImpl @Inject constructor(
   if (game.winlatorContainerId != null) {
    // Custom containers are not cached (rare use case)
    val existingContainers = winlatorEmulator.listContainers().getOrNull() ?: emptyList()
+   // FIXED (2025-12-25): Container ID is String type - direct String→String comparison
    val customContainer = existingContainers.firstOrNull {
-    it.id == "container_${game.winlatorContainerId}"
+    it.id == game.winlatorContainerId
    }
    if (customContainer != null) {
     AppLogger.d(TAG, "Using custom container for ${game.name}: ${customContainer.name}")
@@ -324,11 +362,18 @@ class WinlatorEngineImpl @Inject constructor(
    }
   }
 
-  // PRIORITY 2: Use cached default container (OPTIMIZATION)
+  // PRIORITY 2: Use cached default container (OPTIMIZATION with validation)
   // Most games use the default container, so cache it for instant lookup
+  // CRITICAL: Validate cache before use to prevent stale data issues
   cachedDefaultContainer.get()?.let { cached ->
-   AppLogger.d(TAG, "Using cached default container for: ${game.name}")
-   return cached
+   // Validate: Check if container still exists on filesystem
+   if (validateContainerExists(cached.id)) {
+    AppLogger.d(TAG, "Using cached default container for: ${game.name}")
+    return cached
+   } else {
+    AppLogger.w(TAG, "Cached container no longer exists, invalidating cache")
+    cachedDefaultContainer.set(null) // Clear stale cache
+   }
   }
 
   // PRIORITY 3: Fetch and cache default container

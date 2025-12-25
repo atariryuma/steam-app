@@ -9,7 +9,7 @@ import java.io.File
  * Represents an isolated Wine environment for running Windows applications.
  */
 data class WineContainer(
- val id: Long,
+ val id: String,
  val name: String,
  val screenSize: String = DEFAULT_SCREEN_SIZE,
  val wineVersion: String = DEFAULT_WINE_VERSION,
@@ -42,7 +42,7 @@ data class WineContainer(
    * Creates a default container for testing.
    */
   fun createDefault(dataDir: File): WineContainer {
-   val containerId = System.currentTimeMillis()
+   val containerId = System.currentTimeMillis().toString()
    return WineContainer(
     id = containerId,
     name = "default",

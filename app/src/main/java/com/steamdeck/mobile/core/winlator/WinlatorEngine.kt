@@ -43,9 +43,10 @@ interface WinlatorEngine {
 
  /**
   * Delete container
-  * @param containerId Container ID
+  * @param containerId Container ID (String type: "default_shared_container" or timestamp)
+  * FIXED (2025-12-25): Changed from Long to String (matches Container ID unification)
   */
- suspend fun deleteContainer(containerId: Long): Result<Unit>
+ suspend fun deleteContainer(containerId: String): Result<Unit>
 
  /**
   * Auto-detect game engine (Unity, Unreal, etc.)

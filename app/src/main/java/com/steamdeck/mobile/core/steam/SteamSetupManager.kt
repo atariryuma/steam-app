@@ -5,8 +5,6 @@ import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
 import com.steamdeck.mobile.data.local.database.entity.SteamInstallStatus
-import com.steamdeck.mobile.data.local.database.entity.WinlatorContainerEntity
-import com.steamdeck.mobile.data.local.database.entity.Box64Preset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -214,18 +212,36 @@ class SteamSetupManager @Inject constructor(
 
    // Extract using 7-Zip-JBinding-4Android
    var lastProgress = 0
-   val extractionResult = steamInstallerService.extractSteamFromNSIS(setupFile, steamInstallDir) { filesExtracted, totalFiles ->
-    // Map extraction progress to overall range (0.50-0.90)
-    val extractionProgress = if (totalFiles > 0) filesExtracted.toFloat() / totalFiles else 0f
-    val overallProgress = mapProgress(extractionProgress, ProgressRanges.INSTALLER_START, ProgressRanges.INSTALLER_END)
+   val extractionResult = steamInstallerService.extractSteamFromNSIS(
+    setupFile = setupFile,
+    targetDir = steamInstallDir,
+    onNsisProgress = { filesExtracted, totalFiles ->
+     // Map NSIS extraction progress to range 0.50-0.60 (10%)
+     val extractionProgress = if (totalFiles > 0) filesExtracted.toFloat() / totalFiles else 0f
+     val overallProgress = mapProgress(extractionProgress, 0.50f, 0.60f)
 
-    // Only update every 10% to reduce callback frequency
-    val currentProgress = (extractionProgress * 100).toInt()
-    if (currentProgress >= lastProgress + 10) {
-     progressCallback?.invoke(overallProgress, "Extracting Steam files... ($filesExtracted/$totalFiles)", null)
-     lastProgress = currentProgress
+     val currentProgress = (extractionProgress * 100).toInt()
+     if (currentProgress >= lastProgress + 10) {
+      progressCallback?.invoke(overallProgress, "Extracting bootstrapper... ($filesExtracted/$totalFiles)", null)
+      lastProgress = currentProgress
+     }
+    },
+    onCdnProgress = { currentPackage, totalPackages, bytesDownloaded, totalBytes ->
+     // Map CDN download progress to range 0.60-0.90 (30%)
+     val packageProgress = if (totalPackages > 0) currentPackage.toFloat() / totalPackages else 0f
+     val downloadProgress = if (totalBytes > 0) bytesDownloaded.toFloat() / totalBytes else 0f
+     val combinedProgress = (packageProgress * 0.5f) + (downloadProgress * 0.5f)
+     val overallProgress = mapProgress(combinedProgress, 0.60f, 0.90f)
+
+     val currentPercent = (combinedProgress * 100).toInt()
+     if (currentPercent >= lastProgress + 5) {
+      val mbDownloaded = bytesDownloaded / 1024 / 1024
+      val mbTotal = totalBytes / 1024 / 1024
+      progressCallback?.invoke(overallProgress, "Downloading Steam packages... ($currentPackage/$totalPackages)", "${mbDownloaded}MB / ${mbTotal}MB")
+      lastProgress = currentPercent
+     }
     }
-   }
+   )
 
    if (extractionResult.isFailure) {
     AppLogger.e(TAG, "NSIS extraction failed: ${extractionResult.exceptionOrNull()?.message}")
@@ -294,6 +310,20 @@ class SteamSetupManager @Inject constructor(
   * Get or create container
   *
   * @param containerId Winlator container ID (String type)
+  *
+  * Container Metadata Management (2025-12-25):
+  * - REMOVED: WinlatorContainerEntity/Dao (eliminated duplicate Database management)
+  * - NEW: Filesystem-based management via WinlatorEmulator
+  *
+  * Container Metadata Location:
+  * - Directory: `containers/<containerId>/`
+  * - Metadata: WinlatorEmulator manages Wine version, Box64 preset, etc.
+  * - Standard: Matches Winlator 10.1 implementation
+  *
+  * Why Filesystem-based?
+  * - Single Source of Truth (no Database sync issues)
+  * - Winlator-compatible (direct file access)
+  * - Simpler architecture (YAGNI principle)
   */
  private suspend fun getOrCreateContainer(containerId: String): Result<com.steamdeck.mobile.domain.emulator.EmulatorContainer> =
   withContext(Dispatchers.IO) {
@@ -301,34 +331,6 @@ class SteamSetupManager @Inject constructor(
     // CRITICAL FIX: Protect entire container creation flow with mutex to prevent race conditions
     // Multiple concurrent calls could create duplicate containers without synchronization
     containerCreationMutex.withLock {
-     // Convert container ID to Long and search database (maintains existing Long type)
-     val containerIdLong = containerId.toLongOrNull()
-     var containerEntity = if (containerIdLong != null) {
-      database.winlatorContainerDao().getContainerById(containerIdLong)
-     } else {
-      null
-     }
-
-     // If container doesn't exist, create new one in database
-     if (containerEntity == null) {
-      AppLogger.w(TAG, "Container $containerId not found in database, creating default container...")
-      val newEntity = WinlatorContainerEntity(
-       id = containerIdLong ?: 0, // Save as Long type, 0 for auto-generate
-       name = "Steam Client",
-       box64Preset = Box64Preset.STABILITY, // Steam prioritizes stability
-       wineVersion = "9.0+"
-      )
-
-      try {
-       val newId = database.winlatorContainerDao().insertContainer(newEntity)
-       AppLogger.i(TAG, "Created default container entity with ID: $newId")
-       containerEntity = newEntity.copy(id = newId)
-      } catch (e: Exception) {
-       AppLogger.e(TAG, "Failed to create default container entity", e)
-       return@withLock Result.failure(Exception("Failed to create container in database: ${e.message}"))
-      }
-     }
-
      // Retrieve container list from Winlator
      val containersResult = winlatorEmulator.listContainers()
      if (containersResult.isFailure) {
@@ -354,19 +356,11 @@ class SteamSetupManager @Inject constructor(
       return@withLock Result.success(container)
      }
 
-     // If container doesn't exist, create new one
-     // At this point containerEntity is guaranteed to be non-null (created in L387-404 block)
+     // If container doesn't exist, create new one with default Steam configuration
      AppLogger.i(TAG, "Container not found, creating new container for ID: $containerId")
      val config = com.steamdeck.mobile.domain.emulator.EmulatorContainerConfig(
-      name = containerEntity.name,
-      performancePreset = when (containerEntity.box64Preset) {
-       com.steamdeck.mobile.data.local.database.entity.Box64Preset.PERFORMANCE ->
-        com.steamdeck.mobile.domain.emulator.PerformancePreset.MAXIMUM_PERFORMANCE
-       com.steamdeck.mobile.data.local.database.entity.Box64Preset.STABILITY ->
-        com.steamdeck.mobile.domain.emulator.PerformancePreset.MAXIMUM_STABILITY
-       com.steamdeck.mobile.data.local.database.entity.Box64Preset.CUSTOM ->
-        com.steamdeck.mobile.domain.emulator.PerformancePreset.BALANCED
-      }
+      name = "Steam Client",
+      performancePreset = com.steamdeck.mobile.domain.emulator.PerformancePreset.MAXIMUM_STABILITY // Steam prioritizes stability
      )
 
      val created = winlatorEmulator.createContainer(config)

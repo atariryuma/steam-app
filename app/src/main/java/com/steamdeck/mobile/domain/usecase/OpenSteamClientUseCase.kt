@@ -101,17 +101,22 @@ class OpenSteamClientUseCase @Inject constructor(
                 AppLogger.i(TAG, "No Steam ID found - Steam will require manual login")
             }
 
-            // Launch Steam Big Picture mode
-            val result = steamLauncher.launchSteamBigPicture(containerId)
+            // Launch Steam in background mode (no UI, for download monitoring)
+            // NOTE: XServer is automatically started by SteamLauncher if not running
+            // Uses -silent -no-browser flags for headless UI (X11 still required)
+            val result = steamLauncher.launchSteamBigPicture(
+                containerId = containerId,
+                backgroundMode = true  // Background mode for auto-launch
+            )
 
             return@withContext if (result.isSuccess) {
-                AppLogger.i(TAG, "Steam Big Picture opened successfully")
+                AppLogger.i(TAG, "Steam client opened successfully in background mode")
                 DataResult.Success(Unit)
             } else {
                 val error = result.exceptionOrNull()
-                AppLogger.e(TAG, "Failed to open Steam Big Picture", error)
+                AppLogger.e(TAG, "Failed to open Steam client", error)
                 DataResult.Error(
-                    AppError.Unknown(error ?: Exception("Steam Big Picture launch failed"))
+                    AppError.Unknown(error ?: Exception("Steam client launch failed"))
                 )
             }
 

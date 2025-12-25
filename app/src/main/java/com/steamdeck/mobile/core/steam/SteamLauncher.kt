@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import com.steamdeck.mobile.core.logging.AppLogger
 import com.steamdeck.mobile.core.winlator.WinlatorEmulator
+import com.steamdeck.mobile.core.xserver.XServerManager
 import com.steamdeck.mobile.data.local.database.SteamDeckDatabase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +23,8 @@ import javax.inject.Singleton
 @Singleton
 class SteamLauncher @Inject constructor(
  @ApplicationContext private val context: Context,
- private val winlatorEmulator: WinlatorEmulator
+ private val winlatorEmulator: WinlatorEmulator,
+ private val xServerManager: XServerManager
 ) {
  companion object {
   private const val TAG = "SteamLauncher"
@@ -38,7 +40,20 @@ class SteamLauncher @Inject constructor(
   try {
    AppLogger.i(TAG, "Launching game via Steam: appId=$appId, containerId=$containerId")
 
-   // 1. Get Winlator container
+   // 1. Ensure XServer is running (Steam.exe requires X11/DISPLAY=:0)
+   if (!xServerManager.isRunning()) {
+    AppLogger.i(TAG, "Starting XServer for Steam game launch")
+    val xServerResult = xServerManager.startXServer()
+    if (xServerResult.isFailure) {
+     return@withContext Result.failure(
+      Exception("Failed to start XServer: ${xServerResult.exceptionOrNull()?.message}")
+     )
+    }
+   } else {
+    AppLogger.d(TAG, "XServer already running")
+   }
+
+   // 2. Get Winlator container
    val container = getEmulatorContainer(containerId)
    if (container.isFailure) {
     return@withContext Result.failure(
@@ -52,7 +67,7 @@ class SteamLauncher @Inject constructor(
     )
    }
 
-   // 2. Build Steam.exe path (case-sensitive on Android)
+   // 3. Build Steam.exe path (case-sensitive on Android)
    val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/Steam.exe")
 
    if (!steamExe.exists()) {
@@ -61,7 +76,7 @@ class SteamLauncher @Inject constructor(
     )
    }
 
-   // 3. Build Steam launch arguments
+   // 4. Build Steam launch arguments
    // -applaunch <appId> launches game directly
    val arguments = listOf(
     "-applaunch",
@@ -70,7 +85,7 @@ class SteamLauncher @Inject constructor(
 
    AppLogger.i(TAG, "Launching Steam with arguments: $arguments")
 
-   // 4. Launch Steam via Wine
+   // 5. Launch Steam via Wine
    val processResult = winlatorEmulator.launchExecutable(
     container = emulatorContainer,
     executable = steamExe,
@@ -104,13 +119,28 @@ class SteamLauncher @Inject constructor(
   * Opens Steam in Big Picture mode (fullscreen console-like UI)
   * Users can browse their library and install games
   * FileObserver will detect installations automatically
+  *
+  * @param backgroundMode If true, launches Steam in background without UI (for download monitoring)
   */
- suspend fun launchSteamBigPicture(containerId: String): Result<Unit> =
+ suspend fun launchSteamBigPicture(containerId: String, backgroundMode: Boolean = false): Result<Unit> =
   withContext(Dispatchers.IO) {
    try {
-    AppLogger.i(TAG, "Launching Steam Big Picture for container=$containerId")
+    AppLogger.i(TAG, "Launching Steam ${if (backgroundMode) "in background" else "Big Picture"} for container=$containerId")
 
-    // 1. Get Winlator container
+    // 1. Ensure XServer is running (Steam.exe requires X11/DISPLAY=:0)
+    if (!xServerManager.isRunning()) {
+     AppLogger.i(TAG, "Starting XServer for Steam.exe (background=$backgroundMode)")
+     val xServerResult = xServerManager.startXServer()
+     if (xServerResult.isFailure) {
+      return@withContext Result.failure(
+       Exception("Failed to start XServer: ${xServerResult.exceptionOrNull()?.message}")
+      )
+     }
+    } else {
+     AppLogger.d(TAG, "XServer already running")
+    }
+
+    // 2. Get Winlator container
     val container = getEmulatorContainer(containerId)
     if (container.isFailure) {
      return@withContext Result.failure(
@@ -124,7 +154,7 @@ class SteamLauncher @Inject constructor(
      )
     }
 
-    // 2. Build Steam.exe path (case-sensitive on Android)
+    // 3. Build Steam.exe path (case-sensitive on Android)
     val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/Steam.exe")
 
     if (!steamExe.exists()) {
@@ -133,13 +163,21 @@ class SteamLauncher @Inject constructor(
      )
     }
 
-    // 3. Launch Steam Big Picture mode
-    // -bigpicture launches fullscreen console-like UI
-    val arguments = listOf("-bigpicture")
+    // 4. Build Steam launch arguments
+    val arguments = if (backgroundMode) {
+     // Background mode: no UI, silent operation
+     // -silent: Runs Steam without showing the UI
+     // -no-browser: Disables the built-in web browser (reduces UI dependencies)
+     // NOTE: XServer is still required even in background mode (Wine X11 driver dependency)
+     listOf("-silent", "-no-browser")
+    } else {
+     // Big Picture mode: fullscreen console-like UI
+     listOf("-bigpicture")
+    }
 
-    AppLogger.i(TAG, "Launching Steam Big Picture mode")
+    AppLogger.i(TAG, "Launching Steam with arguments: $arguments")
 
-    // 4. Launch Steam with Big Picture argument
+    // 5. Launch Steam with specified arguments
     val processResult = winlatorEmulator.launchExecutable(
      container = emulatorContainer,
      executable = steamExe,
@@ -148,7 +186,7 @@ class SteamLauncher @Inject constructor(
 
     if (processResult.isFailure) {
      return@withContext Result.failure(
-      Exception("Failed to launch Steam Big Picture: ${processResult.exceptionOrNull()?.message}")
+      Exception("Failed to launch Steam: ${processResult.exceptionOrNull()?.message}")
      )
     }
 
@@ -157,12 +195,12 @@ class SteamLauncher @Inject constructor(
       Exception("Failed to get process handle: ${it.message}")
      )
     }
-    AppLogger.i(TAG, "Steam Big Picture launched successfully: PID ${process.pid}")
+    AppLogger.i(TAG, "Steam launched successfully: PID ${process.pid} (background=$backgroundMode)")
 
     Result.success(Unit)
 
    } catch (e: Exception) {
-    AppLogger.e(TAG, "Failed to launch Steam Big Picture", e)
+    AppLogger.e(TAG, "Failed to launch Steam", e)
     Result.failure(e)
    }
   }
@@ -183,7 +221,20 @@ class SteamLauncher @Inject constructor(
    try {
     AppLogger.i(TAG, "Launching Steam Client for container: $containerId")
 
-    // 1. Get Winlator container
+    // 1. Ensure XServer is running (Steam.exe requires X11/DISPLAY=:0)
+    if (!xServerManager.isRunning()) {
+     AppLogger.i(TAG, "Starting XServer for Steam Client")
+     val xServerResult = xServerManager.startXServer()
+     if (xServerResult.isFailure) {
+      return@withContext Result.failure(
+       Exception("Failed to start XServer: ${xServerResult.exceptionOrNull()?.message}")
+      )
+     }
+    } else {
+     AppLogger.d(TAG, "XServer already running")
+    }
+
+    // 2. Get Winlator container
     val container = getEmulatorContainer(containerId)
     if (container.isFailure) {
      return@withContext Result.failure(
@@ -197,7 +248,7 @@ class SteamLauncher @Inject constructor(
      )
     }
 
-    // 2. Verify Steam.exe exists
+    // 3. Verify Steam.exe exists
     val steamExe = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/Steam.exe")
     if (!steamExe.exists()) {
      return@withContext Result.failure(
@@ -205,7 +256,7 @@ class SteamLauncher @Inject constructor(
      )
     }
 
-    // 3. Get Wine builtin explorer.exe path
+    // 4. Get Wine builtin explorer.exe path
     // Explorer.exe is a Wine builtin, located in Wine's library directory
     val rootfsDir = File(winlatorEmulator.getRootfsPath())
     val explorerExe = File(rootfsDir, "opt/wine/lib/wine/x86_64-windows/explorer.exe")
@@ -216,7 +267,7 @@ class SteamLauncher @Inject constructor(
      )
     }
 
-    // 4. Build command: wine explorer.exe /desktop=shell,1280x720 "C:\Program Files (x86)\Steam\Steam.exe" -no-cef-sandbox -noreactlogin -tcp -console
+    // 5. Build command: wine explorer.exe /desktop=shell,1280x720 "C:\Program Files (x86)\Steam\Steam.exe" -no-cef-sandbox -noreactlogin -tcp -console
     // This keeps explorer.exe as parent process → prevents premature Steam exit
     // CRITICAL: Must use Windows path, not Android filesystem path
     // CEF workarounds:
@@ -235,7 +286,7 @@ class SteamLauncher @Inject constructor(
 
     AppLogger.i(TAG, "Launching Steam via explorer /desktop=shell method")
 
-    // 5. Launch via Winlator
+    // 6. Launch via Winlator
     val processResult = winlatorEmulator.launchExecutable(
      container = emulatorContainer,
      executable = explorerExe,
@@ -320,6 +371,33 @@ class SteamLauncher @Inject constructor(
    Result.failure(
     Exception("Steam app not found. Please install Steam from Google Play Store.")
    )
+  }
+ }
+
+ /**
+  * Check if Steam process is currently running
+  *
+  * Checks for Steam.exe process in Wine/Box64 environment
+  *
+  * @return true if Steam is running, false otherwise
+  */
+ suspend fun isSteamRunning(): Boolean = withContext(Dispatchers.IO) {
+  try {
+   // Check if any Wine process named "Steam.exe" is running
+   val process = ProcessBuilder("ps", "-A")
+    .redirectErrorStream(true)
+    .start()
+
+   val output = process.inputStream.bufferedReader().use { it.readText() }
+   val isSteamRunning = output.contains("Steam.exe", ignoreCase = true) ||
+                        output.contains("steam.exe", ignoreCase = true)
+
+   AppLogger.d(TAG, "Steam running status: $isSteamRunning")
+   isSteamRunning
+
+  } catch (e: Exception) {
+   AppLogger.w(TAG, "Failed to check Steam process status", e)
+   false
   }
  }
 

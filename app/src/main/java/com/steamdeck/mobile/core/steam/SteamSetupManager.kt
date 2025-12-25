@@ -285,6 +285,27 @@ class SteamSetupManager @Inject constructor(
     AppLogger.i(TAG, "  tier0_s.dll: ${tier0Dll.length() / 1024}KB")
    }
 
+   // Step 6: Initialize Steam client (create steamapps directory structure)
+   AppLogger.i(TAG, "Creating steamapps directory structure...")
+   val steamappsDir = File(steamDir, "steamapps")
+   val commonDir = File(steamappsDir, "common")
+
+   try {
+    if (!steamappsDir.exists() && !steamappsDir.mkdirs()) {
+     AppLogger.w(TAG, "Failed to create steamapps directory (non-fatal)")
+    } else {
+     AppLogger.i(TAG, "Created steamapps directory: ${steamappsDir.absolutePath}")
+    }
+
+    if (!commonDir.exists() && !commonDir.mkdirs()) {
+     AppLogger.w(TAG, "Failed to create common directory (non-fatal)")
+    } else {
+     AppLogger.i(TAG, "Created common directory: ${commonDir.absolutePath}")
+    }
+   } catch (e: Exception) {
+    AppLogger.w(TAG, "Failed to create Steam directory structure (non-fatal): ${e.message}")
+   }
+
    // Save installation information
    steamInstallerService.saveInstallation(
     containerId = container.id,

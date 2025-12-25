@@ -271,9 +271,10 @@ class LaunchOrDownloadGameUseCase @Inject constructor(
             progress = 0
         )
 
-        // Launch Steam Big Picture (user will select game to download)
+        // Launch Steam in background mode (no UI, automatic download handling)
         val launchResult = steamLauncher.launchSteamBigPicture(
-            containerId = containerId
+            containerId = containerId,
+            backgroundMode = true  // Background mode for download monitoring
         )
 
         return if (launchResult.isSuccess) {

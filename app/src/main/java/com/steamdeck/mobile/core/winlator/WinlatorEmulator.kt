@@ -433,6 +433,17 @@ class WinlatorEmulator @Inject constructor(
        AppLogger.d(TAG, "Cleaned up temporary rootfs.txz file")
       }
 
+      // CRITICAL: Create .img_version file (required by ImageFs.isValid())
+      // XServerManager checks ImageFs.isValid() before starting XServer
+      val imageFs = com.steamdeck.mobile.core.xenvironment.ImageFs.find(context)
+      if (!imageFs.isValid()) {
+       AppLogger.i(TAG, "Creating .img_version file for rootfs validation...")
+       imageFs.createImgVersionFile(1) // Version 1: Initial rootfs from Winlator 10.1
+       AppLogger.d(TAG, "Created ${imageFs.getImgVersionFile().absolutePath}")
+      } else {
+       AppLogger.d(TAG, ".img_version file already exists (version ${imageFs.getVersion()})")
+      }
+
       // Setup hardcoded linker path now that rootfs is extracted
       setupHardcodedLinkerPath()
       AppLogger.d(TAG, "setupHardcodedLinkerPath() completed")
@@ -2203,129 +2214,59 @@ REGEDIT4
   */
  private suspend fun setWineX11Driver(containerDir: File): Result<Unit> = withContext(Dispatchers.IO) {
      try {
-         AppLogger.i(TAG, "Configuring Wine X11 graphics driver registry...")
+         AppLogger.i(TAG, "Configuring Wine X11 graphics driver (direct user.reg edit)...")
 
-         // Create .reg file with X11 driver configuration
-         val regFile = File(context.cacheDir, "set_wine_x11_driver.reg")
-         regFile.writeText("""
-REGEDIT4
+         // CRITICAL FIX (2025-12-25): Use direct registry file editing instead of regedit
+         // Problem: wine regedit crashes with SIGSEGV (exit code 127) when run via PRoot/Box64
+         // Root cause: PRoot/Box64/Wine interaction issue with HKEY_CURRENT_USER registry access
+         // Solution: Directly edit user.reg file (same approach as setWindowsVersionDirect)
+         // Reference: Winlator's Container.java uses direct file editing for reliability
 
-[HKEY_CURRENT_USER\Software\Wine\Drivers]
-"Graphics"="x11"
-"Audio"="alsa"
+         val userRegFile = File(containerDir, "user.reg")
 
-         """.trimIndent())
-
-         // Build Wine environment
-         val wineEnv = buildMap {
-             put("WINEPREFIX", containerDir.absolutePath)
-             put("WINEARCH", "win64")
-             put("WINEDEBUG", "-all")
-         }
-
-         // Get binaries
-         val box64Binary = getBox64Binary()
-         if (!box64Binary.exists()) {
-             regFile.delete()
-             AppLogger.w(TAG, "Box64 binary not found, skipping X11 driver registry configuration")
-             return@withContext Result.failure(Box64BinaryNotFoundException())
-         }
-
-         if (!wineBinary.exists()) {
-             regFile.delete()
-             AppLogger.w(TAG, "Wine binary not found, skipping X11 driver registry configuration")
-             return@withContext Result.failure(WineBinaryNotFoundException())
-         }
-
-         if (!prootBinary.exists()) {
-             regFile.delete()
-             AppLogger.w(TAG, "Proot binary not found, skipping X11 driver registry configuration")
+         if (!userRegFile.exists()) {
+             AppLogger.w(TAG, "user.reg not found at ${userRegFile.absolutePath}")
              return@withContext Result.failure(
-                 EmulatorException("Proot binary not found at ${prootBinary.absolutePath}")
+                 EmulatorException("user.reg not found, container may not be initialized")
              )
          }
 
-         // Execute: proot wine regedit /S set_wine_x11_driver.reg
-         val command = buildList {
-             add(prootBinary.absolutePath)
-             add("-b")
-             add("${rootfsDir.absolutePath}:/data/data/com.winlator/files/rootfs")
-             add(box64Binary.absolutePath)
-             add(wineBinary.absolutePath)
-             add("regedit")
-             add("/S") // Silent mode
-             add(regFile.absolutePath)
-         }
+         // Read existing user.reg content
+         val existingContent = userRegFile.readText()
 
-         AppLogger.d(TAG, "Executing X11 driver regedit command: ${command.joinToString(" ")}")
+         // Check if Wine\Drivers section already exists
+         if (existingContent.contains("[Software\\\\Wine\\\\Drivers]")) {
+             AppLogger.i(TAG, "Wine Drivers section already exists in user.reg, updating...")
 
-         val processBuilder = ProcessBuilder(command)
+             // Replace existing section (preserve Wine registry format)
+             val timestamp = System.currentTimeMillis() / 1000
+             val hexTime = String.format("%x", System.currentTimeMillis() * 10000 + 0x1dc759afda8f80eL)
 
-         // Add Wine environment with library paths
-         val fullEnv = wineEnv.toMutableMap().apply {
-             put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:/usr/bin:/bin")
-             put("LD_LIBRARY_PATH",
-                 "${rootfsDir.absolutePath}/usr/lib:" +
-                 "${rootfsDir.absolutePath}/lib:" +
-                 "${wineDir.absolutePath}/lib:" +
-                 "${wineDir.absolutePath}/lib/wine/x86_64-unix"
+             val updatedContent = existingContent.replaceFirst(
+                 Regex("""\[Software\\\\Wine\\\\Drivers\][^\[]*"""),
+                 "[Software\\\\Wine\\\\Drivers] $timestamp\n#time=$hexTime\n\"Graphics\"=\"x11\"\n\"Audio\"=\"alsa\"\n\n"
              )
-             put("BOX64_LD_LIBRARY_PATH",
-                 "${rootfsDir.absolutePath}/usr/lib:" +
-                 "${rootfsDir.absolutePath}/lib:" +
-                 "${rootfsDir.absolutePath}/usr/lib/x86_64-linux-gnu:" +
-                 "${wineDir.absolutePath}/lib/wine/x86_64-unix"
-             )
-             put("BOX64_PATH", "${wineDir.absolutePath}/bin")
-             put("BOX64_EMULATED_LIBS", "libc.so.6:libpthread.so.0:libdl.so.2:librt.so.1:libm.so.6")
-             put("BOX64_ALLOWMISSINGLIBS", "1")
+             userRegFile.writeText(updatedContent)
+             AppLogger.i(TAG, "Updated Wine Drivers section with X11 driver (Graphics=x11, Audio=alsa)")
+
+         } else {
+             AppLogger.i(TAG, "Adding new Wine Drivers section to user.reg...")
+
+             // Append new section at the end (Wine registry format)
+             val timestamp = System.currentTimeMillis() / 1000
+             val hexTime = String.format("%x", System.currentTimeMillis() * 10000 + 0x1dc759afda8f80eL)
+
+             val newSection = "\n[Software\\\\Wine\\\\Drivers] $timestamp\n#time=$hexTime\n\"Graphics\"=\"x11\"\n\"Audio\"=\"alsa\"\n"
+
+             userRegFile.appendText(newSection)
+             AppLogger.i(TAG, "Added Wine Drivers section to user.reg (Graphics=x11, Audio=alsa)")
          }
 
-         processBuilder.environment().clear()
-         processBuilder.environment().putAll(fullEnv)
-
-         val process = processBuilder.start()
-
-         // Wait for regedit to complete (max 30 seconds)
-         val completed = withTimeoutOrNull(30_000L) {
-             process.waitFor()
-             true
-         } ?: false
-
-         // Read output
-         val output = try {
-             process.inputStream.bufferedReader().readText()
-         } catch (e: Exception) {
-             "Failed to read output: ${e.message}"
-         }
-
-         if (!completed) {
-             process.destroy()
-             regFile.delete()
-             AppLogger.w(TAG, "X11 driver regedit timeout after 30s. Output: $output")
-             return@withContext Result.failure(
-                 EmulatorException("X11 driver regedit timeout after 30 seconds")
-             )
-         }
-
-         val exitCode = process.exitValue()
-         AppLogger.d(TAG, "X11 driver regedit exit code: $exitCode")
-         AppLogger.d(TAG, "X11 driver regedit output: $output")
-
-         regFile.delete()
-
-         if (exitCode != 0) {
-             AppLogger.w(TAG, "X11 driver regedit failed with exit code $exitCode")
-             return@withContext Result.failure(
-                 EmulatorException("X11 driver regedit failed with exit code $exitCode: $output")
-             )
-         }
-
-         AppLogger.i(TAG, "Successfully configured Wine X11 graphics driver registry")
+         AppLogger.i(TAG, "Successfully configured Wine X11 graphics driver (direct edit)")
          Result.success(Unit)
 
      } catch (e: Exception) {
-         AppLogger.e(TAG, "Failed to set Wine X11 driver configuration", e)
+         AppLogger.e(TAG, "Failed to set Wine X11 driver configuration (direct edit)", e)
          Result.failure(EmulatorException("Failed to set Wine X11 driver configuration: ${e.message}", e))
      }
  }

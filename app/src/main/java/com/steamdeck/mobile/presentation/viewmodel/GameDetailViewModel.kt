@@ -107,13 +107,15 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
-  * Load game details
+  * Load game details and ensure Steam client is running
   */
  fun loadGame(gameId: Long) {
   viewModelScope.launch {
    try {
     val game = gameRepository.getGameById(gameId)
     _uiState.value = if (game != null) {
+     // Auto-launch Steam client if not running (for download/install monitoring)
+     ensureSteamClientRunning(gameId)
      GameDetailUiState.Success(game)
     } else {
      GameDetailUiState.Error("Game not found")
@@ -121,6 +123,43 @@ class GameDetailViewModel @Inject constructor(
    } catch (e: Exception) {
     _uiState.value = GameDetailUiState.Error(e.message ?: "Unknown error")
    }
+  }
+ }
+
+ /**
+  * Ensure Steam client is running in background (for download monitoring)
+  * Only launches if Steam is installed and not already running
+  */
+ private suspend fun ensureSteamClientRunning(gameId: Long) {
+  try {
+   // Check if Steam is installed
+   if (!steamSetupManager.isSteamInstalled()) {
+    AppLogger.d(TAG, "Steam not installed, skipping auto-launch")
+    return
+   }
+
+   // Check if Steam process is already running
+   val isSteamRunning = steamLauncher.isSteamRunning()
+   if (isSteamRunning) {
+    AppLogger.d(TAG, "Steam already running, no need to launch")
+    return
+   }
+
+   // Launch Steam client in background
+   AppLogger.i(TAG, "Auto-launching Steam client for download monitoring")
+   when (val result = openSteamClientUseCase(gameId)) {
+    is DataResult.Success -> {
+     AppLogger.i(TAG, "Steam client auto-launched successfully")
+    }
+    is DataResult.Error -> {
+     // Non-fatal: Log warning but continue
+     AppLogger.w(TAG, "Failed to auto-launch Steam client: ${result.error.message}")
+    }
+    is DataResult.Loading -> {}
+   }
+  } catch (e: Exception) {
+   // Non-fatal: Log warning but continue
+   AppLogger.w(TAG, "Exception while ensuring Steam client running", e)
   }
  }
 

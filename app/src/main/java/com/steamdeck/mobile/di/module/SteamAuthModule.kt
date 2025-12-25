@@ -2,6 +2,7 @@ package com.steamdeck.mobile.di.module
 
 import android.content.Context
 import com.steamdeck.mobile.core.download.DownloadManager
+import com.steamdeck.mobile.core.steam.NsisExtractor
 import com.steamdeck.mobile.core.steam.SteamGameScanner
 import com.steamdeck.mobile.core.steam.SteamInstallerService
 import com.steamdeck.mobile.core.steam.SteamLauncher
@@ -39,13 +40,15 @@ object SteamAuthModule {
   @ApplicationContext context: Context,
   downloadManager: DownloadManager,
   database: SteamDeckDatabase,
-  okHttpClient: OkHttpClient
+  okHttpClient: OkHttpClient,
+  nsisExtractor: NsisExtractor
  ): SteamInstallerService {
   return SteamInstallerService(
    context = context,
    downloadManager = downloadManager,
    database = database,
-   okHttpClient = okHttpClient
+   okHttpClient = okHttpClient,
+   nsisExtractor = nsisExtractor
   )
  }
 

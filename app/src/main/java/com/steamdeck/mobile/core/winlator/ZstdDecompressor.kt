@@ -27,6 +27,11 @@ class ZstdDecompressor @Inject constructor() {
  companion object {
   private const val TAG = "ZstdDecompressor"
   private const val BUFFER_SIZE = 8192 // 8KB buffer
+
+  // Compression ratio estimates for progress calculation
+  // These are used to estimate decompressed size from compressed file size
+  private const val TZST_COMPRESSION_RATIO = 10f  // Zstandard typically achieves ~10x compression
+  private const val TXZ_COMPRESSION_RATIO = 5f    // XZ typically achieves ~5x compression
  }
 
  /**
@@ -128,8 +133,9 @@ class ZstdDecompressor @Inject constructor() {
         AppLogger.d(TAG, "Extracted: ${entry.name} (${entry.size} bytes)")
        }
 
-       // Report progress (estimate 10x compression ratio)
-       val progress = (bytesProcessed.toFloat() / (tzstFileSize * 10)).coerceIn(0f, 0.95f)
+       // Report progress (estimate based on compression ratio)
+       val estimatedTotalBytes = tzstFileSize * TZST_COMPRESSION_RATIO
+       val progress = (bytesProcessed.toFloat() / estimatedTotalBytes).coerceIn(0f, 0.95f)
        progressCallback?.invoke(progress, "Extracting...")
 
        entry = tarInput.nextEntry as TarArchiveEntry?
@@ -321,8 +327,9 @@ class ZstdDecompressor @Inject constructor() {
         AppLogger.d(TAG, "Extracted: ${entry.name} (${entry.size} bytes)")
        }
 
-       // Report progress
-       val progress = (bytesProcessed.toFloat() / (txzFileSize * 5)).coerceIn(0f, 1f)
+       // Report progress (estimate based on compression ratio)
+       val estimatedTotalBytes = txzFileSize * TXZ_COMPRESSION_RATIO
+       val progress = (bytesProcessed.toFloat() / estimatedTotalBytes).coerceIn(0f, 1f)
        progressCallback?.invoke(progress, "Extracting...")
 
        entry = tarInput.nextEntry as TarArchiveEntry?

@@ -102,6 +102,38 @@ class WinlatorEmulator @Inject constructor(
   // Wineserver socket polling
   private const val WINESERVER_SOCKET_POLL_ATTEMPTS = 20  // Max attempts to find wineserver socket
   private const val WINESERVER_SOCKET_POLL_DELAY_MS = 100L // Delay between socket poll attempts
+
+  // Progress range allocation (prevents progress regression)
+  // Used by initialize() method to report consistent progress (0.0 ~ 1.0)
+  private object ProgressRanges {
+   // Step 1: PRoot binary extraction (15% of total)
+   const val PROOT_START = 0.00f
+   const val PROOT_END = 0.15f
+
+   // Step 2: Box64 binary extraction (15% of total)
+   const val BOX64_START = 0.15f
+   const val BOX64_END = 0.30f
+
+   // Step 3: Configuration files extraction (10% of total)
+   const val CONFIG_START = 0.30f
+   const val CONFIG_END = 0.40f
+
+   // Step 4: Wine rootfs extraction (60% of total - largest component, 53MB)
+   const val WINE_START = 0.40f
+   const val WINE_END = 1.00f
+  }
+
+  /**
+   * Map sub-progress (0.0-1.0) to overall progress range
+   *
+   * @param subProgress Progress within current step (0.0 - 1.0)
+   * @param rangeStart Overall progress at step start
+   * @param rangeEnd Overall progress at step end
+   * @return Mapped overall progress
+   */
+  private fun mapProgress(subProgress: Float, rangeStart: Float, rangeEnd: Float): Float {
+   return rangeStart + (subProgress * (rangeEnd - rangeStart))
+  }
  }
 
  override suspend fun isAvailable(): Result<Boolean> = withContext(Dispatchers.IO) {
@@ -131,7 +163,7 @@ class WinlatorEmulator @Inject constructor(
  ): Result<Unit> = withContext(Dispatchers.IO) {
   try {
    AppLogger.i(TAG, "Initializing Winlator emulator...")
-   progressCallback?.invoke(0.0f, "Initializing Winlator...")
+   progressCallback?.invoke(ProgressRanges.PROOT_START, "Initializing Winlator...")
 
    // Create directories
    dataDir.mkdirs()
@@ -142,22 +174,27 @@ class WinlatorEmulator @Inject constructor(
 
    // Step 1: Extract PRoot binary (0.0 - 0.15)
    if (!prootBinary.exists()) {
-    progressCallback?.invoke(0.0f, "Extracting PRoot binary...")
+    progressCallback?.invoke(ProgressRanges.PROOT_START, "Extracting PRoot binary...")
 
     // Extract proot.txz from assets (Termux proot - Android-compatible)
     val prootTxzFile = File(prootDir, "proot-termux-aarch64.txz")
     if (!prootTxzFile.exists()) {
      extractAsset(PROOT_ASSET, prootTxzFile)
-     progressCallback?.invoke(0.025f, "PRoot asset copied")
+     // Asset copy progress (5% of PRoot range)
+     val assetCopyProgress = mapProgress(0.25f, ProgressRanges.PROOT_START, ProgressRanges.PROOT_END)
+     progressCallback?.invoke(assetCopyProgress, "PRoot asset copied")
     }
 
     if (prootTxzFile.exists()) {
-     // Extract .txz to prootDir
+     // Extract .txz to prootDir (remaining 95% of PRoot range)
      val extractResult = zstdDecompressor.extractTxz(
       txzFile = prootTxzFile,
       targetDir = prootDir
      ) { extractProgress, status ->
-      progressCallback?.invoke(0.05f + extractProgress * 0.1f, status)
+      // Map extraction progress (0.0-1.0) to PRoot sub-range (0.05-0.15)
+      val subRangeStart = mapProgress(0.25f, ProgressRanges.PROOT_START, ProgressRanges.PROOT_END)
+      val overallProgress = mapProgress(extractProgress, subRangeStart, ProgressRanges.PROOT_END)
+      progressCallback?.invoke(overallProgress, status)
      }
 
      if (extractResult.isFailure) {
@@ -205,7 +242,7 @@ class WinlatorEmulator @Inject constructor(
      // }
      AppLogger.i(TAG, "PRoot extracted, skipping PIE/TLS patches to test original binary")
 
-     progressCallback?.invoke(0.15f, "PRoot ready")
+     progressCallback?.invoke(ProgressRanges.PROOT_END, "PRoot ready")
     } else {
      AppLogger.e(TAG, "PRoot .txz file not found: ${prootTxzFile.absolutePath}")
      return@withContext Result.failure(
@@ -213,7 +250,7 @@ class WinlatorEmulator @Inject constructor(
      )
     }
    } else {
-    progressCallback?.invoke(0.15f, "PRoot already extracted")
+    progressCallback?.invoke(ProgressRanges.PROOT_END, "PRoot already extracted")
    }
 
    // EXPERIMENTAL: Disable PRoot patching to test if patches cause SIGSEGV
@@ -240,22 +277,27 @@ class WinlatorEmulator @Inject constructor(
 
    // Step 2: Extract Box64 binary (0.15 - 0.3)
    if (!box64Binary.exists()) {
-    progressCallback?.invoke(0.15f, "Extracting Box64 binary...")
+    progressCallback?.invoke(ProgressRanges.BOX64_START, "Extracting Box64 binary...")
 
     // Extract box64.txz from assets
     val box64TxzFile = File(box64Dir, "box64-0.3.4.txz")
     if (!box64TxzFile.exists()) {
      extractAsset(BOX64_ASSET, box64TxzFile)
-     progressCallback?.invoke(0.17f, "Box64 asset copied")
+     // Asset copy progress (約13% of Box64 range: 0.15->0.17 は 13%)
+     val assetCopyProgress = mapProgress(0.13f, ProgressRanges.BOX64_START, ProgressRanges.BOX64_END)
+     progressCallback?.invoke(assetCopyProgress, "Box64 asset copied")
     }
 
     if (box64TxzFile.exists()) {
-     // Extract .txz to box64Dir
+     // Extract .txz to box64Dir (remaining 87% of Box64 range)
      val extractResult = zstdDecompressor.extractTxz(
       txzFile = box64TxzFile,
       targetDir = box64Dir
      ) { extractProgress, status ->
-      progressCallback?.invoke(0.18f + extractProgress * 0.12f, status)
+      // Map extraction progress (0.0-1.0) to Box64 sub-range (0.17-0.30)
+      val subRangeStart = mapProgress(0.13f, ProgressRanges.BOX64_START, ProgressRanges.BOX64_END)
+      val overallProgress = mapProgress(extractProgress, subRangeStart, ProgressRanges.BOX64_END)
+      progressCallback?.invoke(overallProgress, status)
      }
 
      if (extractResult.isFailure) {
@@ -306,7 +348,7 @@ class WinlatorEmulator @Inject constructor(
       // Continue anyway - might not have PT_TLS segment
      }
 
-     progressCallback?.invoke(0.3f, "Box64 ready")
+     progressCallback?.invoke(ProgressRanges.BOX64_END, "Box64 ready")
     } else {
      AppLogger.e(TAG, "Box64 .txz file not found: ${box64TxzFile.absolutePath}")
      return@withContext Result.failure(
@@ -314,7 +356,7 @@ class WinlatorEmulator @Inject constructor(
      )
     }
    } else {
-    progressCallback?.invoke(0.3f, "Box64 already extracted")
+    progressCallback?.invoke(ProgressRanges.BOX64_END, "Box64 already extracted")
    }
 
    // Ensure Box64 patches are always applied (even if already extracted)
@@ -332,8 +374,8 @@ class WinlatorEmulator @Inject constructor(
     }
    }
 
-   // Step 2: Extract configuration files (0.3 - 0.4)
-   progressCallback?.invoke(0.3f, "Extracting configuration files...")
+   // Step 3: Extract configuration files (0.3 - 0.4)
+   progressCallback?.invoke(ProgressRanges.CONFIG_START, "Extracting configuration files...")
 
    val box64RcFile = File(box64Dir, "default.box64rc")
    if (!box64RcFile.exists()) {
@@ -345,11 +387,11 @@ class WinlatorEmulator @Inject constructor(
     extractAsset(ENV_VARS_ASSET, envVarsFile)
    }
 
-   progressCallback?.invoke(0.4f, "Configuration files ready")
+   progressCallback?.invoke(ProgressRanges.CONFIG_END, "Configuration files ready")
 
-   // Step 3: Extract Rootfs/Wine support files (0.4 - 1.0)
+   // Step 4: Extract Rootfs/Wine support files (0.4 - 1.0)
    if (!File(wineDir, "bin").exists()) {
-    progressCallback?.invoke(0.4f, "Extracting Wine rootfs (53MB)...")
+    progressCallback?.invoke(ProgressRanges.WINE_START, "Extracting Wine rootfs (53MB)...")
 
     // Extract rootfs.txz from assets
     val rootfsTxzFile = File(dataDir, "rootfs.txz")
@@ -357,7 +399,7 @@ class WinlatorEmulator @Inject constructor(
      extractAsset(ROOTFS_ASSET, rootfsTxzFile)
     }
 
-    progressCallback?.invoke(0.4f, "Decompressing Wine rootfs...")
+    progressCallback?.invoke(ProgressRanges.WINE_START, "Decompressing Wine rootfs...")
 
     // Extract .txz archive
     if (rootfsTxzFile.exists()) {
@@ -365,8 +407,9 @@ class WinlatorEmulator @Inject constructor(
       txzFile = rootfsTxzFile,
       targetDir = rootfsDir
      ) { extractProgress, status ->
-      // 0.4 to 1.0 = 60% of total progress
-      progressCallback?.invoke(0.4f + extractProgress * 0.6f, status)
+      // Map extraction progress (0.0-1.0) to Wine range (0.4-1.0, 60% of total)
+      val overallProgress = mapProgress(extractProgress, ProgressRanges.WINE_START, ProgressRanges.WINE_END)
+      progressCallback?.invoke(overallProgress, status)
      }.onSuccess {
       AppLogger.i(TAG, "Rootfs extraction successful")
 
@@ -517,10 +560,10 @@ class WinlatorEmulator @Inject constructor(
     // CRITICAL FIX: Ensure library symlinks even if Wine already extracted
     setupLibrarySymlinks()
 
-    progressCallback?.invoke(1.0f, "Wine already ready")
+    progressCallback?.invoke(ProgressRanges.WINE_END, "Wine already ready")
    }
 
-   progressCallback?.invoke(1.0f, "Initialization complete")
+   progressCallback?.invoke(ProgressRanges.WINE_END, "Initialization complete")
 
    AppLogger.i(TAG, "Winlator initialization complete")
    Result.success(Unit)
@@ -680,7 +723,7 @@ class WinlatorEmulator @Inject constructor(
    }
 
    // NEW: Install Wine Mono for .NET Framework compatibility
-   // Required for 32-bit applications (e.g., SteamSetup.exe NSIS installer)
+   // Required for 32-bit applications (e.g., SteamSetup.exe installer)
    try {
     AppLogger.i(TAG, "Installing Wine Mono for WoW64 support...")
     val monoInstallResult = installWineMonoIfNeeded(containerDir)
@@ -846,9 +889,19 @@ class WinlatorEmulator @Inject constructor(
 
    // STEAM-SPECIFIC ENVIRONMENT VARIABLES
    // Research shows Steam requires special configuration on Wine+Box64
-   // CRITICAL: Detect both direct Steam.exe launch AND wine start.exe → Steam.exe launch
-   val isSteam = executable.name.equals("Steam.exe", ignoreCase = true) ||
-                 (executable.name.equals("start.exe", ignoreCase = true) && arguments.contains("Steam.exe"))
+   // CRITICAL: Detect Steam.exe launch via multiple methods:
+   // 1. Direct Steam.exe launch
+   // 2. wine start.exe → Steam.exe
+   // 3. wine explorer.exe /desktop=shell → Steam.exe (Winlator 10.1 method)
+
+   // DEBUG: Log detection logic
+   AppLogger.d(TAG, "Steam detection check - executable.name: ${executable.name}, arguments: $arguments")
+   val check1 = executable.name.equals("Steam.exe", ignoreCase = true)
+   val check2 = executable.name.equals("start.exe", ignoreCase = true) && arguments.contains("Steam.exe")
+   val check3 = executable.name.equals("explorer.exe", ignoreCase = true) && arguments.any { it.contains("Steam.exe", ignoreCase = true) }
+   AppLogger.d(TAG, "Steam detection results - check1 (direct): $check1, check2 (start.exe): $check2, check3 (explorer.exe): $check3")
+
+   val isSteam = check1 || check2 || check3
    if (isSteam) {
     AppLogger.i(TAG, "Detected Steam.exe launch (executable=${executable.name}, args=$arguments) - applying Steam-specific optimizations")
 
@@ -873,12 +926,14 @@ class WinlatorEmulator @Inject constructor(
    }
 
    // Add executable's directory to WINEDLLPATH for DLL loading
-   // Priority: Game DLLs first, then Wine system DLLs
+   // Priority: Game DLLs first, then Wine system DLLs (both 32-bit and 64-bit)
    // This allows Wine to find both game-specific DLLs (ffmpeg.dll) and Windows system DLLs (winhttp.dll)
    // IMPORTANT: Use proot-virtualized path for Wine system DLLs (rootfs is mounted to /data/data/com.winlator/files/rootfs)
+   // CRITICAL: Include both i386-windows (32-bit) and x86_64-windows (64-bit) for WoW64 support
    executable.parentFile?.let { exeDir ->
-    val wineSystemDllPath = "/data/data/com.winlator/files/rootfs/opt/wine/lib/wine/x86_64-windows"
-    val combinedPath = "${exeDir.absolutePath}:${wineSystemDllPath}"
+    val wine32DllPath = "/data/data/com.winlator/files/rootfs/opt/wine/lib/wine/i386-windows"
+    val wine64DllPath = "/data/data/com.winlator/files/rootfs/opt/wine/lib/wine/x86_64-windows"
+    val combinedPath = "${exeDir.absolutePath}:${wine32DllPath}:${wine64DllPath}"
     environmentVars["WINEDLLPATH"] = combinedPath
     AppLogger.d(TAG, "Set WINEDLLPATH: $combinedPath")
    }
@@ -898,6 +953,9 @@ class WinlatorEmulator @Inject constructor(
     environmentVars["BOX64_NOGTK"] = "1"  // GTK disabled (Android)
 
     // === Wine Optimizations ===
+    // WINEARCH is set in base config (buildEnvironmentVariables) - no override needed
+    // WoW64 mode warnings are non-fatal - Steam can run despite "experimental mode" messages
+
     // CRITICAL: Extend base WINEDEBUG instead of overwriting
     // Base has +err,+process,+loaddll (line 2060) - preserve for DLL/process diagnostics
     environmentVars["WINEDEBUG"] = "+err,+warn,+process,+loaddll,+x11drv,+steam"
@@ -1294,7 +1352,8 @@ class WinlatorEmulator @Inject constructor(
      "${wineDir.absolutePath}/lib:" +
      "${wineDir.absolutePath}/lib/wine/x86_64-unix"
    )
-   put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/x86_64-windows")
+   // Include both 32-bit (i386-windows) and 64-bit (x86_64-windows) for WoW64 support
+   put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/i386-windows:${wineDir.absolutePath}/lib/wine/x86_64-windows")
 
    // Box64 library paths (critical for Android dlopen restrictions)
    // CRITICAL FIX: Include both x86_64 (emulated) AND aarch64 (native) library paths
@@ -2538,7 +2597,8 @@ REGEDIT4
    )
 
    // Set Wine DLL path for Windows libraries
-   put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/x86_64-windows")
+   // Include both 32-bit (i386-windows) and 64-bit (x86_64-windows) for WoW64 support
+   put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/i386-windows:${wineDir.absolutePath}/lib/wine/x86_64-windows")
 
    // Add Box64 library paths for better compatibility
    put(
@@ -2566,8 +2626,9 @@ REGEDIT4
    putAll(config.customEnvVars)
 
    // CRITICAL: WINEARCH must be set AFTER customEnvVars to ensure it's never overridden
-   // Wine 9.2+ WoW64 mode requires win64 architecture (32-bit apps run via WoW64 layer)
-   // DO NOT allow customEnvVars to override this - it would break WoW64 mode
+   // Use win64 with WoW64 for 32-bit app support (matches Winlator 10.1)
+   // WoW64 "experimental" warnings are non-fatal - apps can run despite error messages
+   // Research: Box64 #1036, #1665 - WoW64 mode allows Steam to progress
    put("WINEARCH", "win64")
   }
  }
@@ -2928,7 +2989,7 @@ REGEDIT4
   * Install Wine Mono to Wine container if needed
   *
   * Wine Mono provides .NET Framework compatibility, which is required for
-  * some 32-bit Windows applications (e.g., SteamSetup.exe NSIS installer).
+  * some 32-bit Windows applications (e.g., SteamSetup.exe installer).
   *
   * @param containerDir Wine container directory
   * @return Installation result (non-fatal if fails)
@@ -3154,4 +3215,10 @@ Windows Registry Editor Version 5.00
    Result.failure(e)
   }
  }
+
+ /**
+  * Get rootfs directory path for accessing Wine builtin executables.
+  * Used to locate Wine's builtin explorer.exe for Steam launching.
+  */
+ fun getRootfsPath(): String = rootfsDir.absolutePath
 }

@@ -197,11 +197,11 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
 
-    // Compression (Wine/Box64 binaries & NSIS extraction)
+    // Compression (Wine/Box64 binaries and NSIS extraction)
     implementation(libs.zstd.jni) // Zstandard with JNI (includes Android ARM64 libs)
     implementation(libs.commons.compress) // Apache Commons Compress for tar/zip
     implementation(libs.xz) // XZ-Java for .txz decompression
-    implementation(libs.sevenzipjbinding) // 7-Zip-JBinding-4Android for NSIS extraction (ARM64 compatible)
+    implementation(libs.sevenz.jbinding) // 7-Zip-JBinding-4Android for NSIS extraction
 
     // Kotlinx Serialization (Steam API JSON)
     implementation(libs.kotlinx.serialization.json)

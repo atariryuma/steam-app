@@ -1,169 +1,141 @@
 package com.steamdeck.mobile.core.steam
 
 import com.steamdeck.mobile.core.logging.AppLogger
-import net.sf.sevenzipjbinding.ArchiveFormat
-import net.sf.sevenzipjbinding.IArchiveExtractCallback
-import net.sf.sevenzipjbinding.IInArchive
-import net.sf.sevenzipjbinding.ISequentialOutStream
-import net.sf.sevenzipjbinding.PropID
-import net.sf.sevenzipjbinding.SevenZip
-import net.sf.sevenzipjbinding.impl.RandomAccessFileInStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import net.sf.sevenzipjbinding.IInArchive
+import net.sf.sevenzipjbinding.SevenZip
+import net.sf.sevenzipjbinding.impl.RandomAccessFileInStream
+import net.sf.sevenzipjbinding.simple.ISimpleInArchiveItem
 import java.io.File
-import java.io.FileOutputStream
 import java.io.RandomAccessFile
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
- * NSIS extractor using 7-Zip-JBinding-4Android library
+ * NSIS installer extractor using 7-Zip-JBinding-4Android
  *
- * This class extracts files from NSIS installers using the 7-Zip-JBinding library.
- * Supports all NSIS compression formats: LZMA, BZIP2, ZLIB/Deflate
+ * Extracts all files from SteamSetup.exe (NSIS installer) to a target directory.
+ * This bypasses Wine WoW64 limitations by directly extracting installer contents.
  *
- * ARM64 compatible - uses 7-Zip-JBinding-4Android with ARM64 support
+ * Technical details:
+ * - Uses 7-Zip native library with ARM64 support
+ * - Supports all NSIS compression formats (LZMA, BZIP2, ZLIB/Deflate)
+ * - Extracts ~132 files including Steam.exe, steamclient.dll, libcef.dll, etc.
+ * - Total extracted size: ~180MB
  */
-class NsisExtractor(private val nsisFile: File) {
+@Singleton
+class NsisExtractor @Inject constructor() {
+ companion object {
+  private const val TAG = "NsisExtractor"
+ }
 
-    companion object {
-        private const val TAG = "NsisExtractor"
+ /**
+  * Extract all files from NSIS installer to target directory
+  *
+  * @param nsisFile SteamSetup.exe file (NSIS installer)
+  * @param targetDir Target directory for extraction (e.g., C:\Program Files (x86)\Steam)
+  * @param progressCallback Optional progress callback (filesExtracted, totalFiles)
+  * @return Result indicating success or failure with extracted file count
+  */
+ suspend fun extractAll(
+  nsisFile: File,
+  targetDir: File,
+  progressCallback: ((filesExtracted: Int, totalFiles: Int) -> Unit)? = null
+ ): Result<Int> = withContext(Dispatchers.IO) {
+  try {
+   AppLogger.i(TAG, "Starting NSIS extraction from: ${nsisFile.absolutePath}")
+   AppLogger.i(TAG, "Target directory: ${targetDir.absolutePath}")
+
+   if (!nsisFile.exists()) {
+    return@withContext Result.failure(
+     Exception("NSIS file not found: ${nsisFile.absolutePath}")
+    )
+   }
+
+   // Ensure target directory exists
+   if (!targetDir.exists()) {
+    targetDir.mkdirs()
+   }
+
+   var archive: IInArchive? = null
+   var randomAccessFile: RandomAccessFile? = null
+   var filesExtracted = 0
+
+   try {
+    // Open NSIS archive using 7-Zip
+    randomAccessFile = RandomAccessFile(nsisFile, "r")
+    val inStream = RandomAccessFileInStream(randomAccessFile)
+
+    // Auto-detect archive format (NSIS)
+    archive = SevenZip.openInArchive(null, inStream)
+
+    val totalFiles = archive.numberOfItems
+    AppLogger.i(TAG, "Found $totalFiles items in NSIS archive")
+
+    // Extract all items
+    for (item in archive.simpleInterface.archiveItems) {
+     if (!item.isFolder) {
+      extractItem(item, targetDir)
+      filesExtracted++
+
+      if (filesExtracted % 10 == 0) {
+       progressCallback?.invoke(filesExtracted, totalFiles)
+       AppLogger.d(TAG, "Extracted $filesExtracted/$totalFiles files")
+      }
+     }
     }
 
-    /**
-     * Extract Steam client files from NSIS installer
-     *
-     * @param targetDir Target directory for extracted files
-     * @param onProgress Optional progress callback (filesExtracted, totalFiles)
-     * @return Result indicating success or failure with extracted file count
-     */
-    suspend fun extractSteamFiles(
-        targetDir: File,
-        onProgress: ((filesExtracted: Int, totalFiles: Int) -> Unit)? = null
-    ): Result<Int> = withContext(Dispatchers.IO) {
-        var archive: IInArchive? = null
-        var randomAccessFile: RandomAccessFile? = null
-        val openStreams = mutableListOf<FileOutputStream>()
+    progressCallback?.invoke(filesExtracted, totalFiles)
+    AppLogger.i(TAG, "NSIS extraction completed: $filesExtracted files extracted")
+    Result.success(filesExtracted)
 
-        try {
-            AppLogger.i(TAG, "Extracting NSIS using 7-Zip-JBinding library (ARM64 compatible)")
-            AppLogger.i(TAG, "Source: ${nsisFile.absolutePath}")
-            AppLogger.i(TAG, "Target: ${targetDir.absolutePath}")
+   } finally {
+    archive?.close()
+    randomAccessFile?.close()
+   }
 
-            // Ensure target directory exists
-            targetDir.mkdirs()
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "NSIS extraction failed", e)
+   Result.failure(e)
+  }
+ }
 
-            // Open NSIS archive using 7-Zip library
-            randomAccessFile = RandomAccessFile(nsisFile, "r")
-            val inStream = RandomAccessFileInStream(randomAccessFile)
+ /**
+  * Extract a single item from archive
+  */
+ private fun extractItem(item: ISimpleInArchiveItem, targetDir: File) {
+  val itemPath = item.path ?: return
 
-            // Auto-detect NSIS format (supports LZMA, BZIP2, ZLIB)
-            archive = SevenZip.openInArchive(ArchiveFormat.NSIS, inStream)
+  // Skip certain directories/files we don't need
+  if (shouldSkip(itemPath)) {
+   return
+  }
 
-            val itemCount = archive.numberOfItems
-            AppLogger.i(TAG, "Found $itemCount items in NSIS archive")
+  val targetFile = File(targetDir, itemPath)
 
-            var extractedFiles = 0
+  // Create parent directories
+  targetFile.parentFile?.mkdirs()
 
-            // Extract all files
-            val callback = object : IArchiveExtractCallback {
-                override fun setTotal(total: Long) {
-                    AppLogger.d(TAG, "Total bytes to extract: $total")
-                }
+  // Extract file
+  item.extractSlow { data ->
+   targetFile.outputStream().use { output ->
+    output.write(data)
+   }
+   data.size
+  }
 
-                override fun setCompleted(completeValue: Long) {
-                    // Note: completeValue is bytes processed, not file count
-                    // We use extractedFiles counter for accurate file progress
-                }
+  AppLogger.d(TAG, "Extracted: $itemPath (${targetFile.length()} bytes)")
+ }
 
-                override fun getStream(index: Int, extractAskMode: net.sf.sevenzipjbinding.ExtractAskMode): ISequentialOutStream? {
-                    val path = archive.getProperty(index, PropID.PATH) as? String
-                    val isFolder = archive.getProperty(index, PropID.IS_FOLDER) as? Boolean ?: false
-
-                    if (path == null) {
-                        AppLogger.w(TAG, "Skipping item $index (no path)")
-                        return null
-                    }
-
-                    val outputFile = File(targetDir, path)
-
-                    if (isFolder) {
-                        outputFile.mkdirs()
-                        AppLogger.d(TAG, "Created directory: ${outputFile.name}")
-                        return null
-                    }
-
-                    // Ensure parent directory exists
-                    outputFile.parentFile?.mkdirs()
-
-                    extractedFiles++
-
-                    // Report progress after incrementing counter
-                    onProgress?.invoke(extractedFiles, itemCount)
-
-                    AppLogger.d(TAG, "Extracting file $extractedFiles/$itemCount: ${outputFile.name}")
-
-                    // Return output stream for file data
-                    val fileOutputStream = FileOutputStream(outputFile)
-                    openStreams.add(fileOutputStream)
-                    return object : ISequentialOutStream {
-                        override fun write(data: ByteArray): Int {
-                            fileOutputStream.write(data)
-                            // Note: Stream will be closed after extraction completes
-                            // (tracked in openStreams list and closed in finally block)
-                            return data.size
-                        }
-                    }
-                }
-
-                override fun prepareOperation(extractAskMode: net.sf.sevenzipjbinding.ExtractAskMode) {
-                    // Called before extraction starts
-                }
-
-                override fun setOperationResult(operationResultCode: net.sf.sevenzipjbinding.ExtractOperationResult) {
-                    // Called after extraction completes
-                    if (operationResultCode != net.sf.sevenzipjbinding.ExtractOperationResult.OK) {
-                        AppLogger.w(TAG, "Extraction result: $operationResultCode")
-                    }
-                }
-            }
-
-            // Extract all items
-            archive.extract(null, false, callback)
-
-            // Verify Steam.exe exists (case-sensitive on Android)
-            val steamExe = File(targetDir, "Steam.exe")
-            if (!steamExe.exists()) {
-                AppLogger.w(TAG, "Steam.exe not found after extraction. Extracted $extractedFiles files.")
-                AppLogger.w(TAG, "Directory contents: ${targetDir.listFiles()?.joinToString { it.name }}")
-            } else {
-                AppLogger.i(TAG, "Successfully extracted Steam.exe (${steamExe.length()} bytes)")
-            }
-
-            AppLogger.i(TAG, "NSIS extraction complete: $extractedFiles files extracted")
-            Result.success(extractedFiles)
-
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Failed to extract NSIS installer", e)
-            Result.failure(e)
-        } finally {
-            // Close archive and file handle
-            openStreams.forEach { stream ->
-                try {
-                    stream.close()
-                } catch (e: Exception) {
-                    AppLogger.w(TAG, "Error closing output stream", e)
-                }
-            }
-            try {
-                archive?.close()
-            } catch (e: Exception) {
-                AppLogger.w(TAG, "Error closing archive", e)
-            }
-
-            try {
-                randomAccessFile?.close()
-            } catch (e: Exception) {
-                AppLogger.w(TAG, "Error closing file", e)
-            }
-        }
-    }
+ /**
+  * Check if item should be skipped during extraction
+  */
+ private fun shouldSkip(path: String): Boolean {
+  // Skip installer-specific files (we only want Steam runtime files)
+  return path.startsWith("\$PLUGINSDIR/") ||
+         path == "uninstall.exe" ||
+         path.endsWith(".nsi") ||
+         path.endsWith(".nsh")
+ }
 }

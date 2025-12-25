@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network Security Configuration
+
+  Allows HTTP communication to CCADB (Mozilla's Common CA Database) for CA certificate download.
+
+  Security justification:
+  - CCADB serves Mozilla CA bundle over HTTP (bootstrap problem: can't use HTTPS without certificates)
+  - This is Mozilla's official CA certificate distribution method
+  - Downloaded file is validated (size check + PEM header verification)
+  - Only used during initial rootfs installation (one-time operation)
+
+  References:
+  - https://ccadb.my.salesforce-sites.com/mozilla/IncludedRootsPEMTxt
+  - https://developer.android.com/training/articles/security-config
+-->
+<network-security-config>
+    <!-- Allow HTTP for CA certificate download from CCADB (Mozilla's Common CA Database) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">salesforce-sites.com</domain>
+    </domain-config>
+
+    <!-- Default: HTTPS only for all other domains -->
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

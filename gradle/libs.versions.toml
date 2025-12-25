@@ -19,7 +19,7 @@ zxing = "3.5.3"
 zstd-jni = "1.5.6-8"
 commons-compress = "1.28.0"
 xz = "1.10"
-sevenzipjbinding = "Release-16.02-2.03"
+sevenz-jbinding = "Release-16.02-2.03"
 turbine = "1.1.0"
 mockk = "1.13.13"
 arch-core-testing = "2.2.0"
@@ -79,11 +79,11 @@ androidx-security-crypto = { group = "androidx.security", name = "security-crypt
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version = "1.2.0" }
 
-# Compression (for Wine/Box64 binaries & NSIS extraction)
+# Compression (for Wine/Box64 binaries and NSIS extraction)
 zstd-jni = { group = "com.github.luben", name = "zstd-jni", version.ref = "zstd-jni" }
 commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commons-compress" }
 xz = { group = "org.tukaani", name = "xz", version.ref = "xz" }
-sevenzipjbinding = { group = "com.github.omicronapps", name = "7-Zip-JBinding-4Android", version.ref = "sevenzipjbinding" }
+sevenz-jbinding = { group = "com.github.omicronapps", name = "7-Zip-JBinding-4Android", version.ref = "sevenz-jbinding" }
 
 # Core
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.15.0" }

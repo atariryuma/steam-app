@@ -112,15 +112,11 @@
     <string name="error_steam_client_launch_unexpected">An unexpected error occurred while launching Steam Client: %1$s</string>
     <string name="error_uninstall_failed">Steam Client uninstallation failed: %1$s</string>
 
-    <!-- Steam Installation Errors (SteamSetup.exe method) -->
-    <string name="error_steamcmd_download_failed">Steam installer download failed.\n\nPlease check your internet connection and try again.</string>
-    <string name="error_steamcmd_extraction_failed">Steam installer extraction failed.\n\nError: %1$s\n\nPlease ensure you have sufficient storage space (at least 1GB available).</string>
-    <string name="error_nsis_extraction_failed">NSIS extraction failed.\n\nError: %1$s\n\nFalling back to Wine installer execution.\n\nNote: Wine method requires WoW64 support and may fail on some devices.</string>
-    <string name="error_nsis_archive_open_failed">Failed to open NSIS archive.\n\nThe SteamSetup.exe file may be corrupted.\n\nSolutions:\n• Clear app cache and retry\n• Check internet connection\n• Ensure sufficient storage space</string>
-    <string name="error_steamcmd_timeout">Steam installation timed out after 10 minutes.\n\nPossible causes:\n• Slow network connection\n• Network interruption\n\nSolutions:\n• Connect to a faster Wi-Fi network\n• Retry the installation</string>
-    <string name="error_steamcmd_execution_failed">Steam installation failed.\n\nError: %1$s\n\nPlease retry the installation.</string>
+    <!-- Steam Installation Errors (NSIS Extraction method) -->
+    <string name="error_steam_download_failed">Steam installer download failed.\n\nPlease check your internet connection and try again.</string>
+    <string name="error_steam_installer_timeout">Steam installation timed out after 3 minutes.\n\nThe NSIS extraction did not complete.\n\nPossible causes:\n• Corrupted SteamSetup.exe download\n• Insufficient system resources\n\nSolutions:\n• Restart the app and retry\n• Check available storage space (minimum 1GB required)\n• Ensure device has sufficient RAM</string>
+    <string name="error_steam_installer_failed">Steam installer execution failed.\n\nError: %1$s\n\nPlease retry the installation.</string>
     <string name="error_steam_client_not_found">Steam client files not found after installation.\n\nInstallation completed, but steam.exe is missing.\n\nSolutions:\n• Retry the installation\n• Check available storage space (minimum 1GB required)\n• Clear app cache and try again</string>
-    <string name="error_steamcmd_dir_not_found">Steam installation directory not found.\n\nExpected location: %1$s\n\nThe installation may have failed silently. Please retry.</string>
 
     <!-- SteamLoginViewModel -->
     <string name="error_auth_session_invalid">Your authentication session has expired. Please sign in again.</string>
@@ -145,15 +141,12 @@
     <string name="progress_elapsed_time">Elapsed: %1$s</string>
     <string name="progress_eta">ETA: %1$s</string>
 
-    <!-- Steam Installation Steps -->
-    <string name="progress_steam_step_1">Downloading Steam installer</string>
-    <string name="progress_steam_step_2">Extracting installer</string>
-    <string name="progress_steam_step_2_nsis">Extracting Steam from NSIS installer</string>
-    <string name="progress_steam_step_3">Creating Wine container</string>
-    <string name="progress_steam_step_4">Initializing Wine prefix</string>
-    <string name="progress_steam_step_5">Installing Steam client</string>
-    <string name="progress_steam_nsis_success">NSIS extraction completed successfully</string>
-    <string name="progress_steam_fallback_wine">Falling back to Wine installer execution</string>
+    <!-- Steam Installation Steps (NSIS Extraction method - 5 steps) -->
+    <string name="progress_steam_step_1">Initializing Winlator</string>
+    <string name="progress_steam_step_2">Creating Wine container</string>
+    <string name="progress_steam_step_3">Downloading Steam installer</string>
+    <string name="progress_steam_step_4">Extracting Steam files</string>
+    <string name="progress_steam_step_5">Verifying installation</string>
 
     <!-- Wine Container Creation Steps -->
     <string name="progress_wine_step_1">Preparing container directory</string>

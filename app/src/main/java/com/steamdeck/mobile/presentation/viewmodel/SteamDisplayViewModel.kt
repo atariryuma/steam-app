@@ -56,15 +56,10 @@ class SteamDisplayViewModel @Inject constructor(
     /**
      * Launch Steam Big Picture mode with XServer initialization
      *
-     * CRITICAL FIX: Use WineProgramLauncherComponent instead of SteamLauncher.launchSteamBigPicture()
-     * - SteamLauncher creates SEPARATE process environment via winlatorEmulator.launchExecutable()
-     * - WineProgramLauncherComponent runs in SAME XEnvironment as XServerComponent
-     * - Both components started together via environment.startEnvironmentComponents()
-     *
-     * INTEGRATED MODE (2025-12-22):
-     * - Configure GLRenderer window filtering to hide Windows desktop
-     * - Only show Steam Big Picture window (seamless Android-like UX)
-     * - No virtual desktop mode (/desktop flag removed)
+     * REFACTORED (2025-12-24): Use SteamLauncher with explorer /desktop=shell method
+     * - SteamLauncher.launchSteamBigPicture() uses proven Winlator approach
+     * - wine explorer /desktop=shell → keeps explorer.exe as parent process
+     * - Prevents premature Steam exit (stable Steam execution)
      *
      * @param containerId Wine container ID
      * @param xServer XServer instance
@@ -76,9 +71,9 @@ class SteamDisplayViewModel @Inject constructor(
             try {
                 AppLogger.i(TAG, "Starting Steam launch sequence: containerId=$containerId")
 
-                // Step 1: Initialize XServer environment WITH Steam launcher
+                // Step 1: Initialize XServer environment
                 _uiState.value = SteamDisplayUiState.InitializingXServer
-                android.util.Log.d(TAG, "Step 1: Initializing XEnvironment with WineProgramLauncherComponent")
+                android.util.Log.d(TAG, "Step 1: Initializing XServer")
 
                 val initialized = initializeXEnvironment(xServer, containerId, xServerView)
                 if (!initialized) {
@@ -89,15 +84,21 @@ class SteamDisplayViewModel @Inject constructor(
 
                 AppLogger.i(TAG, "XServer initialized successfully")
 
-                // Step 2: Launch Steam via WineProgramLauncherComponent (already started with XEnvironment)
+                // Step 2: Launch Steam via SteamLauncher (explorer /desktop=shell method)
                 _uiState.value = SteamDisplayUiState.Launching
-                android.util.Log.d(TAG, "Step 2: Steam launching via WineProgramLauncherComponent")
-                AppLogger.i(TAG, "Steam launching: containerId=$containerId")
+                android.util.Log.d(TAG, "Step 2: Launching Steam via SteamLauncher")
+                AppLogger.i(TAG, "Using explorer /desktop=shell method for stable Steam execution")
 
-                // WineProgramLauncherComponent automatically launches when environment.startEnvironmentComponents() is called
-                // No need for separate steamLauncher.launchSteamBigPicture() call
+                val launchResult = steamLauncher.launchSteamClient(containerId)
+                if (launchResult.isFailure) {
+                    val error = launchResult.exceptionOrNull()?.message ?: "Unknown error"
+                    AppLogger.e(TAG, "Steam launch failed: $error")
+                    _uiState.value = SteamDisplayUiState.Error("Failed to launch Steam: $error")
+                    return@launch
+                }
+
                 _uiState.value = SteamDisplayUiState.Running
-                AppLogger.i(TAG, "Steam launched successfully")
+                AppLogger.i(TAG, "Steam launched successfully via explorer /desktop=shell")
             } catch (e: Exception) {
                 val errorMessage = e.message ?: "Failed to launch Steam"
                 _uiState.value = SteamDisplayUiState.Error(errorMessage)
@@ -238,23 +239,10 @@ class SteamDisplayViewModel @Inject constructor(
             xEnvironment?.addComponent(xServerComponent)
             AppLogger.d(TAG, "Added XServerComponent to environment")
 
-            // CRITICAL FIX: Create WineProgramLauncherComponent to launch Steam in SAME environment
-            // This ensures Wine process shares the same XEnvironment as XServerComponent
-            // Winlator architecture: XServerComponent + WineProgramLauncherComponent in ONE XEnvironment
-
-            // Steam is installed in container directory (NOT rootfs)
-            // Path: /data/.../winlator/containers/{containerId}/drive_c/Program Files (x86)/Steam/Steam.exe
+            // CRITICAL: Create Steam auto-login configuration
+            // VDF files will be created in the correct container by SteamLauncher
             val containersDir = File(context.filesDir, "winlator/containers")
             val containerDir = File(containersDir, containerId)
-            val steamExe = File(containerDir, "drive_c/Program Files (x86)/Steam/Steam.exe")
-
-            if (!steamExe.exists()) {
-                AppLogger.e(TAG, "Steam not found: ${steamExe.absolutePath}")
-                xEnvironment?.stopEnvironmentComponents()
-                return@withContext false
-            }
-
-            // CRITICAL: Create Steam auto-login configuration
             // 1. loginusers.vdf: User account info for auto-login
             // 2. config.vdf: CDN servers + AutoLoginUser setting
             AppLogger.i(TAG, "Configuring Steam auto-login...")
@@ -318,67 +306,18 @@ class SteamDisplayViewModel @Inject constructor(
             renderer.setUnviewableWMClasses("progman", "shell_traywnd")  // Hide Windows desktop only
             AppLogger.i(TAG, "Simple mode: Hide desktop only, no forced fullscreen")
 
-            // STEAM LAUNCH - USE WINE START.EXE VIA WINLATOR (2025-12-23)
-            // CRITICAL APPROACH: wine start.exe → explorer.exe → Steam.exe (desktop environment)
-            // - WinlatorEmulator handles ALL environment setup (LD_LIBRARY_PATH, BOX64_LD_LIBRARY_PATH, WINEDLLPATH, etc.)
-            // - start.exe launches Steam via explorer.exe → creates desktop environment → X11 driver loads
-            // - Direct Steam.exe execution caused "nodrv_CreateWindow" (X11 driver not loading)
-            // - Evidence: Previous logs showed "wine explorer /desktop=shell" successfully opened desktop
+            // XServer initialization complete
+            // Steam will be launched separately via SteamLauncher.launchSteamBigPicture()
+            // which uses the proven "wine explorer /desktop=shell" method
 
-            // Get Winlator container (Steam is installed in container, not rootfs)
-            AppLogger.i(TAG, "Getting Winlator container: $containerId")
-            val containersResult = winlatorEmulator.listContainers()
-            if (containersResult.isFailure) {
-                AppLogger.e(TAG, "Failed to list containers: ${containersResult.exceptionOrNull()?.message}")
-                xEnvironment?.stopEnvironmentComponents()
-                return@withContext false
-            }
-
-            val containers = containersResult.getOrNull() ?: emptyList()
-            val emulatorContainer = containers.firstOrNull { it.id == containerId }
-            if (emulatorContainer == null) {
-                AppLogger.e(TAG, "Container not found: $containerId")
-                xEnvironment?.stopEnvironmentComponents()
-                return@withContext false
-            }
-
-            // APPROACH 3 (2025-12-23): Direct Steam.exe execution (same as game launching)
-            // Previous attempts:
-            // 1. wine explorer /desktop=shell,SIZE cmd /c start → Desktop opens but Steam doesn't start
-            // 2. wine start.exe → Steam.exe launches but nodrv_CreateWindow error
-            //
-            // NEW APPROACH: Use EXACT same method as SteamLauncher.kt (game launching)
-            // - Direct launchExecutable(Steam.exe, arguments)
-            // - No start.exe, no explorer.exe, no desktop shell
-            // - If game launching works, this should work too
-
-            // Steam.exe path
-            val steamExeFile = File(emulatorContainer.rootPath, "drive_c/Program Files (x86)/Steam/Steam.exe")
-            if (!steamExeFile.exists()) {
-                AppLogger.e(TAG, "Steam not found: ${steamExeFile.absolutePath}")
-                xEnvironment?.stopEnvironmentComponents()
-                return@withContext false
-            }
-
-            AppLogger.i(TAG, "Launching Steam directly (same method as game launching)")
-            AppLogger.i(TAG, "Steam path: ${steamExeFile.absolutePath}")
-
-            // Direct Steam.exe arguments (no start.exe wrapper)
-            // -lognetapi: Network API debug logging
-            // -vgui: Legacy VGUI interface (more stable than CEF)
-            // --no-cef-sandbox: Disable CEF sandboxing for Wine compatibility
-            val steamArguments = listOf("-lognetapi", "-vgui", "--no-cef-sandbox")
-            AppLogger.i(TAG, "Steam arguments: $steamArguments")
-
-            // CRITICAL FIX (2025-12-22): Start XServerComponent FIRST, THEN Wine
-            // Problem: startEnvironmentComponents() launches ALL components simultaneously
-            // Wine tries to connect to :0 before socket exists → "no driver could be loaded"
-            // Solution: Start XServerComponent, wait for socket, THEN start Wine launcher
+            // CRITICAL FIX (2025-12-24): Start XServerComponent and wait for socket
+            // Problem: Steam launch fails if socket doesn't exist yet
+            // Solution: Start XServerComponent, wait for socket creation, THEN return success
             AppLogger.i(TAG, "Starting XServerComponent (creating Unix socket)...")
             xServerComponent.start()
             AppLogger.d(TAG, "XServerComponent started, waiting for socket...")
 
-            // Wait for Unix socket to be ready BEFORE launching Wine
+            // Wait for Unix socket to be ready BEFORE allowing Steam launch
             AppLogger.d(TAG, "Waiting for socket: ${socketConfig.path}")
             val socketReady = waitForSocket(socketConfig.path, SOCKET_TIMEOUT_MS)
 
@@ -398,34 +337,7 @@ class SteamDisplayViewModel @Inject constructor(
             }
 
             AppLogger.i(TAG, "XServer socket ready: ${socketConfig.path}")
-
-            // NOW launch Steam directly (socket is ready, Wine can connect immediately)
-            AppLogger.i(TAG, "Socket verified, launching Steam.exe directly...")
-            val launchResult = winlatorEmulator.launchExecutable(
-                container = emulatorContainer,
-                executable = steamExeFile,  // Launch Steam.exe directly (same as game launching)
-                arguments = steamArguments
-            )
-
-            if (launchResult.isFailure) {
-                val error = launchResult.exceptionOrNull()
-                AppLogger.e(TAG, "Failed to launch Steam: ${error?.message}")
-                xEnvironment?.stopEnvironmentComponents()
-                return@withContext false
-            }
-
-            val steamProcess = launchResult.getOrElse {
-                AppLogger.e(TAG, "Failed to get Steam process handle: ${it.message}")
-                xEnvironment?.stopEnvironmentComponents()
-                return@withContext false
-            }
-
-            AppLogger.i(TAG, "Steam launched successfully (direct execution)")
-            AppLogger.i(TAG, "Steam.exe process PID: ${steamProcess.pid}")
-            AppLogger.i(TAG, "Using same launch method as game execution via SteamLauncher.kt")
-
-            // NOTE: Process monitoring is handled by WinlatorEmulator internally
-            // Steam will run in background, displaying in XServer view
+            AppLogger.i(TAG, "XServer initialization complete, ready for Steam launch")
 
             true
 

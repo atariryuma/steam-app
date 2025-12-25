@@ -446,8 +446,11 @@ fun GameDetailContent(
    }
 
    // Steam ToS Compliance: Guide users to download via official Steam client
+   // Show button if: (1) game not installed OR (2) currently downloading/installing
    if (game.source == com.steamdeck.mobile.domain.model.GameSource.STEAM &&
-    game.executablePath.isBlank()
+    (game.executablePath.isBlank() ||
+     game.installationStatus == com.steamdeck.mobile.domain.model.InstallationStatus.DOWNLOADING ||
+     game.installationStatus == com.steamdeck.mobile.domain.model.InstallationStatus.INSTALLING)
    ) {
     Card(
      modifier = Modifier.fillMaxWidth(),
@@ -492,7 +495,10 @@ fun GameDetailContent(
 
       // Single action button - Open Steam Big Picture
       Button(
-       onClick = onOpenSteamInstallPage,
+       onClick = {
+        android.util.Log.d("GameDetailScreen", "Open Steam Big Picture button clicked")
+        onOpenSteamInstallPage()
+       },
        modifier = Modifier.fillMaxWidth(),
        colors = ButtonDefaults.buttonColors(
         containerColor = MaterialTheme.colorScheme.primary

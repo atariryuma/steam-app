@@ -95,13 +95,10 @@
 # zstd-jni (JNI bindings)
 -keep class com.github.luben.zstd.** { *; }
 
-# 7-Zip-JBinding-4Android - Native library for NSIS extraction
--keep class net.sf.sevenzipjbinding.** { *; }
+# Native uinput Controller Bridge (JNI)
 -keepclasseswithmembernames class * {
     native <methods>;
 }
-
-# Native uinput Controller Bridge (JNI)
 -keep class com.steamdeck.mobile.core.input.NativeUInputBridge {
     native <methods>;
 }
@@ -121,3 +118,8 @@
     public static *** v(...);
     public static *** i(...);
 }
+
+# 7-Zip-JBinding-4Android (NSIS extraction)
+-keep class net.sf.sevenzipjbinding.** { *; }
+-keepclassmembers class net.sf.sevenzipjbinding.** { *; }
+-dontwarn net.sf.sevenzipjbinding.**

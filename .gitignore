@@ -109,5 +109,19 @@ __pycache__/
 # Claude Code local configuration (user-specific)
 CLAUDE.local.md
 .claude/commands/*.local.md
+.claude/settings.local.json
 nul
 .steam-api-key.local
+
+# Debug and log files
+*_log.txt
+build_log*.txt
+dll-debug-log.txt
+*.bat
+
+# External projects
+GameNative/
+
+# Documentation (work in progress)
+CODE_REVIEW_REPORT.md
+IMPLEMENTATION_GUIDE_*.md

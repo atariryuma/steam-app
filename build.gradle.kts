@@ -6,3 +6,6 @@ plugins {
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.ksp) apply false
 }
+
+// Apply asset download script
+apply(from = "download-assets.gradle.kts")

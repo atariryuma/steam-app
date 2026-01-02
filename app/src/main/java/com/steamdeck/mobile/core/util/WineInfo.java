@@ -55,16 +55,44 @@ public class WineInfo implements Parcelable {
 
     public String getExecutable(Context context, boolean wow64Mode) {
         if (this == MAIN_WINE_VERSION) {
-            File wineBinDir = new File(ImageFs.find(context).getRootDir(), "/opt/wine/bin");
+            // CRITICAL FIX (2025-12-27): Dynamic Proton/Wine path detection
+            ImageFs imageFs = ImageFs.find(context);
+            String wineBasePath = imageFs.getWinePath();  // Returns "" for Proton, "/opt/wine" for Wine
+            File wineBinDir = new File(imageFs.getRootDir(), wineBasePath + "/bin");
             File wineBinFile = new File(wineBinDir, "wine");
             File winePreloaderBinFile = new File(wineBinDir, "wine-preloader");
-            FileUtils.copy(new File(wineBinDir, wow64Mode ? "wine-wow64" : "wine32"), wineBinFile);
-            FileUtils.copy(new File(wineBinDir, wow64Mode ? "wine-preloader-wow64" : "wine32-preloader"), winePreloaderBinFile);
+
+            // HIGH FIX (2025-12-27): Proton may use different binary names - fallback if variants don't exist
+            File sourceWine = new File(wineBinDir, wow64Mode ? "wine-wow64" : "wine32");
+            File sourcePreloader = new File(wineBinDir, wow64Mode ? "wine-preloader-wow64" : "wine32-preloader");
+
+            // Fallback to generic names if specific variants don't exist (Proton compatibility)
+            if (!sourceWine.exists()) {
+                sourceWine = new File(wineBinDir, "wine");
+            }
+            if (!sourcePreloader.exists()) {
+                sourcePreloader = new File(wineBinDir, "wine-preloader");
+            }
+
+            FileUtils.copy(sourceWine, wineBinFile);
+            FileUtils.copy(sourcePreloader, winePreloaderBinFile);
             FileUtils.chmod(wineBinFile, 0771);
             FileUtils.chmod(winePreloaderBinFile, 0771);
             return wow64Mode ? "wine" : "wine64";
         }
-        else return (new File(path, "/bin/wine64")).isFile() ? "wine64" : "wine";
+        else {
+            // MEDIUM FIX (2025-12-27): Check for wine64 first, then wine (Proton uses "wine", Wine uses "wine64")
+            File wine64Binary = new File(path, "/bin/wine64");
+            File wineBinary = new File(path, "/bin/wine");
+            if (wine64Binary.isFile()) {
+                return "wine64";
+            } else if (wineBinary.isFile()) {
+                return "wine";
+            } else {
+                // Fallback to "wine" if neither exists
+                return "wine";
+            }
+        }
     }
 
     public String identifier() {

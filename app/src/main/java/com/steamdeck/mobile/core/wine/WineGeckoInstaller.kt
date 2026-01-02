@@ -67,9 +67,31 @@ class WineGeckoInstaller @Inject constructor(
                 )
             }
 
-            response.body?.byteStream()?.use { input ->
-                msiFile.outputStream().use { output ->
-                    input.copyTo(output)
+            val responseBody = response.body
+                ?: return@withContext Result.failure(Exception("Empty response body"))
+
+            val contentLength = responseBody.contentLength()
+            var bytesDownloaded = 0L
+
+            // PERFORMANCE: Use 128KB buffer for 60MB file download
+            responseBody.byteStream().use { input ->
+                msiFile.outputStream().buffered(131072).use { output ->
+                    val buffer = ByteArray(131072)  // 128KB buffer
+                    var bytes: Int
+                    var lastLoggedPercent = 0
+
+                    while (input.read(buffer).also { bytes = it } >= 0) {
+                        output.write(buffer, 0, bytes)
+                        bytesDownloaded += bytes
+
+                        // Log progress every 10%
+                        val currentPercent = ((bytesDownloaded * 100) / contentLength).toInt()
+                        if (currentPercent >= lastLoggedPercent + 10) {
+                            AppLogger.d(TAG, "Wine Gecko download: $currentPercent% (${bytesDownloaded / 1024 / 1024}MB)")
+                            lastLoggedPercent = currentPercent
+                        }
+                    }
+                    output.flush()
                 }
             }
 

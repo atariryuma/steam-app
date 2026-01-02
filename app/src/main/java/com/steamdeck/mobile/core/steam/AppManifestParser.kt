@@ -44,11 +44,16 @@ data class AppManifest(
 object AppManifestParser {
     private const val TAG = "AppManifestParser"
 
+    // FIXED (2025-12-26): File size limit to prevent OutOfMemoryError from corrupted files
+    private const val MAX_FILE_SIZE_BYTES = 1024 * 1024 // 1MB (normal ACF files are ~1-10KB)
+
     // Regex for Valve KeyValue format: "key"  "value"
     private val keyValueRegex = Regex("\"(\\w+)\"\\s+\"([^\"]+)\"")
 
     /**
      * Parse an ACF manifest file
+     *
+     * FIXED (2025-12-26): Added file size validation to prevent OutOfMemoryError
      *
      * @param file The appmanifest_*.acf file to parse
      * @return Result containing parsed AppManifest or error
@@ -63,9 +68,29 @@ object AppManifestParser {
                 return Result.failure(Exception("Cannot read manifest file: ${file.absolutePath}"))
             }
 
-            AppLogger.d(TAG, "Parsing ACF manifest: ${file.name}")
+            // FIXED (2025-12-26): Validate file size before reading
+            // Prevents OutOfMemoryError if Steam crashed and wrote corrupted binary data
+            val fileSize = file.length()
+            if (fileSize > MAX_FILE_SIZE_BYTES) {
+                AppLogger.e(TAG, "Manifest file too large (${fileSize / 1024}KB > ${MAX_FILE_SIZE_BYTES / 1024}KB): ${file.name}")
+                return Result.failure(Exception("Manifest file corrupted (size too large: ${fileSize / 1024}KB)"))
+            }
+
+            if (fileSize == 0L) {
+                AppLogger.e(TAG, "Manifest file is empty: ${file.name}")
+                return Result.failure(Exception("Manifest file is empty"))
+            }
+
+            AppLogger.d(TAG, "Parsing ACF manifest: ${file.name} (${fileSize / 1024}KB)")
 
             val content = file.readText()
+
+            // FIXED (2025-12-26): Validate content format before regex processing
+            // Corrupted files may contain binary data that regex can't handle efficiently
+            if (!content.contains("AppState") && !content.contains("appid")) {
+                AppLogger.e(TAG, "Manifest file does not contain expected KeyValue format: ${file.name}")
+                return Result.failure(Exception("Manifest file corrupted (invalid format)"))
+            }
 
             // Extract key-value pairs
             val values = keyValueRegex.findAll(content)

@@ -104,9 +104,9 @@ class OpenSteamClientUseCase @Inject constructor(
             // Launch Steam in background mode (no UI, for download monitoring)
             // NOTE: XServer is automatically started by SteamLauncher if not running
             // Uses -silent -no-browser flags for headless UI (X11 still required)
-            val result = steamLauncher.launchSteamBigPicture(
+            val result = steamLauncher.launchSteam(
                 containerId = containerId,
-                backgroundMode = true  // Background mode for auto-launch
+                mode = com.steamdeck.mobile.core.steam.SteamLauncher.SteamLaunchMode.BACKGROUND
             )
 
             return@withContext if (result.isSuccess) {

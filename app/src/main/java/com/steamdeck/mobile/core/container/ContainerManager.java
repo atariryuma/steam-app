@@ -187,7 +187,20 @@ public class ContainerManager {
     }
 
     private void extractCommonDlls(String srcName, String dstName, JSONObject commonDlls, File containerDir, OnExtractFileListener onExtractFileListener) throws JSONException {
-        File srcDir = new File(ImageFs.find(context).getRootDir(), "/opt/wine/lib/wine/"+srcName);
+        // CRITICAL FIX (2025-12-27): Dynamic Proton/Wine path detection
+        ImageFs imageFs = ImageFs.find(context);
+        String wineBasePath = imageFs.getWinePath();  // Returns "" for Proton, "/opt/wine" for Wine
+
+        // Detect actual architecture directory (aarch64-windows for Proton, x86_64-windows for Wine)
+        String actualSrcName = srcName;
+        if (srcName.equals("x86_64-windows")) {
+            File aarch64Dir = new File(imageFs.getRootDir(), wineBasePath + "/lib/wine/aarch64-windows");
+            if (aarch64Dir.exists()) {
+                actualSrcName = "aarch64-windows";
+            }
+        }
+
+        File srcDir = new File(imageFs.getRootDir(), wineBasePath + "/lib/wine/" + actualSrcName);
         JSONArray dlnames = commonDlls.getJSONArray(dstName);
 
         for (int i = 0; i < dlnames.length(); i++) {

@@ -307,6 +307,21 @@
     <string name="setting_steam_big_picture_mode_title">Big Picture Mode</string>
     <string name="setting_steam_big_picture_mode_description">Launch Steam in full-screen Big Picture mode (recommended for mobile)</string>
 
+    <!-- GameDetailScreen - Installation Status Card (2025-12-26) -->
+    <string name="install_card_title_not_installed">Game Not Installed</string>
+    <string name="install_card_title_downloading">Downloading Game</string>
+    <string name="install_card_title_installing">Installing Game</string>
+    <string name="install_card_title_validation_failed">Installation Failed</string>
+    <string name="install_card_title_update_required">Update Required</string>
+    <string name="install_card_title_update_paused">Update Paused</string>
+
+    <string name="install_card_desc_not_installed">Press \'Launch Game\' to automatically download and install this game through Steam.</string>
+    <string name="install_card_desc_downloading">Game is being downloaded. Progress will be shown below.</string>
+    <string name="install_card_desc_installing">Game files are being installed. Almost ready!</string>
+    <string name="install_card_desc_validation_failed">Installation validation failed. Press \'Retry Installation\' to try again.</string>
+    <string name="install_card_desc_update_required">A game update is required. Press \'Launch Game\' to update.</string>
+    <string name="install_card_desc_update_paused">Game update is paused. Press \'Launch Game\' to resume.</string>
+
     <!-- XServer integration -->
     <string name="steam_display_initializing_xserver">Initializing Display Server…</string>
     <string name="steam_display_launching_steam">Launching Steam…</string>
@@ -314,19 +329,49 @@
     <string name="steam_display_error_init">Failed to initialize display server</string>
 
     <!-- Wine Test -->
-    <string name="wine_test_title">Wine Test</string>
-    <string name="wine_test_section_availability">Wine Availability Check</string>
-    <string name="wine_test_check_availability">Check Availability</string>
-    <string name="wine_test_section_init">Emulator Initialization</string>
-    <string name="wine_test_init_emulator">Initialize Emulator</string>
-    <string name="wine_test_section_container">Container Creation Test</string>
-    <string name="wine_test_create_container">Create Test Container</string>
-    <string name="wine_test_section_list">Container Listing</string>
-    <string name="wine_test_list_containers">List All Containers</string>
-    <string name="wine_test_section_x11">X11 Client Test</string>
-    <string name="wine_test_x11_client">Test X11 Connection</string>
-    <string name="wine_test_result_title">Test Result</string>
-    <string name="wine_test_result_idle">Select a test to run</string>
+    <string name="wine_test_title">Wine Environment Diagnostics</string>
+    <string name="wine_test_header">Wine Environment Test</string>
+
+    <!-- Status labels -->
+    <string name="wine_test_status_ready">Ready</string>
+    <string name="wine_test_status_running">Running…</string>
+    <string name="wine_test_status_available">Available</string>
+    <string name="wine_test_status_error">Error</string>
+
+    <!-- Test buttons (essential tests only) -->
+    <string name="wine_test_check_availability">1. Check Wine</string>
+    <string name="wine_test_init_emulator">2. Initialize</string>
+    <string name="wine_test_create_container">3. Test Container</string>
+
+    <!-- Progress messages -->
+    <string name="wine_test_checking_availability">Checking %1$s availability…</string>
+    <string name="wine_test_initializing">Initializing %1$s…</string>
+    <string name="wine_test_creating_container">Creating test container…</string>
+
+    <!-- Success messages -->
+    <string name="wine_test_available_success">✓ %1$s %2$s is available!</string>
+    <string name="wine_test_available_details">Backend: %1$s\nWine: %2$s\nTranslation: %3$s\nGraphics: %4$s</string>
+    <string name="wine_test_available_capabilities">Capabilities:</string>
+    <string name="wine_test_available_ready">Ready for initialization.</string>
+
+    <string name="wine_test_init_success">✓ %1$s initialized successfully!</string>
+    <string name="wine_test_init_next_steps">You can now:\n• Create containers\n• Install Windows applications\n• Launch games\n\nSee Settings for container management.</string>
+
+    <string name="wine_test_container_success">✓ Container created successfully!</string>
+    <string name="wine_test_container_details">ID: %1$s\nName: %2$s\nPath: %3$s\nSize: %4$dKB\nInitialized: %5$s</string>
+    <string name="wine_test_container_ready">Container is ready for use.</string>
+
+    <!-- Error messages -->
+    <string name="wine_test_not_available">%1$s is not available.</string>
+    <string name="wine_test_required_components">Required components:\n• Wine binaries (~100MB download)\n• Box64/FEX translator\n• Linux rootfs environment\n• Graphics drivers (DXVK/VKD3D)\n\nClick "Initialize Emulator" to set up.</string>
+    <string name="wine_test_error_checking">Error checking availability: %1$s</string>
+    <string name="wine_test_init_failed">Initialization failed: %1$s</string>
+    <string name="wine_test_init_note">Note: Full Winlator integration requires:\n1. Wine binary download (~100MB)\n2. zstd decompression tool\n3. Root/proot for chroot environment\n\nCurrent implementation is partial.\nSee WINLATOR_ARCHITECTURE_FINDINGS.md</string>
+    <string name="wine_test_container_error">Container creation failed: %1$s</string>
+
+    <!-- Result titles -->
+    <string name="wine_test_result_success">✓ Test Success</string>
+    <string name="wine_test_result_error">✗ Error</string>
 
     <string name="copy">Copy</string>
     <string name="stability">Stability</string>
@@ -377,6 +422,26 @@ Try:
     <string name="button_next_authenticate">Next: Authenticate</string>
     <string name="button_advanced_options">Advanced Options</string>
     <string name="button_hide_advanced">Hide Advanced</string>
+
+    <!-- FIXED (2025-12-26): GameDetailScreen hardcoded strings moved to strings.xml -->
+    <string name="game_launching">Game launching...</string>
+    <string name="launch_dialog_initializing">Initializing Winlator environment…</string>
+    <string name="launch_dialog_please_wait">Please wait...</string>
+    <string name="launch_dialog_still_launching">Still launching, please wait a bit longer…</string>
+    <string name="dialog_launch_error_title">Cannot launch game</string>
+    <string name="button_ok">OK</string>
+    <string name="loading_text">Loading...</string>
+    <string name="error_occurred_title">Error occurred</string>
+    <string name="button_back">Back</string>
+    <string name="info_card_title_game_info">Game Info</string>
+    <string name="info_card_title_file_paths">File Paths</string>
+    <string name="info_card_title_steam_info">Steam Info</string>
+    <string name="info_label_play_time">Play Time</string>
+    <string name="info_label_last_played">Last Played</string>
+    <string name="info_label_source">Source</string>
+    <string name="info_label_executable">Executable</string>
+    <string name="info_label_install_path">Installation Path</string>
+    <string name="info_label_steam_app_id">Steam App ID</string>
 
     <!-- Settings UX Improvements - Step 2: Steam Authentication -->
     <string name="button_sync_library">Sync Library</string>

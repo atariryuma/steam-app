@@ -1,7 +1,0 @@
-===== Steam Install Monitor Service Started =====
-Timestamp: 1766307107254
-Log file: /storage/emulated/0/Android/data/com.steamdeck.mobile.debug/files/steam-install-realtime.txt
-=================================================
-[1766307107257] Service started with params: containerId=1766298787048, steamAppId=2653790, gameId=189
-[1766307107257] Steamapps directory path: /data/user/0/com.steamdeck.mobile.debug/files/winlator/containers/1766298787048/drive_c/Program Files (x86)/Steam/steamapps
-[1766307107257] ERROR: Steamapps directory not found

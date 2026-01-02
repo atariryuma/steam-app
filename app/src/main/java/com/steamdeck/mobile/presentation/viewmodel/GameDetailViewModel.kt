@@ -19,7 +19,9 @@ import com.steamdeck.mobile.domain.usecase.ScanInstalledGamesUseCase
 import com.steamdeck.mobile.domain.usecase.ToggleFavoriteUseCase
 import com.steamdeck.mobile.presentation.util.toUserMessage
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.withTimeout
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,13 +49,15 @@ class GameDetailViewModel @Inject constructor(
  private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
  private val deleteGameUseCase: DeleteGameUseCase,
  private val openSteamClientUseCase: com.steamdeck.mobile.domain.usecase.OpenSteamClientUseCase,
+ private val triggerGameDownloadUseCase: com.steamdeck.mobile.domain.usecase.TriggerGameDownloadUseCase,
  private val steamLauncher: SteamLauncher,
  private val steamSetupManager: SteamSetupManager,
  private val scanInstalledGamesUseCase: ScanInstalledGamesUseCase,
  private val gameRepository: GameRepository,
  private val winlatorEngine: WinlatorEngine,
  private val controllerInputRouter: com.steamdeck.mobile.core.input.ControllerInputRouter,
- private val gameControllerManager: com.steamdeck.mobile.core.input.GameControllerManager
+ private val gameControllerManager: com.steamdeck.mobile.core.input.GameControllerManager,
+ private val xServerManager: com.steamdeck.mobile.core.xserver.XServerManager
 ) : ViewModel() {
 
  companion object {
@@ -75,16 +79,55 @@ class GameDetailViewModel @Inject constructor(
  private val _isScanning = MutableStateFlow(false)
  val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
- // Controller connection state
+ /**
+  * Controller connection state
+  *
+  * LIFECYCLE CLARIFICATION (2025-12-26):
+  * - This Flow is managed by GameControllerManager (application-level singleton)
+  * - Survives ViewModel destruction (hot StateFlow, not tied to viewModelScope)
+  * - Hardware callbacks (USB/Bluetooth) cleaned up by GameControllerManager.cleanup()
+  *   in Application.onTerminate() or Activity.onDestroy()
+  * - No manual cleanup required in ViewModel.onCleared()
+  *
+  * TECHNICAL DETAILS:
+  * - StateFlow is hot: Emits latest value immediately on collection
+  * - Multiple ViewModels can observe same Flow without resource leaks
+  * - GameControllerManager uses InputDevice.getDeviceIds() (no native resources)
+  *
+  * @see com.steamdeck.mobile.core.input.GameControllerManager
+  */
  val connectedControllers: StateFlow<List<com.steamdeck.mobile.core.input.GameController>> =
   gameControllerManager.connectedControllers
 
+ /**
+  * XServer instance for game display
+  *
+  * CRITICAL (2025-12-27): Use XServerManager's shared instance
+  * - XServerManager creates XServer when Steam/game launches
+  * - This StateFlow provides UI access to the active XServer
+  * - Returns null if XServer not yet started
+  *
+  * LIFECYCLE:
+  * - XServer started by XServerManager.startXServer() during game launch
+  * - Survives ViewModel destruction (managed by XServerManager singleton)
+  * - UI observes this Flow to get XServer instance for rendering
+  *
+  * @see com.steamdeck.mobile.core.xserver.XServerManager
+  */
+ private val _xServer = MutableStateFlow<XServer?>(null)
+ val xServer: StateFlow<XServer?> = _xServer.asStateFlow()
+
  // FIXED: Track process monitoring job to prevent memory leaks
- // XServer instance for game display
- private var xServer: XServer? = null
- val gameXServer: XServer?
-  get() = xServer
+ // REMOVED (2025-12-26): XServer lifecycle managed by Screen, not ViewModel
+ // Old bug: ViewModel held XServer reference across configuration changes → GPU memory leak
+ // New: Screen creates and owns XServer, passes to launch methods
  private var processMonitoringJob: Job? = null
+
+ // FIXED (2025-12-26): Dedicated lock object to prevent deadlock
+ // Bug: synchronized(this) exposes ViewModel to external locking
+ // Impact: Potential deadlock if framework code locks ViewModel instance
+ // Fix: Use dedicated lock object instead of ViewModel instance
+ private val monitoringJobLock = Any()
 
  init {
   checkSteamInstallation()
@@ -93,35 +136,74 @@ class GameDetailViewModel @Inject constructor(
  override fun onCleared() {
   super.onCleared()
 
-  // Cancel process monitoring when ViewModel is cleared
+  // FIXED (2025-12-26): Cancel all jobs including loadGameJob
+  loadGameJob?.cancel()
+  loadGameJob = null
+
   processMonitoringJob?.cancel()
   processMonitoringJob = null
 
-  // Clean up XServer resources
-  xServer = null
+  installProgressMonitoringJob?.cancel()
+  installProgressMonitoringJob = null
+
+  // FIXED (2025-12-26): XServer cleanup removed - managed by Screen's DisposableEffect
+  // XServer lifecycle is now tied to Composition, not ViewModel
+  // This prevents GPU memory leaks during configuration changes
 
   // Clean up WinlatorEngine resources
   winlatorEngine.cleanup()
 
-  AppLogger.d(TAG, "ViewModel cleared: process monitoring, XServer, and WinlatorEngine resources cleaned up")
+  AppLogger.d(TAG, "ViewModel cleared: all jobs cancelled and WinlatorEngine resources cleaned up")
  }
+
+ // FIXED (2025-12-26): Track loadGame job to prevent concurrent calls
+ private var loadGameJob: Job? = null
 
  /**
   * Load game details and ensure Steam client is running
+  *
+  * FIXED (2025-12-26): Prevents concurrent loadGame calls and restarts Flow monitoring if needed
   */
  fun loadGame(gameId: Long) {
-  viewModelScope.launch {
+  // FIXED (2025-12-26): Cancel previous loadGame call to prevent duplicate operations
+  loadGameJob?.cancel()
+
+  loadGameJob = viewModelScope.launch {
    try {
+    // CRITICAL (2025-12-27): Update XServer reference from XServerManager
+    // This provides UI with access to the active XServer for game rendering
+    _xServer.value = xServerManager.getXServer()
+    if (_xServer.value != null) {
+     AppLogger.d(TAG, "XServer instance acquired from XServerManager")
+    }
+
     val game = gameRepository.getGameById(gameId)
     _uiState.value = if (game != null) {
      // Auto-launch Steam client if not running (for download/install monitoring)
      ensureSteamClientRunning(gameId)
+
+     // FIXED (2025-12-26): Restart Flow monitoring if game is downloading/installing
+     // This ensures monitoring continues even after screen navigation or app restart
+     if (game.installationStatus in listOf(
+       InstallationStatus.DOWNLOADING,
+       InstallationStatus.INSTALLING
+      )) {
+      AppLogger.i(TAG, "Restarting installation progress monitoring for gameId=$gameId (status=${game.installationStatus})")
+      // Note: XServer will be null here, so auto-launch won't work
+      // But monitoring will continue and update UI states
+      observeInstallationProgressWithAutoLaunch(gameId, null, null)
+     }
+
      GameDetailUiState.Success(game)
     } else {
-     GameDetailUiState.Error("Game not found")
+     // FIXED (2025-12-26): Use strings.xml for error message
+     GameDetailUiState.Error(context.getString(com.steamdeck.mobile.R.string.error_game_not_found))
     }
    } catch (e: Exception) {
-    _uiState.value = GameDetailUiState.Error(e.message ?: "Unknown error")
+    // FIXED (2025-12-26): Use strings.xml for error message
+    _uiState.value = GameDetailUiState.Error(
+     e.message ?: context.getString(com.steamdeck.mobile.R.string.error_unknown)
+    )
    }
   }
  }
@@ -179,8 +261,9 @@ class GameDetailViewModel @Inject constructor(
   viewModelScope.launch {
    AppLogger.i(TAG, ">>> ViewModel: Starting game launch for gameId=$gameId")
 
-   // Store XServer reference for game display
-   this@GameDetailViewModel.xServer = xServer
+   // FIXED (2025-12-26): XServer reference NOT stored in ViewModel
+   // XServer is owned by Screen's Composition and passed as parameter
+   // This prevents GPU memory leaks during configuration changes
 
    // Configure XServer integrated mode (hide desktop, show only game window)
    val currentState = _uiState.value
@@ -204,12 +287,36 @@ class GameDetailViewModel @Inject constructor(
      _launchState.value = LaunchState.Running(launchInfo.processId)
      AppLogger.i(TAG, ">>> ViewModel: Launch SUCCESS, PID=${launchInfo.processId}")
 
-     // FIXED: Start monitoring in viewModelScope (auto-cancelled on ViewModel clear)
-     processMonitoringJob?.cancel() // Cancel previous monitoring if exists
+     // FIXED (2025-12-26): Start controller routing in viewModelScope
+     // Previous bug: LaunchGameUseCase started routing in new CoroutineScope(Dispatchers.IO)
+     // This caused resource leak as the scope was never cancelled
+     startControllerRouting()
+
+     // FIXED (2025-12-26): Properly collect monitoringFlow to enable play time tracking
+     // Without collect(), the Flow never executes and play time is NOT recorded
+     // FIXED (2025-12-26): Cancel AND join to prevent race condition
+     processMonitoringJob?.cancel()
+     processMonitoringJob?.join() // Wait for cancellation to complete
      processMonitoringJob = viewModelScope.launch {
-      launchInfo.monitoringFlow.collect {
-       // Flow handles all play time tracking internally
-       // Just collect to keep it active
+      try {
+       launchInfo.monitoringFlow.collect {
+        // Flow handles all play time tracking internally (5min checkpoints + final save)
+        // This collect {} block MUST exist for the Flow to execute
+       }
+       // Flow completed normally (game process ended)
+       AppLogger.i(TAG, ">>> Game process monitoring completed for PID=${launchInfo.processId}")
+       _launchState.value = LaunchState.Idle
+      } catch (e: Exception) {
+       if (e is kotlinx.coroutines.CancellationException) {
+        // ViewModel cancelled - expected during cleanup
+        AppLogger.d(TAG, ">>> Game monitoring cancelled (ViewModel cleared)")
+       } else {
+        // Unexpected error
+        AppLogger.e(TAG, ">>> Game monitoring error", e)
+        _launchState.value = LaunchState.Error(
+         e.message ?: context.getString(com.steamdeck.mobile.R.string.error_unknown)
+        )
+       }
       }
      }
     }
@@ -217,6 +324,10 @@ class GameDetailViewModel @Inject constructor(
      val errorMessage = result.error.toUserMessage(context)
      _launchState.value = LaunchState.Error(errorMessage)
      AppLogger.e(TAG, ">>> ViewModel: Launch FAILED - $errorMessage")
+
+     // FIXED (2025-12-26): Stop controller routing on launch failure
+     // No need to check if routing was started - stopRouting() is idempotent
+     controllerInputRouter.stopRouting()
     }
     is DataResult.Loading -> {
      // Loading handled by Launching state
@@ -227,14 +338,20 @@ class GameDetailViewModel @Inject constructor(
 
  /**
   * Cancel game launch (timeout or user cancellation)
+  *
+  * FIXED (2025-12-26): Use strings.xml for error messages
   */
  fun cancelLaunch() {
   AppLogger.w(TAG, ">>> Launch cancelled by user or timeout")
-  _launchState.value = LaunchState.Error("Launch timeout after 90 seconds")
+  _launchState.value = LaunchState.Error(
+   context.getString(com.steamdeck.mobile.R.string.error_launch_timeout)
+  )
  }
 
  /**
   * Stop currently running game
+  *
+  * FIXED (2025-12-26): Use strings.xml for error messages
   */
  fun stopGame() {
   viewModelScope.launch {
@@ -250,7 +367,9 @@ class GameDetailViewModel @Inject constructor(
     AppLogger.i(TAG, ">>> Game stopped successfully")
    } else {
     AppLogger.e(TAG, ">>> Failed to stop game: ${result.exceptionOrNull()?.message}")
-    _launchState.value = LaunchState.Error("Failed to stop game")
+    _launchState.value = LaunchState.Error(
+     context.getString(com.steamdeck.mobile.R.string.error_unknown)
+    )
    }
   }
  }
@@ -349,8 +468,9 @@ class GameDetailViewModel @Inject constructor(
 
     // Launch via Steam Client
     // FIXED (2025-12-25): Container ID is String type - no conversion needed
-    val result = steamLauncher.launchGameViaSteam(
+    val result = steamLauncher.launchSteam(
      containerId = game.winlatorContainerId ?: "default_shared_container",
+     mode = com.steamdeck.mobile.core.steam.SteamLauncher.SteamLaunchMode.GAME_LAUNCH,
      appId = game.steamAppId
     )
 
@@ -467,6 +587,28 @@ class GameDetailViewModel @Inject constructor(
  }
 
  /**
+  * Trigger game download via Steam client in Wine container
+  *
+  * @Deprecated("Use launchOrDownloadGame instead - it handles all scenarios automatically")
+  *
+  * This method is kept for API compatibility but delegates to launchOrDownloadGame.
+  * launchOrDownloadGame provides:
+  * - Automatic Steam installation if needed
+  * - Better error handling
+  * - Auto-launch after installation complete
+  * - Unified state management
+  */
+ @Deprecated(
+  message = "Use launchOrDownloadGame instead",
+  replaceWith = ReplaceWith("launchOrDownloadGame(gameId, xServer, xServerView)")
+ )
+ fun triggerGameDownload(gameId: Long) {
+  AppLogger.w(TAG, "triggerGameDownload is deprecated. Delegating to launchOrDownloadGame.")
+  // Delegate to the unified method without XServer (download only, no auto-launch)
+  launchOrDownloadGame(gameId, null, null)
+ }
+
+ /**
   * Scan for installed games and update executable file paths
   */
  fun scanForInstalledGame(gameId: Long) {
@@ -569,7 +711,10 @@ class GameDetailViewModel @Inject constructor(
          _steamLaunchState.value = SteamLaunchState.DownloadStartedManualTracking
          AppLogger.w(TAG, "Big Picture launched, but automatic tracking unavailable: downloadId=${data.downloadId}")
         }
-        _launchState.value = LaunchState.Idle
+
+        // FIXED (2025-12-26): Keep Launching state during monitoring
+        // This prevents premature UI reset and ensures monitoring survives screen navigation
+        // State will be updated by observeInstallationProgressWithAutoLaunch when progress changes
 
         // Start observing installation progress (will auto-launch when complete)
         observeInstallationProgressWithAutoLaunch(gameId, xServer, xServerView)
@@ -584,14 +729,19 @@ class GameDetailViewModel @Inject constructor(
           SteamLaunchState.Installing(data.progress)
          else -> SteamLaunchState.Idle
         }
-        _launchState.value = LaunchState.Idle
+
+        // FIXED (2025-12-26): Keep Launching state to maintain UI consistency
+        // Will be updated by monitoring flow when status changes
         AppLogger.i(TAG, "Game already in progress: status=${data.status}, progress=${data.progress}%")
+
+        // Start observing installation progress (will auto-launch when complete)
+        observeInstallationProgressWithAutoLaunch(gameId, xServer, xServerView)
        }
 
        is LaunchOrDownloadResult.SteamInstalling -> {
         // Steam installation in progress (first-time setup)
         _steamLaunchState.value = SteamLaunchState.InstallingSteam(data.progress)
-        _launchState.value = LaunchState.Idle
+        // FIXED (2025-12-26): Keep Launching state during Steam installation
         AppLogger.i(TAG, "Steam installation in progress: ${(data.progress * 100).toInt()}%")
        }
       }
@@ -626,22 +776,57 @@ class GameDetailViewModel @Inject constructor(
   *
   * NEW 2025: Auto-launch enhancement
   * When download/installation completes, automatically launches the game
+  *
+  * FIXED (2025-12-26): Comprehensive bug fixes
+  * - Job reference stored to survive screen navigation
+  * - 2-hour timeout prevents infinite monitoring
+  * - Null safety after delay (game may be deleted)
+  * - Error handling for loadGame failures
+  * - Uses strings.xml for all user-facing messages
   */
+ private var installProgressMonitoringJob: Job? = null
+
  private fun observeInstallationProgressWithAutoLaunch(
   gameId: Long,
   xServer: XServer?,
   xServerView: com.steamdeck.mobile.presentation.widget.XServerView?
  ) {
-  viewModelScope.launch {
+  // FIXED (2025-12-26): Synchronized cancellation to prevent race condition
+  // Key issue: Multiple calls can happen simultaneously (e.g., loadGame + launchOrDownloadGame)
+  // Without synchronization, both create new jobs → duplicate monitoring
+  // FIXED (2025-12-26): Use dedicated lock object instead of ViewModel instance
+  synchronized(monitoringJobLock) {
+   // Cancel previous job (if exists)
+   val oldJob = installProgressMonitoringJob
+   oldJob?.cancel()
+
+   // Start new monitoring in ViewModel scope (survives screen navigation)
+   installProgressMonitoringJob = viewModelScope.launch {
+    // Wait for previous job to fully complete cancellation
+    // This prevents two jobs from observing the same gameId Flow concurrently
+    oldJob?.join()
    try {
-    gameRepository.observeGame(gameId)
-     .takeWhile { game ->
-      // Stop observing when installation completes or fails
-      game?.installationStatus !in listOf(
-       InstallationStatus.INSTALLED,
-       InstallationStatus.VALIDATION_FAILED
-      )
-     }
+    AppLogger.i(TAG, "Starting installation progress monitoring for gameId=$gameId")
+
+    // FIXED (2025-12-26): Use withTimeout for proper Flow timeout enforcement
+    // This ensures the entire Flow collection completes within 2 hours
+    val twoHoursInMillis = 2 * 60 * 60 * 1000L // 2 hours
+
+    withTimeout(twoHoursInMillis) {
+     gameRepository.observeGame(gameId)
+      .takeWhile { game ->
+       // Stop observing when installation completes or fails
+       val shouldContinue = game?.installationStatus !in listOf(
+        InstallationStatus.INSTALLED,
+        InstallationStatus.VALIDATION_FAILED
+       )
+
+       if (!shouldContinue) {
+        AppLogger.i(TAG, "Monitoring complete: status=${game?.installationStatus}")
+       }
+
+       shouldContinue
+      }
      .collect { game ->
       if (game == null) {
        AppLogger.w(TAG, "Game not found during progress monitoring")
@@ -653,9 +838,14 @@ class GameDetailViewModel @Inject constructor(
       when (game.installationStatus) {
        InstallationStatus.DOWNLOADING -> {
         _steamLaunchState.value = SteamLaunchState.Downloading(game.installProgress)
+        // FIXED (2025-12-26): Reset launch state to Idle when actively downloading
+        // User can navigate away and monitoring continues in ViewModel scope
+        _launchState.value = LaunchState.Idle
        }
        InstallationStatus.INSTALLING -> {
         _steamLaunchState.value = SteamLaunchState.Installing(game.installProgress)
+        // FIXED (2025-12-26): Reset launch state to Idle when actively installing
+        _launchState.value = LaunchState.Idle
        }
        InstallationStatus.INSTALLED -> {
         _steamLaunchState.value = SteamLaunchState.InstallComplete(game.name)
@@ -664,97 +854,88 @@ class GameDetailViewModel @Inject constructor(
         // Brief delay for user to see completion message
         kotlinx.coroutines.delay(1000)
 
-        // Reload game information
-        loadGame(gameId)
+        // FIXED (2025-12-26): Reload game and verify it still exists (may be deleted during delay)
+        try {
+         val updatedGame = gameRepository.getGameById(gameId)
+         if (updatedGame == null) {
+          AppLogger.w(TAG, "Game was deleted during auto-launch delay, aborting auto-launch")
+          _steamLaunchState.value = SteamLaunchState.Error(
+           context.getString(com.steamdeck.mobile.R.string.error_game_not_found)
+          )
+          _launchState.value = LaunchState.Idle
+          return@collect
+         }
 
-        // Auto-launch game (FIXED 2025: Handle null XServer)
-        AppLogger.i(TAG, "Auto-launching game: ${game.name}")
-        if (xServer != null && xServerView != null) {
-         launchGame(gameId, xServer, xServerView)
-        } else {
-         // XServer not initialized - skip auto-launch (user must manually launch)
-         AppLogger.w(TAG, "XServer not available for auto-launch")
-         _steamLaunchState.value = SteamLaunchState.InstallComplete(game.name)
+         // Update UI state with fresh game data
+         _uiState.value = GameDetailUiState.Success(updatedGame)
+
+         // Auto-launch game (FIXED 2025: Handle null XServer)
+         AppLogger.i(TAG, "Auto-launching game: ${updatedGame.name}")
+         if (xServer != null && xServerView != null) {
+          launchGame(gameId, xServer, xServerView)
+         } else {
+          // XServer not initialized - skip auto-launch (user must manually launch)
+          AppLogger.w(TAG, "XServer not available for auto-launch")
+          _steamLaunchState.value = SteamLaunchState.InstallComplete(updatedGame.name)
+          _launchState.value = LaunchState.Idle
+         }
+        } catch (e: Exception) {
+         // FIXED (2025-12-26): Handle loadGame errors gracefully
+         AppLogger.e(TAG, "Failed to reload game after installation", e)
+         _steamLaunchState.value = SteamLaunchState.Error(
+          e.message ?: context.getString(com.steamdeck.mobile.R.string.error_unknown)
+         )
+         _launchState.value = LaunchState.Idle
         }
        }
        InstallationStatus.VALIDATION_FAILED -> {
+        // FIXED (2025-12-26): Use strings.xml for error messages
         _steamLaunchState.value = SteamLaunchState.ValidationFailed(
-         listOf("Installation validation failed. Please check game files.")
+         listOf(context.getString(com.steamdeck.mobile.R.string.game_status_validation_failed))
         )
+        // FIXED (2025-12-26): Reset launch state to Idle on validation failure
+        _launchState.value = LaunchState.Idle
        }
        else -> {
         // Other statuses - no action needed
        }
       }
      }
+    }
 
     AppLogger.i(TAG, "Finished observing installation progress for gameId=$gameId")
 
+   } catch (e: TimeoutCancellationException) {
+    // FIXED (2025-12-26): Handle timeout separately with specific error message
+    AppLogger.w(TAG, "Monitoring timeout after 2 hours for gameId=$gameId")
+    _steamLaunchState.value = SteamLaunchState.Error("Installation monitoring timeout (2 hours)")
+    _launchState.value = LaunchState.Idle
    } catch (e: Exception) {
     AppLogger.e(TAG, "Error observing installation progress", e)
     _steamLaunchState.value = SteamLaunchState.Error(
-     e.message ?: "Error monitoring installation progress"
+     e.message ?: context.getString(com.steamdeck.mobile.R.string.error_unknown)
     )
+    _launchState.value = LaunchState.Idle
    }
-  }
+   } // End of viewModelScope.launch
+  } // End of synchronized block
  }
 
  /**
-  * Observe installation progress in real-time (FIXED: Auto-stops on completion)
+  * DEPRECATED (2025-12-26): Use observeInstallationProgressWithAutoLaunch instead
   *
-  * NEW 2025: Monitors game installation status via Flow
-  * Updates UI with download/install progress
-  * FIXED: takeWhile stops Flow when installation completes
+  * This method is a duplicate of observeInstallationProgressWithAutoLaunch without auto-launch.
+  * Kept for reference but should not be called.
+  *
+  * @see observeInstallationProgressWithAutoLaunch
   */
+ @Deprecated(
+  message = "Use observeInstallationProgressWithAutoLaunch instead",
+  replaceWith = ReplaceWith("observeInstallationProgressWithAutoLaunch(gameId, xServer, xServerView)")
+ )
  private fun observeInstallationProgress(gameId: Long) {
-  viewModelScope.launch {
-   try {
-    gameRepository.observeGame(gameId)
-     .takeWhile { game ->
-      // CRITICAL FIX: Stop observing when installation is complete
-      // Prevents battery drain from unnecessary database polling
-      game?.installationStatus !in listOf(
-       InstallationStatus.INSTALLED,
-       InstallationStatus.VALIDATION_FAILED
-      )
-     }
-     .collect { game ->
-     if (game == null) {
-      AppLogger.w(TAG, "Game not found during progress monitoring")
-      return@collect
-     }
-
-     AppLogger.d(TAG, "Installation status: ${game.installationStatus}, progress: ${game.installProgress}%")
-
-     when (game.installationStatus) {
-      InstallationStatus.DOWNLOADING -> {
-       _steamLaunchState.value = SteamLaunchState.Downloading(game.installProgress)
-      }
-      InstallationStatus.INSTALLING -> {
-       _steamLaunchState.value = SteamLaunchState.Installing(game.installProgress)
-      }
-      InstallationStatus.INSTALLED -> {
-       _steamLaunchState.value = SteamLaunchState.InstallComplete(game.name)
-       AppLogger.i(TAG, "Game installation complete: ${game.name}")
-
-       // Reload game information
-       loadGame(gameId)
-      }
-      InstallationStatus.VALIDATION_FAILED -> {
-       _steamLaunchState.value = SteamLaunchState.ValidationFailed(
-        listOf("Installation validation failed. Please check game files.")
-       )
-      }
-      else -> {
-       // Other statuses (NOT_INSTALLED, UPDATE_REQUIRED, etc.)
-       // No UI update needed
-      }
-     }
-    }
-   } catch (e: Exception) {
-    AppLogger.e(TAG, "Exception during installation progress monitoring", e)
-   }
-  }
+  AppLogger.w(TAG, "DEPRECATED: observeInstallationProgress called. Use observeInstallationProgressWithAutoLaunch instead.")
+  // No-op: This method should not be used
  }
 
  /**

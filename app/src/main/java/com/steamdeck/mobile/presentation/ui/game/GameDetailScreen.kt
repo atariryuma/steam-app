@@ -75,17 +75,38 @@ fun GameDetailScreen(
  var steamLaunchErrorMessage by remember { mutableStateOf("") }
  var validationErrors by remember { mutableStateOf<List<String>>(emptyList()) }
  var launchElapsedSeconds by remember { mutableStateOf(0) }
+ val snackbarHostState = remember { SnackbarHostState() }
 
- // Create XServer instance for game display (stable across recompositions)
- val screenWidth = remember { context.resources.displayMetrics.widthPixels }
- val screenHeight = remember { context.resources.displayMetrics.heightPixels }
- val actualScreenSize = remember(screenWidth, screenHeight) { "${screenWidth}x${screenHeight}" }
+ // CRITICAL (2025-12-27): Use XServer from ViewModel (shared instance from XServerManager)
+ // This connects UI to the XServer that games are actually rendering to
+ val xServer by viewModel.xServer.collectAsStateWithLifecycle()
 
- val xServer = remember(actualScreenSize) {
-  XServer(ScreenInfo(actualScreenSize))
- }
+ // Create XServerView when XServer becomes available
  val xServerView = remember(xServer) {
-  XServerView(context, xServer)
+  xServer?.let { XServerView(context, it) }
+ }
+
+ // FIXED (2025-12-27): Clean up XServerView on screen disposal
+ // XServer instance is managed by XServerManager (survives screen navigation)
+ // Only cleanup the View, not the XServer itself
+ DisposableEffect(xServerView) {
+  onDispose {
+   xServerView?.let { view ->
+    try {
+     // Only pause View if game is NOT running
+     val currentLaunchState = launchState
+     if (currentLaunchState !is LaunchState.Running) {
+      view.onPause()
+      android.util.Log.d("GameDetailScreen", "XServerView paused (game not running)")
+     } else {
+      android.util.Log.d("GameDetailScreen", "XServerView cleanup skipped (game running)")
+     }
+    } catch (e: Exception) {
+     // Catch ALL exceptions including NPE from StateFlow access during disposal
+     android.util.Log.w("GameDetailScreen", "XServer cleanup failed (ViewModel cleared?)", e)
+    }
+   }
+  }
  }
 
  // Load game details
@@ -93,21 +114,33 @@ fun GameDetailScreen(
   viewModel.loadGame(gameId)
  }
 
- // Timer for launch timeout
- LaunchedEffect(launchState is LaunchState.Launching) {
+ // FIXED (2025-12-26): Wall clock-based timer for accurate timeout tracking
+ // Previous bugs:
+ //   1. while loop could become infinite if launchState stuck
+ //   2. repeat() with delay() doesn't account for suspension (Doze mode)
+ LaunchedEffect(launchState) {
   if (launchState is LaunchState.Launching) {
-   launchElapsedSeconds = 0
-   while (launchState is LaunchState.Launching) {
-    delay(1000)
-    launchElapsedSeconds++
+   val startTimeMillis = System.currentTimeMillis()
+   val timeoutMillis = 90_000L // 90 seconds
 
-    // 90 second timeout
-    if (launchElapsedSeconds >= 90) {
-     viewModel.cancelLaunch()
-     launchErrorMessage = context.getString(R.string.error_launch_timeout)
-     showLaunchErrorDialog = true
-     break
+   try {
+    while (launchState is LaunchState.Launching) {
+     val elapsedMillis = System.currentTimeMillis() - startTimeMillis
+     launchElapsedSeconds = (elapsedMillis / 1000).toInt()
+
+     // Check wall clock timeout (accurate even if coroutine suspended)
+     if (elapsedMillis >= timeoutMillis) {
+      viewModel.cancelLaunch()
+      launchErrorMessage = context.getString(R.string.error_launch_timeout)
+      showLaunchErrorDialog = true
+      break
+     }
+
+     delay(1000) // Update UI every second
     }
+   } catch (e: kotlinx.coroutines.CancellationException) {
+    // LaunchedEffect cancelled (screen disposed) - expected behavior
+    android.util.Log.d("GameDetailScreen", "Launch timer cancelled")
    }
   }
  }
@@ -127,23 +160,66 @@ fun GameDetailScreen(
   }
  }
 
- // Monitor Steam launch errors
+ // Monitor Steam launch state changes
+ // FIXED (2025-12-26): Use state snapshot instead of direct state to prevent infinite loop
+ // Key issue: LaunchedEffect re-runs on configuration change, but state reset happens in coroutine
+ // Solution: Reset state IMMEDIATELY before launching coroutine
  LaunchedEffect(steamLaunchState) {
   when (val state = steamLaunchState) {
    is SteamLaunchState.Error -> {
     steamLaunchErrorMessage = state.message
     showSteamLaunchErrorDialog = true
+    // FIXED: Reset immediately to prevent dialog re-showing on config change
+    viewModel.resetSteamLaunchState()
    }
    is SteamLaunchState.ValidationFailed -> {
     validationErrors = state.errors
     showValidationErrorDialog = true
+    // FIXED: Reset immediately to prevent dialog re-showing on config change
+    viewModel.resetSteamLaunchState()
+   }
+   is SteamLaunchState.InstallComplete -> {
+    // CRITICAL FIX: Capture game name BEFORE resetting state
+    val gameName = state.gameName
+
+    // FIXED: Reset state IMMEDIATELY to prevent infinite loop on configuration change
+    // This ensures LaunchedEffect won't re-trigger with InstallComplete state
+    viewModel.resetSteamLaunchState()
+
+    // FIXED (2025-12-26): Removed nested launch{} to prevent orphaned coroutines
+    // LaunchedEffect's scope auto-cancels on recomposition, no need for nested launch
+    kotlinx.coroutines.delay(500) // Brief delay for smooth UX
+    val snackbarResult = snackbarHostState.showSnackbar(
+     message = "$gameName is ready to play!",
+     actionLabel = "Launch",
+     duration = androidx.compose.material3.SnackbarDuration.Long
+    )
+    if (snackbarResult == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+     // User clicked "Launch" - trigger game launch
+     // FIXED (2025-12-27): Null-check for XServer and XServerView
+     // Copy to local variables for smart cast
+     val currentXServer = xServer
+     val currentXServerView = xServerView
+     if (currentXServer != null && currentXServerView != null) {
+      viewModel.launchGame(gameId, currentXServer, currentXServerView)
+     } else {
+      android.util.Log.w("GameDetailScreen", "Cannot launch game: XServer not available")
+     }
+    }
    }
    else -> {}
   }
  }
 
- Box(modifier = Modifier.fillMaxSize()) {
-  when (val state = uiState) {
+ Scaffold(
+  modifier = Modifier.fillMaxSize(),
+  snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+ ) { paddingValues ->
+  Box(modifier = Modifier
+   .fillMaxSize()
+   .padding(paddingValues)
+  ) {
+   when (val state = uiState) {
    is GameDetailUiState.Loading -> {
     LoadingContent()
    }
@@ -154,10 +230,30 @@ fun GameDetailScreen(
      isScanning = isScanning,
      launchState = launchState,
      steamLaunchState = steamLaunchState,
-     onLaunchGame = { viewModel.launchGame(gameId, xServer, xServerView) },
+     onLaunchGame = {
+      // FIXED (2025-12-27): Null-check for XServer availability
+      // Copy to local variables for smart cast
+      val currentXServer = xServer
+      val currentXServerView = xServerView
+      if (currentXServer != null && currentXServerView != null) {
+       viewModel.launchGame(gameId, currentXServer, currentXServerView)
+      } else {
+       android.util.Log.w("GameDetailScreen", "Cannot launch: XServer not available")
+      }
+     },
      onLaunchViaSteam = { viewModel.launchGameViaSteam(gameId) },
      onOpenSteamClient = { viewModel.openSteamClient(gameId) },
-     onLaunchOrDownloadGame = { viewModel.launchOrDownloadGame(gameId, xServer, xServerView) },
+     onLaunchOrDownloadGame = {
+      // FIXED (2025-12-27): Null-check for XServer availability
+      // Copy to local variables for smart cast
+      val currentXServer = xServer
+      val currentXServerView = xServerView
+      if (currentXServer != null && currentXServerView != null) {
+       viewModel.launchOrDownloadGame(gameId, currentXServer, currentXServerView)
+      } else {
+       android.util.Log.w("GameDetailScreen", "Cannot launch: XServer not available")
+      }
+     },
      onScanForInstalledGame = { viewModel.scanForInstalledGame(gameId) },
      onNavigateBack = onNavigateBack,
      onNavigateToSettings = onNavigateToSettings,
@@ -187,11 +283,12 @@ fun GameDetailScreen(
      enter = AnimationDefaults.DialogEnter,
      exit = AnimationDefaults.DialogExit
     ) {
+     // FIXED (2025-12-26): Use strings.xml for launch dialog messages
      LaunchingDialogWithProgress(
      message = if (launchElapsedSeconds < 60) {
-      "Initializing Winlator environment..."
+      stringResource(R.string.launch_dialog_initializing)
      } else {
-      "Still launching... Please wait."
+      stringResource(R.string.launch_dialog_still_launching)
      },
      elapsedSeconds = launchElapsedSeconds
     )
@@ -263,7 +360,8 @@ fun GameDetailScreen(
   }
 
   // XServerView overlay for running game
-  if (launchState is LaunchState.Running) {
+  // FIXED (2025-12-27): Only show if XServerView is available
+  if (launchState is LaunchState.Running && xServerView != null) {
    Box(modifier = Modifier.fillMaxSize()) {
     // Full-screen game display
     AndroidView(
@@ -278,17 +376,9 @@ fun GameDetailScreen(
      }
     )
 
-    // Lifecycle management: Keep XServer running when navigating away
-    // CHANGED (2025-12-22): Remove onPause() to preserve game state
-    // - Old behavior: onPause() when leaving screen → Game continues but rendering stops
-    // - New behavior: Keep rendering active → Seamless return to running game
-    // - XServer cleanup only happens when Activity is destroyed (handled by ViewModel)
-    DisposableEffect(Unit) {
-     onDispose {
-      // DO NOT call onPause() here - let game keep running in background
-      // Cleanup will be handled by ViewModel.onCleared() when Activity is destroyed
-     }
-    }
+    // FIXED (2025-12-26): Remove duplicate DisposableEffect
+    // Lifecycle management now handled by the single DisposableEffect at screen level (line 93-115)
+    // This prevents duplicate cleanup attempts and ensures consistent behavior
 
     // Close button overlay
     IconButton(
@@ -310,7 +400,8 @@ fun GameDetailScreen(
     }
    }
   }
- }
+  } // End Box
+ } // End Scaffold
 }
 
 @Composable
@@ -448,11 +539,19 @@ fun GameDetailContent(
    }
 
    // Steam ToS Compliance: Guide users to download via official Steam client
-   // Show button if: (1) game not installed OR (2) currently downloading/installing
+   // Show button based on installation status (more reliable than executablePath)
+   // FIXED (2025-12-26): Complete InstallationStatus coverage
+   //   - NOT_INSTALLED: Show download button
+   //   - DOWNLOADING/INSTALLING: Show progress
+   //   - VALIDATION_FAILED: Allow retry
+   //   - UPDATE_REQUIRED/UPDATE_PAUSED: Allow update/resume
    if (game.source == com.steamdeck.mobile.domain.model.GameSource.STEAM &&
-    (game.executablePath.isBlank() ||
+    (game.installationStatus == com.steamdeck.mobile.domain.model.InstallationStatus.NOT_INSTALLED ||
      game.installationStatus == com.steamdeck.mobile.domain.model.InstallationStatus.DOWNLOADING ||
-     game.installationStatus == com.steamdeck.mobile.domain.model.InstallationStatus.INSTALLING)
+     game.installationStatus == com.steamdeck.mobile.domain.model.InstallationStatus.INSTALLING ||
+     game.installationStatus == com.steamdeck.mobile.domain.model.InstallationStatus.VALIDATION_FAILED ||
+     game.installationStatus == com.steamdeck.mobile.domain.model.InstallationStatus.UPDATE_REQUIRED ||
+     game.installationStatus == com.steamdeck.mobile.domain.model.InstallationStatus.UPDATE_PAUSED)
    ) {
     Card(
      modifier = Modifier.fillMaxWidth(),
@@ -470,13 +569,29 @@ fun GameDetailContent(
        horizontalArrangement = Arrangement.spacedBy(12.dp)
       ) {
        Icon(
-        Icons.Outlined.Download,
+        when (game.installationStatus) {
+         com.steamdeck.mobile.domain.model.InstallationStatus.DOWNLOADING -> Icons.Default.Download
+         com.steamdeck.mobile.domain.model.InstallationStatus.INSTALLING -> Icons.Default.Settings
+         com.steamdeck.mobile.domain.model.InstallationStatus.VALIDATION_FAILED -> Icons.Default.Warning
+         com.steamdeck.mobile.domain.model.InstallationStatus.UPDATE_REQUIRED,
+         com.steamdeck.mobile.domain.model.InstallationStatus.UPDATE_PAUSED -> Icons.Default.CloudSync
+         else -> Icons.Default.Download
+        },
         contentDescription = null,
         tint = MaterialTheme.colorScheme.primary,
         modifier = Modifier.size(28.dp)
        )
+       // FIXED (2025-12-26): Use strings.xml for installation status titles
        Text(
-        "Game Not Installed",
+        stringResource(when (game.installationStatus) {
+         com.steamdeck.mobile.domain.model.InstallationStatus.NOT_INSTALLED -> R.string.install_card_title_not_installed
+         com.steamdeck.mobile.domain.model.InstallationStatus.DOWNLOADING -> R.string.install_card_title_downloading
+         com.steamdeck.mobile.domain.model.InstallationStatus.INSTALLING -> R.string.install_card_title_installing
+         com.steamdeck.mobile.domain.model.InstallationStatus.VALIDATION_FAILED -> R.string.install_card_title_validation_failed
+         com.steamdeck.mobile.domain.model.InstallationStatus.UPDATE_REQUIRED -> R.string.install_card_title_update_required
+         com.steamdeck.mobile.domain.model.InstallationStatus.UPDATE_PAUSED -> R.string.install_card_title_update_paused
+         else -> R.string.install_card_title_not_installed
+        }),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -488,9 +603,17 @@ fun GameDetailContent(
        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
       )
 
-      // UPDATED (2025): One-button UX description
+      // FIXED (2025-12-26): Use strings.xml for installation status descriptions
       Text(
-       "Press 'Launch Game' to automatically download and install this game through Steam.",
+       stringResource(when (game.installationStatus) {
+        com.steamdeck.mobile.domain.model.InstallationStatus.NOT_INSTALLED -> R.string.install_card_desc_not_installed
+        com.steamdeck.mobile.domain.model.InstallationStatus.DOWNLOADING -> R.string.install_card_desc_downloading
+        com.steamdeck.mobile.domain.model.InstallationStatus.INSTALLING -> R.string.install_card_desc_installing
+        com.steamdeck.mobile.domain.model.InstallationStatus.VALIDATION_FAILED -> R.string.install_card_desc_validation_failed
+        com.steamdeck.mobile.domain.model.InstallationStatus.UPDATE_REQUIRED -> R.string.install_card_desc_update_required
+        com.steamdeck.mobile.domain.model.InstallationStatus.UPDATE_PAUSED -> R.string.install_card_desc_update_paused
+        else -> R.string.install_card_desc_not_installed
+       }),
        style = MaterialTheme.typography.bodyMedium,
        color = MaterialTheme.colorScheme.onPrimaryContainer
       )
@@ -501,20 +624,36 @@ fun GameDetailContent(
         android.util.Log.d("GameDetailScreen", "Launch/Download button clicked")
         onLaunchOrDownloadGame()
        },
-       // FIXED (2025): Add LaunchState.Launching check to prevent double-clicks during launch
+       // FIXED (2025-12-26): Comprehensive state check - ALL 14 SteamLaunchState types checked
+       // Enabled states:
+       //   - Idle (initial state, allows launch)
+       //   - Error (allows retry)
+       //   - NotInstalled (allows download)
+       //   - InstallComplete (allows launch after installation)
+       //   - ValidationFailed (allows retry)
+       // Disabled states:
+       //   - CheckingInstallation, InitiatingDownload, InstallingSteam,
+       //     Downloading, Installing, DownloadStartedManualTracking,
+       //     Launching, Running (operations in progress)
        enabled = launchState !is LaunchState.Launching &&
+                 launchState !is LaunchState.Running &&
+                 steamLaunchState !is SteamLaunchState.CheckingInstallation &&
                  steamLaunchState !is SteamLaunchState.InstallingSteam &&
                  steamLaunchState !is SteamLaunchState.Downloading &&
                  steamLaunchState !is SteamLaunchState.Installing &&
-                 steamLaunchState !is SteamLaunchState.InitiatingDownload,
+                 steamLaunchState !is SteamLaunchState.InitiatingDownload &&
+                 steamLaunchState !is SteamLaunchState.DownloadStartedManualTracking &&
+                 steamLaunchState !is SteamLaunchState.Launching &&
+                 steamLaunchState !is SteamLaunchState.Running,
        modifier = Modifier.fillMaxWidth(),
        colors = ButtonDefaults.buttonColors(
         containerColor = MaterialTheme.colorScheme.primary
        )
       ) {
-       // FIXED (2025-12-25): Show proper loading indicator when actually processing
+       // FIXED (2025-12-26): Comprehensive state UI with all possible states
        if (steamLaunchState is SteamLaunchState.Launching ||
-           steamLaunchState is SteamLaunchState.InitiatingDownload) {
+           steamLaunchState is SteamLaunchState.InitiatingDownload ||
+           steamLaunchState is SteamLaunchState.CheckingInstallation) {
         CircularProgressIndicator(
          modifier = Modifier.size(20.dp),
          strokeWidth = 2.dp,
@@ -526,6 +665,14 @@ fun GameDetailContent(
           is SteamLaunchState.InstallingSteam -> Icons.Default.CloudDownload
           is SteamLaunchState.Downloading -> Icons.Default.Download
           is SteamLaunchState.Installing -> Icons.Default.Settings
+          is SteamLaunchState.Running -> Icons.Default.Videocam
+          is SteamLaunchState.InstallComplete -> Icons.Default.CheckCircle
+          is SteamLaunchState.ValidationFailed -> Icons.Default.Warning
+          is SteamLaunchState.Error -> Icons.Default.Error
+          is SteamLaunchState.NotInstalled -> Icons.Default.Download
+          is SteamLaunchState.Idle -> Icons.Default.PlayArrow
+          is SteamLaunchState.DownloadStartedManualTracking -> Icons.Default.Download
+          // All other states default to PlayArrow
           else -> Icons.Default.PlayArrow
          },
          contentDescription = null,
@@ -535,11 +682,20 @@ fun GameDetailContent(
        Spacer(modifier = Modifier.width(8.dp))
        Text(
         text = when (steamLaunchState) {
+         is SteamLaunchState.CheckingInstallation -> "Checking Installation..."
          is SteamLaunchState.InstallingSteam -> "Preparing Steam ${(steamLaunchState.progress * 100).toInt()}%"
          is SteamLaunchState.Downloading -> "Downloading ${steamLaunchState.progress}%"
+         is SteamLaunchState.DownloadStartedManualTracking -> "Download Started (Check Steam)"
          is SteamLaunchState.Installing -> "Installing ${steamLaunchState.progress}%"
+         is SteamLaunchState.InstallComplete -> "${steamLaunchState.gameName} Ready!"
          is SteamLaunchState.InitiatingDownload -> "Starting Download..."
          is SteamLaunchState.Launching -> "Launching..."
+         is SteamLaunchState.Running -> "Running (PID: ${steamLaunchState.processId})"
+         is SteamLaunchState.ValidationFailed -> "Retry Installation"
+         is SteamLaunchState.Error -> "Retry"
+         is SteamLaunchState.NotInstalled -> "Download Game"
+         is SteamLaunchState.Idle -> "Launch Game"
+         // All other states default to "Launch Game"
          else -> "Launch Game"
         },
         style = MaterialTheme.typography.titleSmall
@@ -549,8 +705,79 @@ fun GameDetailContent(
     }
    }
 
-   // REMOVED (2025): Old standalone "Launch Game" button
-   // Now unified into single "Launch or Download" button above for one-button UX
+   // Launch button for installed Steam games
+   // FIXED (2025-12-26): Added launch button for INSTALLED Steam games
+   if (game.source == com.steamdeck.mobile.domain.model.GameSource.STEAM &&
+       game.installationStatus == com.steamdeck.mobile.domain.model.InstallationStatus.INSTALLED) {
+    Button(
+     onClick = { onLaunchOrDownloadGame() },
+     enabled = launchState !is LaunchState.Launching &&
+               steamLaunchState !is SteamLaunchState.Launching &&
+               steamLaunchState !is SteamLaunchState.Running,
+     modifier = Modifier.fillMaxWidth(),
+     colors = ButtonDefaults.buttonColors(
+      containerColor = MaterialTheme.colorScheme.primary
+     )
+    ) {
+     if (launchState is LaunchState.Launching || steamLaunchState is SteamLaunchState.Launching) {
+      CircularProgressIndicator(
+       modifier = Modifier.size(20.dp),
+       strokeWidth = 2.dp,
+       color = MaterialTheme.colorScheme.onPrimary
+      )
+     } else {
+      Icon(
+       imageVector = when (steamLaunchState) {
+        is SteamLaunchState.Running -> Icons.Default.Videocam
+        else -> Icons.Default.PlayArrow
+       },
+       contentDescription = null,
+       modifier = Modifier.size(20.dp)
+      )
+     }
+     Spacer(modifier = Modifier.width(8.dp))
+     Text(
+      text = when {
+       launchState is LaunchState.Launching || steamLaunchState is SteamLaunchState.Launching -> "Launching..."
+       steamLaunchState is SteamLaunchState.Running -> "Running (PID: ${steamLaunchState.processId})"
+       else -> "Launch Game"
+      },
+      style = MaterialTheme.typography.titleSmall
+     )
+    }
+   }
+
+   // Launch button for imported games (non-Steam games)
+   if (game.source == com.steamdeck.mobile.domain.model.GameSource.IMPORTED &&
+       game.executablePath.isNotBlank()) {
+    Button(
+     onClick = onLaunchGame,
+     enabled = launchState !is LaunchState.Launching,
+     modifier = Modifier.fillMaxWidth(),
+     colors = ButtonDefaults.buttonColors(
+      containerColor = MaterialTheme.colorScheme.primary
+     )
+    ) {
+     if (launchState is LaunchState.Launching) {
+      CircularProgressIndicator(
+       modifier = Modifier.size(20.dp),
+       strokeWidth = 2.dp,
+       color = MaterialTheme.colorScheme.onPrimary
+      )
+     } else {
+      Icon(
+       imageVector = Icons.Default.PlayArrow,
+       contentDescription = null,
+       modifier = Modifier.size(20.dp)
+      )
+     }
+     Spacer(modifier = Modifier.width(8.dp))
+     Text(
+      text = if (launchState is LaunchState.Launching) "Launching..." else "Launch Game",
+      style = MaterialTheme.typography.titleSmall
+     )
+    }
+   }
 
    // Game info card
    InfoCard(
@@ -670,11 +897,11 @@ fun LaunchingDialog() {
  AlertDialog(
   onDismissRequest = {}, // Non-dismissible
   icon = { CircularProgressIndicator() },
-  title = { Text("gamelaunchin...") },
+  title = { Text(stringResource(R.string.game_launching)) },
   text = {
    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    Text("Initializing Winlator environment...")
-    Text("Please wait...", style = MaterialTheme.typography.bodySmall)
+    Text(stringResource(R.string.launch_dialog_initializing))
+    Text(stringResource(R.string.launch_dialog_please_wait), style = MaterialTheme.typography.bodySmall)
    }
   },
   confirmButton = {} // No button, non-dismissible
@@ -689,11 +916,11 @@ fun LaunchErrorDialog(
  AlertDialog(
   onDismissRequest = onDismiss,
   icon = { Icon(Icons.Default.Info, contentDescription = stringResource(R.string.content_desc_info)) },
-  title = { Text("Cannot launch game") },
+  title = { Text(stringResource(R.string.dialog_launch_error_title)) },
   text = { Text(message) },
   confirmButton = {
    TextButton(onClick = onDismiss) {
-    Text("OK")
+    Text(stringResource(R.string.button_ok))
    }
   }
  )
@@ -711,7 +938,7 @@ fun LoadingContent(modifier: Modifier = Modifier) {
   ) {
    CircularProgressIndicator()
    Text(
-    text = "Loading...",
+    text = stringResource(R.string.loading_text),
     style = MaterialTheme.typography.bodyMedium,
     color = MaterialTheme.colorScheme.onSurfaceVariant
    )
@@ -741,7 +968,7 @@ fun ErrorContent(
     tint = MaterialTheme.colorScheme.error
    )
    Text(
-    text = "Error occurred",
+    text = stringResource(R.string.error_occurred_title),
     style = MaterialTheme.typography.titleLarge,
     fontWeight = FontWeight.Bold,
     color = MaterialTheme.colorScheme.error
@@ -752,7 +979,7 @@ fun ErrorContent(
     color = MaterialTheme.colorScheme.onSurfaceVariant
    )
    Button(onClick = onNavigateBack) {
-    Text("Back")
+    Text(stringResource(R.string.button_back))
    }
   }
  }

@@ -164,8 +164,19 @@ fun HomeScreen(
  ) { uri ->
   uri?.let {
    executableUri = it
-   // Auto-suggest game name from filename (remove extension)
-   val fileName = it.lastPathSegment?.substringAfterLast("/") ?: ""
+   // Auto-suggest game name from filename using ContentResolver
+   val fileName = try {
+    context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
+     val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+     if (nameIndex >= 0 && cursor.moveToFirst()) {
+      cursor.getString(nameIndex)
+     } else {
+      it.lastPathSegment?.substringAfterLast("/") ?: ""
+     }
+    } ?: it.lastPathSegment?.substringAfterLast("/") ?: ""
+   } catch (e: Exception) {
+    it.lastPathSegment?.substringAfterLast("/") ?: ""
+   }
    suggestedGameName = fileName.removeSuffix(".exe").removeSuffix(".bat").removeSuffix(".msi")
    // Open dialog automatically after file selection
    showAddGameDialog = true

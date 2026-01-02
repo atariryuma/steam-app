@@ -13,12 +13,16 @@ import com.steamdeck.mobile.domain.usecase.SyncSteamLibraryUseCase
 import com.steamdeck.mobile.presentation.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -42,7 +46,8 @@ class SettingsViewModel @Inject constructor(
  private val steamSetupManager: SteamSetupManager,
  private val steamAuthManager: com.steamdeck.mobile.core.steam.SteamAuthManager,
  private val steamConfigManager: com.steamdeck.mobile.core.steam.SteamConfigManager,
- private val steamRepository: com.steamdeck.mobile.data.remote.steam.SteamRepository
+ private val steamRepository: com.steamdeck.mobile.data.remote.steam.SteamRepository,
+ private val xServerManager: com.steamdeck.mobile.core.xserver.XServerManager
 ) : ViewModel() {
 
  companion object {
@@ -52,6 +57,14 @@ class SettingsViewModel @Inject constructor(
  private val _uiState = MutableStateFlow<SettingsUiState>(SettingsUiState.Loading)
  val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
+ /**
+  * XServer instance for Steam client display
+  * CRITICAL (2025-12-27): Use XServerManager's shared instance
+  * Same pattern as GameDetailViewModel - ensures games render to correct XServer
+  */
+ private val _xServer = MutableStateFlow<com.steamdeck.mobile.core.xserver.XServer?>(null)
+ val xServer: StateFlow<com.steamdeck.mobile.core.xserver.XServer?> = _xServer.asStateFlow()
+
  private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
  val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
 
@@ -60,6 +73,9 @@ class SettingsViewModel @Inject constructor(
 
  private val _autoLaunchSteamState = MutableStateFlow<AutoLaunchState>(AutoLaunchState.Idle)
  val autoLaunchSteamState: StateFlow<AutoLaunchState> = _autoLaunchSteamState.asStateFlow()
+
+ // FIXED (2025-12-26): Track loadSettings job to prevent multiple collectors
+ private var loadJob: Job? = null
 
  init {
   loadSettings()
@@ -157,11 +173,15 @@ class SettingsViewModel @Inject constructor(
  /**
   * Load settings data
   *
+  * FIXED (2025-12-26): Cancel previous collection to prevent multiple collectors leak
+  *
   * Note: Users must register their own Steam Web API Key
   * Obtain at: https://steamcommunity.com/dev/apikey
   */
  private fun loadSettings() {
-  viewModelScope.launch {
+  // FIXED (2025-12-26): Cancel previous collector before starting new one
+  loadJob?.cancel()
+  loadJob = viewModelScope.launch {
    val steamIdFlow = securePreferences.getSteamId()
    val usernameFlow = securePreferences.getSteamUsername()
    val lastSyncFlow = securePreferences.getLastSyncTimestamp()
@@ -182,7 +202,9 @@ class SettingsViewModel @Inject constructor(
      lastSyncTimestamp = lastSync,
      isSteamConfigured = isConfigured
     )
-   }.collect { data ->
+   }
+   .distinctUntilChanged() // FIXED (2025-12-26): Prevent duplicate emissions
+   .collect { data ->
     _uiState.value = SettingsUiState.Success(data)
    }
   }
@@ -209,9 +231,28 @@ class SettingsViewModel @Inject constructor(
   */
  fun syncAfterQrLogin() {
   viewModelScope.launch {
+   // FIXED (2025-12-26): Add timeout to getSteamId() to prevent infinite wait
    // Wait for QR authentication to complete (Flow-based synchronization)
-   val steamId = securePreferences.getSteamId().first { !it.isNullOrBlank() }
-   val steamUsername = securePreferences.getSteamUsername().first()
+   val steamId = try {
+    kotlinx.coroutines.withTimeout(10000) {
+     securePreferences.getSteamId().first { !it.isNullOrBlank() }
+    }
+   } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+    AppLogger.e(TAG, "SteamID not available after 10s timeout, aborting sync")
+    _autoLaunchSteamState.value = AutoLaunchState.LaunchError("Authentication timeout")
+    return@launch
+   }
+
+   // FIXED (2025-12-26): Add timeout to prevent infinite wait
+   val steamUsername = try {
+    kotlinx.coroutines.withTimeout(5000) {
+     securePreferences.getSteamUsername().first { !it.isNullOrBlank() }
+    }
+   } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+    AppLogger.w(TAG, "Username not available after 5s timeout, using SteamID as fallback")
+    steamId // Fallback to SteamID if username not set
+   }
+
    val containerId = getSteamContainerId()
 
    // Validate prerequisites
@@ -255,7 +296,10 @@ class SettingsViewModel @Inject constructor(
    _autoLaunchSteamState.value = AutoLaunchState.LaunchingSteam
    try {
     AppLogger.i(TAG, "Auto-launching Steam client after QR login")
-    val launchResult = steamLauncher.launchSteamClient(containerId)
+    val launchResult = steamLauncher.launchSteam(
+        containerId = containerId,
+        mode = com.steamdeck.mobile.core.steam.SteamLauncher.SteamLaunchMode.BIG_PICTURE
+    )
 
     if (launchResult.isSuccess) {
      _autoLaunchSteamState.value = AutoLaunchState.SteamRunning
@@ -504,15 +548,15 @@ class SettingsViewModel @Inject constructor(
  /**
   * Open Steam Client in XServer
   *
-  * TODO: Navigate to SteamDisplayScreen with integrated XServer rendering
-  * Will use SteamDisplayScreen.kt (Compose UI) + XServerView (OpenGL rendering)
+  * Launches Steam client in Big Picture mode and displays it in XServer.
+  * Uses XServerManager's shared instance to ensure proper rendering.
   *
   * @param containerId WinlatorContainer ID (e.g., "default_shared_container")
   */
  fun openSteamClient(containerId: String) {
   viewModelScope.launch {
    try {
-    AppLogger.i(TAG, "Opening Steam Client (XServer integration pending)")
+    AppLogger.i(TAG, "Opening Steam Client in XServer")
 
     // Get Steam.exe path from container
     val steamInstallPath = getSteamInstallPath(containerId)
@@ -524,12 +568,40 @@ class SettingsViewModel @Inject constructor(
      return@launch
     }
 
-    // TODO: Navigate to Screen.SteamDisplay route
-    // For now, just log the intent
-    AppLogger.d(TAG, "Would navigate to SteamDisplayScreen with steam.exe: $steamInstallPath")
-    _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
-     successMessage = "XServer integration pending - navigation route needed"
-    ) ?: SettingsUiState.Loading
+    // CRITICAL: Get XServer from XServerManager BEFORE launching Steam
+    // This ensures Steam renders to the correct XServer instance
+    _xServer.value = xServerManager.getXServer()
+    if (_xServer.value == null) {
+     AppLogger.w(TAG, "XServer not available, initializing XServerManager")
+     // XServerManager will create XServer on first access
+     _xServer.value = xServerManager.getXServer()
+    }
+
+    AppLogger.d(TAG, "XServer instance acquired: ${_xServer.value != null}")
+
+    // Launch Steam in Big Picture mode via SteamLauncher
+    AppLogger.i(TAG, "Launching Steam: $steamInstallPath")
+    val launchResult = withContext(Dispatchers.IO) {
+     steamLauncher.launchSteam(
+      containerId = containerId,
+      mode = SteamLauncher.SteamLaunchMode.BIG_PICTURE
+     )
+    }
+
+    launchResult.fold(
+     onSuccess = {
+      AppLogger.i(TAG, "Steam client launched successfully")
+      _uiState.value = (_uiState.value as? SettingsUiState.Success)?.copy(
+       successMessage = "Steam client opened"
+      ) ?: SettingsUiState.Loading
+     },
+     onFailure = { error ->
+      AppLogger.e(TAG, "Failed to launch Steam client", error)
+      _steamInstallState.value = SteamInstallState.Error(
+       "Failed to launch Steam: ${error.message ?: "Unknown error"}"
+      )
+     }
+    )
 
    } catch (e: Exception) {
     _steamInstallState.value = SteamInstallState.Error(
@@ -613,6 +685,20 @@ class SettingsViewModel @Inject constructor(
   if (currentState != null && currentState.successMessage != null) {
    _uiState.value = currentState.copy(successMessage = null)
   }
+ }
+
+ /**
+  * FIXED (2025-12-26): Cancel Flow collection on ViewModel destruction
+  *
+  * Bug: loadSettings() launches infinite Flow.collect() in viewModelScope
+  * Impact: On configuration change, new collector starts but old one never cancels
+  * Result: Multiple concurrent collectors → memory leak
+  * Fix: Cancel loadJob in onCleared()
+  */
+ override fun onCleared() {
+  super.onCleared()
+  loadJob?.cancel()
+  AppLogger.d(TAG, "SettingsViewModel cleared, loadJob cancelled")
  }
 
 }

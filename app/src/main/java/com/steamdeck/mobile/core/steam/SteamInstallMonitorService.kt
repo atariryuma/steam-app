@@ -19,9 +19,12 @@ import com.steamdeck.mobile.domain.repository.GameRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
@@ -46,6 +49,8 @@ class SteamInstallMonitorService : Service() {
         private const val NOTIFICATION_CHANNEL_ID = "steam_install_monitor"
         private const val NOTIFICATION_ID = 1001
         private const val TIMEOUT_MILLIS = 2 * 60 * 60 * 1000L // 2 hours
+        private const val MIN_NOTIFICATION_UPDATE_INTERVAL_MS = 500L // Base interval
+        private const val MAX_NOTIFICATION_UPDATE_INTERVAL_MS = 8000L // Max 8 seconds
 
         const val EXTRA_CONTAINER_ID = "container_id"
         const val EXTRA_STEAM_APP_ID = "steam_app_id"
@@ -84,6 +89,15 @@ class SteamInstallMonitorService : Service() {
     private var steamAppId: Long? = null
     private var gameId: Long? = null
     private var downloadId: Long? = null
+
+    // FIXED (2025-12-26): Store timeout job reference to prevent memory leak
+    private var timeoutJob: Job? = null
+
+    // FIXED (2025-12-26): Notification update synchronization with exponential backoff
+    private val notificationLock = Any()
+    private var lastNotificationUpdateTime = 0L
+    private var consecutiveSecurityExceptions = 0
+    private var currentUpdateInterval = 500L // Start at 500ms
 
     override fun onCreate() {
         super.onCreate()
@@ -127,9 +141,25 @@ class SteamInstallMonitorService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        AppLogger.d(TAG, "Service destroyed")
-        fileObserver?.stopWatching()
+        AppLogger.d(TAG, "Service destroyed - starting cleanup")
+
+        // FIXED (2025-12-26): Comprehensive cleanup with job cancellation
+        // Critical: Must cancel all jobs before cancelling scope to prevent zombie coroutines
+
+        // Step 1: Stop FileObserver first to prevent new events
+        // FIXED (2025-12-26): Use new stopWatchingAndCleanup() to prevent race condition
+        fileObserver?.stopWatchingAndCleanup()
+        AppLogger.d(TAG, "FileObserver stopped and cleaned up")
+
+        // Step 2: Cancel timeout job (prevents 2-hour delayed error marking)
+        timeoutJob?.cancel()
+        timeoutJob = null
+        AppLogger.d(TAG, "Timeout job cancelled")
+
+        // Step 3: Cancel all coroutines in service scope
+        // This cancels: startMonitoring, handleInstallComplete, handleManifestChange
         serviceScope.cancel()
+        AppLogger.d(TAG, "Service scope cancelled - all cleanup complete")
     }
 
     /**
@@ -190,8 +220,9 @@ class SteamInstallMonitorService : Service() {
                 )
                 fileObserver?.startWatching()
 
+                // FIXED (2025-12-26): Store timeout job reference for proper cancellation
                 // Set timeout to auto-stop service after 2 hours
-                launch {
+                timeoutJob = launch {
                     delay(TIMEOUT_MILLIS)
                     AppLogger.w(TAG, "Timeout reached (2 hours), stopping service")
 
@@ -222,6 +253,10 @@ class SteamInstallMonitorService : Service() {
 
     /**
      * Handle installation complete event
+     *
+     * FIXED (2025-12-26): Added lifecycle safety with isActive check
+     * - Prevents zombie service if app/service destroyed during 5s delay
+     * - Cancels delay if service already stopped
      */
     private fun handleInstallComplete(manifest: AppManifest, gameId: Long, downloadId: Long) {
         serviceScope.launch {
@@ -245,12 +280,22 @@ class SteamInstallMonitorService : Service() {
                 // Show completion notification
                 updateNotification("${manifest.name} is ready to play!")
 
+                // FIXED (2025-12-26): Check if coroutine is still active before delay
                 // Stop service after 5 seconds (allow user to see notification)
-                delay(5000)
-                stopSelf()
+                if (isActive) {
+                    delay(5000)
+                    if (isActive) {
+                        stopSelf()
+                    }
+                }
 
             } catch (e: Exception) {
-                AppLogger.e(TAG, "Failed to handle install complete", e)
+                if (e is kotlinx.coroutines.CancellationException) {
+                    AppLogger.d(TAG, "Install complete handler cancelled (service destroyed)")
+                    throw e  // Re-throw to propagate cancellation
+                } else {
+                    AppLogger.e(TAG, "Failed to handle install complete", e)
+                }
             }
         }
     }
@@ -289,11 +334,47 @@ class SteamInstallMonitorService : Service() {
 
     /**
      * Update notification message
+     *
+     * FIXED (2025-12-26): Rate-limited notification updates to prevent Android 8+ restrictions
+     * - Prevents SecurityException from high-frequency updates
+     * - Limits updates to max 2 per second (500ms interval)
+     * - Thread-safe with synchronized block
      */
     private fun updateNotification(message: String) {
-        val notification = createNotification(message)
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(NOTIFICATION_ID, notification)
+        synchronized(notificationLock) {
+            val currentTime = System.currentTimeMillis()
+            val timeSinceLastUpdate = currentTime - lastNotificationUpdateTime
+
+            // FIXED (2025-12-26): Use dynamic interval with exponential backoff
+            if (timeSinceLastUpdate < currentUpdateInterval) {
+                AppLogger.d(TAG, "Skipping notification update (rate limit: ${timeSinceLastUpdate}ms < ${currentUpdateInterval}ms)")
+                return
+            }
+
+            try {
+                val notification = createNotification(message)
+                val notificationManager = getSystemService(NotificationManager::class.java)
+                notificationManager.notify(NOTIFICATION_ID, notification)
+                lastNotificationUpdateTime = currentTime
+
+                // FIXED (2025-12-26): Reset backoff on success
+                consecutiveSecurityExceptions = 0
+                currentUpdateInterval = MIN_NOTIFICATION_UPDATE_INTERVAL_MS
+                AppLogger.d(TAG, "Notification updated: $message")
+            } catch (e: SecurityException) {
+                // FIXED (2025-12-26): Exponential backoff on SecurityException
+                // Android 10+ can throw this under load or in Doze mode
+                consecutiveSecurityExceptions++
+                currentUpdateInterval = minOf(
+                    MIN_NOTIFICATION_UPDATE_INTERVAL_MS * (1 shl consecutiveSecurityExceptions), // 2^n backoff
+                    MAX_NOTIFICATION_UPDATE_INTERVAL_MS
+                )
+                AppLogger.w(TAG, "Notification update failed (SecurityException #${consecutiveSecurityExceptions}), backing off to ${currentUpdateInterval}ms")
+            } catch (e: Exception) {
+                // Non-fatal: Log error but continue monitoring
+                AppLogger.w(TAG, "Failed to update notification: ${e.message}")
+            }
+        }
     }
 
 
@@ -301,6 +382,12 @@ class SteamInstallMonitorService : Service() {
      * Recursive FileObserver for monitoring steamapps directory
      *
      * Monitors appmanifest_*.acf files for CREATE and MODIFY events
+     *
+     * FIXED (2025-12-26): Comprehensive concurrent event handling
+     * - Uses synchronized block to prevent race conditions during Job check
+     * - Cancels AND joins previous job to ensure proper cleanup
+     * - Prevents multiple coroutines from accessing the same file concurrently
+     * - CRITICAL FIX: Tracks stopped state to prevent processing queued events after stopWatching()
      */
     private inner class RecursiveFileObserver(
         private val path: String,
@@ -311,8 +398,33 @@ class SteamInstallMonitorService : Service() {
         private val onProgressUpdate: (Int) -> Unit
     ) : FileObserver(path, FileObserver.CREATE or FileObserver.MODIFY) {
 
+        // FIXED (2025-12-26): Track ongoing manifest parsing to prevent concurrent execution
+        private var manifestParsingJob: Job? = null
+        private val jobLock = Any() // Synchronization lock for Job access
+
+        // FIXED (2025-12-26): Use AtomicBoolean for thread-safe stopped flag
+        // Bug: @Volatile ensures atomicity but not memory barrier ordering
+        // Impact: Kernel inotify thread may read stale `false` from cache after stopWatching()
+        // Result: Rare crash "Cannot access database, already closed"
+        // Fix: AtomicBoolean guarantees visibility across threads
+        private val isStopped = java.util.concurrent.atomic.AtomicBoolean(false)
+
+        /**
+         * Stop watching and cancel all ongoing jobs
+         * FIXED (2025-12-26): Sets isStopped flag BEFORE calling super.stopWatching()
+         */
+        fun stopWatchingAndCleanup() {
+            synchronized(jobLock) {
+                isStopped.set(true) // FIXED: AtomicBoolean with memory barrier
+                manifestParsingJob?.cancel() // Cancel ongoing parsing job
+                stopWatching() // Release inotify file descriptor
+            }
+        }
+
         override fun onEvent(event: Int, path: String?) {
-            if (path == null) return
+            // FIXED (2025-12-26): Early exit if observer has been stopped
+            // Prevents processing kernel-buffered inotify events after stopWatching()
+            if (isStopped.get() || path == null) return // FIXED: AtomicBoolean.get()
 
             try {
 
@@ -329,7 +441,18 @@ class SteamInstallMonitorService : Service() {
 
                     if (fileAppId == steamAppId) {
                         AppLogger.d(TAG, "Detected event on target manifest: $path (event=$event)")
-                        handleManifestChange(manifestFile)
+
+                        // FIXED (2025-12-26): Synchronized check to prevent race condition
+                        // Multiple events can arrive during the delay(500) window
+                        synchronized(jobLock) {
+                            if (manifestParsingJob?.isActive == true) {
+                                AppLogger.d(TAG, "Skipping event: manifest parsing already in progress")
+                                return
+                            }
+
+                            // Start new parsing job immediately to block subsequent events
+                            handleManifestChange(manifestFile)
+                        }
                     } else {
                     }
                 }
@@ -340,13 +463,37 @@ class SteamInstallMonitorService : Service() {
 
         /**
          * Handle manifest file change
+         *
+         * FIXED (2025-12-26): Comprehensive error handling and lifecycle safety
+         * - Cancels previous job with join() to ensure cleanup completes
+         * - Handles file deletion/permission errors gracefully
+         * - Checks service lifecycle before accessing repositories
+         * - CRITICAL FIX: Checks if serviceScope is active before launching coroutine
          */
         private fun handleManifestChange(manifestFile: File) {
-            serviceScope.launch {
+            // FIXED (2025-12-26): Check if service is still active before launching coroutine
+            // Prevents launching coroutines after service is destroyed
+            if (!serviceScope.isActive) {
+                AppLogger.d(TAG, "Service scope cancelled, skipping manifest parsing for ${manifestFile.name}")
+                return
+            }
+
+            // Cancel previous job and wait for cleanup (called within synchronized block)
+            val oldJob = manifestParsingJob
+            manifestParsingJob = serviceScope.launch {
                 try {
+                    // FIXED (2025-12-26): Wait for old job to fully complete cancellation
+                    // This prevents two jobs from accessing the same file concurrently
+                    oldJob?.cancelAndJoin()
+
                     // Wait a bit to ensure file write is complete
                     delay(500)
 
+                    // FIXED (2025-12-26): Check if service is still active before file access
+                    if (!isActive) {
+                        AppLogger.d(TAG, "Service destroyed during delay, aborting manifest parsing")
+                        return@launch
+                    }
 
                     if (!manifestFile.exists() || !manifestFile.canRead()) {
                         AppLogger.w(TAG, "Manifest file not readable: ${manifestFile.absolutePath}")
@@ -363,6 +510,12 @@ class SteamInstallMonitorService : Service() {
 
                     val manifest = result.getOrThrow()
                     AppLogger.d(TAG, "Parsed manifest: appId=${manifest.appId}, name=${manifest.name}, stateFlags=${manifest.stateFlags}")
+
+                    // FIXED (2025-12-26): Check service lifecycle before repository access
+                    if (!isActive) {
+                        AppLogger.d(TAG, "Service destroyed during parsing, skipping repository updates")
+                        return@launch
+                    }
 
                     when (manifest.stateFlags) {
                         2 -> {
@@ -388,7 +541,12 @@ class SteamInstallMonitorService : Service() {
                     }
 
                 } catch (e: Exception) {
-                    AppLogger.e(TAG, "Error handling manifest change", e)
+                    if (e is kotlinx.coroutines.CancellationException) {
+                        AppLogger.d(TAG, "Manifest parsing cancelled (expected during cleanup)")
+                        throw e // Re-throw to propagate cancellation
+                    } else {
+                        AppLogger.e(TAG, "Error handling manifest change", e)
+                    }
                 }
             }
         }

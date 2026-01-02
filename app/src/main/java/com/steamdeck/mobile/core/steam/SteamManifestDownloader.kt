@@ -185,22 +185,32 @@ class SteamManifestDownloader @Inject constructor(
             val body = response.body ?: throw Exception("Empty response body for ${pkg.name}")
             val totalBytes = body.contentLength()
 
-            outputFile.outputStream().use { output ->
+            // PERFORMANCE: Use 128KB buffer instead of 8KB (16x improvement)
+            outputFile.outputStream().buffered(131072).use { output ->  // 128KB buffered output
                 body.byteStream().use { input ->
-                    val buffer = ByteArray(8192)
+                    val buffer = ByteArray(131072)  // 128KB buffer for faster downloads
                     var bytesRead: Int
                     var totalBytesRead = 0L
+
+                    // Report progress every 512KB (optimized for large packages)
+                    var lastReportedBytes = 0L
+                    val reportInterval = 524288L // 512KB (reduced callback overhead)
 
                     while (input.read(buffer).also { bytesRead = it } != -1) {
                         output.write(buffer, 0, bytesRead)
                         totalBytesRead += bytesRead
 
-                        if (totalBytesRead % (1024 * 1024) == 0L) { // Report every 1MB
+                        // Report progress if we've crossed the next 512KB boundary
+                        if (totalBytesRead - lastReportedBytes >= reportInterval) {
                             progressCallback?.invoke(totalBytesRead)
+                            lastReportedBytes = totalBytesRead
+                            AppLogger.d(TAG, "Downloaded ${totalBytesRead / 1024}KB / ${totalBytes / 1024}KB (${totalBytesRead * 100 / totalBytes}%)")
                         }
                     }
 
+                    // Final progress report
                     progressCallback?.invoke(totalBytesRead)
+                    AppLogger.i(TAG, "Package download completed: ${totalBytesRead / 1024}KB")
                     totalBytesRead
                 }
             }

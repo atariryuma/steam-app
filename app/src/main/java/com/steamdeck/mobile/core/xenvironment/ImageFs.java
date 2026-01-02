@@ -17,7 +17,7 @@ public class ImageFs {
     public static final String CONFIG_PATH = "/home/"+USER+"/.config";
     public static final String WINEPREFIX = "/home/"+USER+"/.wine";
     private final File rootDir;
-    private String winePath = "/opt/wine";
+    private String winePath = null;  // CRITICAL FIX (2025-12-27): Dynamically detect Proton vs Wine
 
     private ImageFs(File rootDir) {
         this.rootDir = rootDir;
@@ -60,6 +60,24 @@ public class ImageFs {
     }
 
     public String getWinePath() {
+        // CRITICAL FIX (2025-12-27): Dynamically detect Proton 10 vs Wine 10.10
+        // Proton 10: Wine binaries at /lib/wine/aarch64-windows/
+        // Wine 10.10: Wine binaries at /opt/wine/lib/wine/x86_64-windows/
+        if (winePath == null) {
+            File protonBinDir = new File(rootDir, "/bin/wine");
+            File wineBinDir = new File(rootDir, "/opt/wine/bin/wine");
+
+            if (protonBinDir.exists()) {
+                // Proton 10 ARM64EC: binaries at root level (/bin, /lib)
+                winePath = "";
+            } else if (wineBinDir.exists()) {
+                // Wine 10.10: binaries in /opt/wine subdirectory
+                winePath = "/opt/wine";
+            } else {
+                // Fallback to Wine structure (most common)
+                winePath = "/opt/wine";
+            }
+        }
         return winePath;
     }
 

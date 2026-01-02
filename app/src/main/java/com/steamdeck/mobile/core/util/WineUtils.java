@@ -193,8 +193,19 @@ public abstract class WineUtils {
             setWindowMetrics(registryEditor);
         }
 
-        File wineSystem32Dir = new File(rootDir, "/opt/wine/lib/wine/x86_64-windows");
-        File wineSysWoW64Dir = new File(rootDir, "/opt/wine/lib/wine/i386-windows");
+        // CRITICAL FIX (2025-12-27): Dynamic Proton/Wine architecture detection
+        ImageFs imageFs = ImageFs.find(context);
+        String wineBasePath = imageFs.getWinePath();  // Returns "" for Proton, "/opt/wine" for Wine
+
+        // Detect 64-bit architecture (aarch64-windows for Proton, x86_64-windows for Wine)
+        String wine64Arch = "x86_64-windows";
+        File aarch64Dir = new File(rootDir, wineBasePath + "/lib/wine/aarch64-windows");
+        if (aarch64Dir.exists()) {
+            wine64Arch = "aarch64-windows";
+        }
+
+        File wineSystem32Dir = new File(rootDir, wineBasePath + "/lib/wine/" + wine64Arch);
+        File wineSysWoW64Dir = new File(rootDir, wineBasePath + "/lib/wine/i386-windows");
         File containerSystem32Dir = new File(rootDir, ImageFs.WINEPREFIX+"/drive_c/windows/system32");
         File containerSysWoW64Dir = new File(rootDir, ImageFs.WINEPREFIX+"/drive_c/windows/syswow64");
 

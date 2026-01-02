@@ -164,14 +164,25 @@ class SteamInstallerService @Inject constructor(
    var bytesDownloaded = 0L
 
    responseBody.byteStream().use { input ->
-    setupFile.outputStream().buffered().use { output ->
-     val buffer = ByteArray(8192)
+    setupFile.outputStream().buffered(65536).use { output ->  // 64KB buffer (8x improvement)
+     // PERFORMANCE: Use 64KB buffer instead of 8KB (8x fewer I/O operations)
+     val buffer = ByteArray(65536)  // 64KB buffer for faster downloads
      var bytes: Int
+     var lastReportedBytes = 0L
+     val reportInterval = 131072L  // Report every 128KB (reduces callback overhead)
+
      while (input.read(buffer).also { bytes = it } >= 0) {
       output.write(buffer, 0, bytes)
       bytesDownloaded += bytes
-      onProgress?.invoke(bytesDownloaded, contentLength)
+
+      // Report progress every 128KB or on completion (reduces UI thread overhead)
+      if (bytesDownloaded - lastReportedBytes >= reportInterval || bytes < buffer.size) {
+       onProgress?.invoke(bytesDownloaded, contentLength)
+       lastReportedBytes = bytesDownloaded
+      }
      }
+     // Final progress report
+     onProgress?.invoke(bytesDownloaded, contentLength)
      // Ensure all data is written to disk
      output.flush()
     }

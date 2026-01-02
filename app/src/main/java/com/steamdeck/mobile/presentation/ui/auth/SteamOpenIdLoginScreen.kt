@@ -2,6 +2,9 @@ package com.steamdeck.mobile.presentation.ui.auth
 
 import com.steamdeck.mobile.core.logging.AppLogger
 
+import android.webkit.ConsoleMessage
+import android.webkit.CookieManager
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -72,12 +75,19 @@ fun SteamOpenIdLoginScreen(
   AndroidView(
    factory = { context ->
     WebView(context).apply {
+     // Enable cookies for Steam session management (CRITICAL for OpenID login)
+     val cookieManager = CookieManager.getInstance()
+     cookieManager.setAcceptCookie(true)
+     cookieManager.setAcceptThirdPartyCookies(this, true)
+
      settings.apply {
       javaScriptEnabled = true // Required for Steam login form
       domStorageEnabled = true // Session management
       setSupportMultipleWindows(false)
       loadWithOverviewMode = true
       useWideViewPort = true
+      // Enable debugging for WebView console logs
+      android.webkit.WebView.setWebContentsDebuggingEnabled(true)
      }
 
      webViewClient = object : WebViewClient() {
@@ -86,7 +96,7 @@ fun SteamOpenIdLoginScreen(
        request: WebResourceRequest?
       ): Boolean {
        val url = request?.url.toString()
-       AppLogger.d("SteamOpenIdLogin", "URL redirect: $url")
+       AppLogger.d("SteamOpenIdLogin", "🔄 URL redirect: $url")
 
        // Detect callback URL (localhost/127.0.0.1 callback interception)
        // Check both localhost and 127.0.0.1 for compatibility
@@ -97,11 +107,25 @@ fun SteamOpenIdLoginScreen(
         return true // Prevent WebView from trying to load localhost
        }
 
+       // Allow Steam Store login page (OpenID redirects here when not logged in)
+       // After login, Steam will redirect back to OpenID flow automatically
+       if (url.contains("store.steampowered.com/login") ||
+           url.contains("steamcommunity.com/login")) {
+        AppLogger.d("SteamOpenIdLogin", "🔑 Steam login page detected, allowing navigation")
+        return false // Allow WebView to load Steam login page
+       }
+
+       // Track OpenID flow URLs
+       if (url.contains("steamcommunity.com/openid")) {
+        AppLogger.d("SteamOpenIdLogin", "🔐 OpenID flow URL: $url")
+       }
+
        return false
       }
 
       override fun onPageFinished(view: WebView?, url: String?) {
        super.onPageFinished(view, url)
+       AppLogger.d("SteamOpenIdLogin", "📄 Page loaded: $url")
        isLoading = false
       }
 
@@ -113,6 +137,16 @@ fun SteamOpenIdLoginScreen(
       ) {
        super.onReceivedError(view, errorCode, description, failingUrl)
        onError("Page load error: $description")
+      }
+     }
+
+     // Enable JavaScript console logging
+     webChromeClient = object : WebChromeClient() {
+      override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+       consoleMessage?.let {
+        AppLogger.d("SteamOpenIdLogin", "🖥️ JS Console [${it.messageLevel()}]: ${it.message()} (${it.sourceId()}:${it.lineNumber()})")
+       }
+       return true
       }
      }
 

@@ -41,7 +41,9 @@ class WinlatorEmulator @Inject constructor(
  private val processMonitor: ProcessMonitor,
  private val wineMonoInstaller: WineMonoInstaller,
  private val wineGeckoInstaller: com.steamdeck.mobile.core.wine.WineGeckoInstaller,
- private val gpuDetector: com.steamdeck.mobile.core.util.GpuDetector
+ private val gpuDetector: com.steamdeck.mobile.core.util.GpuDetector,
+ private val versionManager: ComponentVersionManager,
+ private val protonManager: com.steamdeck.mobile.core.proton.ProtonManager
 ) : WindowsEmulator {
 
  override val name: String = "Winlator"
@@ -51,15 +53,34 @@ class WinlatorEmulator @Inject constructor(
  private val box64Dir = File(dataDir, "box64")
  private val prootDir = File(dataDir, "proot")
  private val rootfsDir = File(dataDir, "rootfs")
- private val wineDir = File(rootfsDir, "opt/wine")
  private val containersDir = File(dataDir, "containers")
+
+ // Cached Wine/Proton directory (prevents race condition during initialization)
+ // FIXED (2025-12-26): Remove lazy delegate for runtime flexibility
+ // Bug: lazy{} caches first evaluation, ignoring runtime config changes
+ // Impact: If Proton setting changes, wineDir returns wrong path
+ // Fix: Use getter to re-evaluate on each access (future-proof for Settings toggle)
+ private val wineDir: File
+  get() = if (versionManager.isProtonEnabled()) {
+   rootfsDir  // Proton: binaries in /bin/wine directly
+  } else {
+   File(rootfsDir, "opt/wine")  // Wine: binaries in /opt/wine/bin/wine
+  }
 
  // Binary paths (extracted from assets at runtime)
  private val prootBinary = File(prootDir, "proot")
  private val box64Binary = File(box64Dir, "box64")
- private val wineBinary = File(wineDir, "bin/wine")
- private val winebootBinary = File(wineDir, "bin/wineboot")
- private val wineserverBinary = File(wineDir, "bin/wineserver")
+
+ // FIXED (2025-12-27): Remove lazy delegate to match wineDir behavior
+ // Bug: lazy{} caches wineDir at first access, but wineDir is a getter that re-evaluates
+ // Impact: If Proton enabled, winebootBinary still points to old Wine path
+ // Fix: Use getters to re-evaluate on each access (matches wineDir behavior)
+ private val wineBinary: File
+  get() = File(wineDir, "bin/wine")
+ private val winebootBinary: File
+  get() = File(wineDir, "bin/wineboot")
+ private val wineserverBinary: File
+  get() = File(wineDir, "bin/wineserver")
 
  // Active processes map (processId -> ProcessInfo) - Thread-safe for concurrent access
  private val activeProcesses = ConcurrentHashMap<String, ProcessInfo>()
@@ -76,18 +97,13 @@ class WinlatorEmulator @Inject constructor(
  companion object {
   private const val TAG = "WinlatorEmulator"
 
-  // Box64 assets
-  private const val BOX64_ASSET = "winlator/box64-0.3.4.txz" // Downgraded from v0.3.6 for stability
+  // Configuration assets
   private const val BOX64_RC_ASSET = "winlator/default.box64rc"
   private const val ENV_VARS_ASSET = "winlator/env_vars.json"
 
-  // Rootfs assets (contains Wine 9.0+)
-  private const val ROOTFS_ASSET = "winlator/rootfs.txz"
-
-  // PRoot asset for SELinux compatibility
-  // CRITICAL FIX: Use Termux proot (proven compatible with Android)
-  // Previous v5.3.0 was incompatible and crashed with SIGSEGV
-  private const val PROOT_ASSET = "winlator/proot-termux-aarch64.txz"
+  // NOTE: Box64, Rootfs, PRoot asset paths now managed by ComponentVersionManager
+  // See component_versions.json for version configuration
+  // Benefits: Easy updates without code changes, single source of truth
 
   // Process management timeouts
   private const val OUTPUT_DRAIN_TIMEOUT_MS = 2000L  // Timeout for output reading completion
@@ -118,9 +134,14 @@ class WinlatorEmulator @Inject constructor(
    const val CONFIG_START = 0.30f
    const val CONFIG_END = 0.40f
 
-   // Step 4: Wine rootfs extraction (60% of total - largest component, 53MB)
+   // Step 4: Wine/Proton rootfs extraction (60% of total)
+   // Includes: Proton rootfs (0.4-0.96) + glibc extraction (0.96-0.98) + linker setup (0.98-1.0)
    const val WINE_START = 0.40f
    const val WINE_END = 1.00f
+   const val GLIBC_START = 0.96f  // Proton only: glibc extraction from Wine
+   const val GLIBC_END = 0.98f
+   const val LINKER_START = 0.98f // Linker symlink setup
+   const val LINKER_END = 1.00f
   }
 
   /**
@@ -176,10 +197,12 @@ class WinlatorEmulator @Inject constructor(
    if (!prootBinary.exists()) {
     progressCallback?.invoke(ProgressRanges.PROOT_START, "Extracting PRoot binary...")
 
-    // Extract proot.txz from assets (Termux proot - Android-compatible)
-    val prootTxzFile = File(prootDir, "proot-termux-aarch64.txz")
+    // Extract proot from assets (version managed by ComponentVersionManager)
+    val prootAssetPath = versionManager.getProotAssetPath()
+    val prootFileName = prootAssetPath.substringAfterLast('/')
+    val prootTxzFile = File(prootDir, prootFileName)
     if (!prootTxzFile.exists()) {
-     extractAsset(PROOT_ASSET, prootTxzFile)
+     extractAsset(prootAssetPath, prootTxzFile)
      // Asset copy progress (5% of PRoot range)
      val assetCopyProgress = mapProgress(0.25f, ProgressRanges.PROOT_START, ProgressRanges.PROOT_END)
      progressCallback?.invoke(assetCopyProgress, "PRoot asset copied")
@@ -279,10 +302,12 @@ class WinlatorEmulator @Inject constructor(
    if (!box64Binary.exists()) {
     progressCallback?.invoke(ProgressRanges.BOX64_START, "Extracting Box64 binary...")
 
-    // Extract box64.txz from assets
-    val box64TxzFile = File(box64Dir, "box64-0.3.4.txz")
+    // Extract box64 from assets (version managed by ComponentVersionManager)
+    val box64AssetPath = versionManager.getBox64AssetPath()
+    val box64FileName = box64AssetPath.substringAfterLast('/')
+    val box64TxzFile = File(box64Dir, box64FileName)
     if (!box64TxzFile.exists()) {
-     extractAsset(BOX64_ASSET, box64TxzFile)
+     extractAsset(box64AssetPath, box64TxzFile)
      // Asset copy progress (approx. 13% of Box64 range: 0.15->0.17 is 13%)
      val assetCopyProgress = mapProgress(0.13f, ProgressRanges.BOX64_START, ProgressRanges.BOX64_END)
      progressCallback?.invoke(assetCopyProgress, "Box64 asset copied")
@@ -389,17 +414,34 @@ class WinlatorEmulator @Inject constructor(
 
    progressCallback?.invoke(ProgressRanges.CONFIG_END, "Configuration files ready")
 
-   // Step 4: Extract Rootfs/Wine support files (0.4 - 1.0)
-   if (!File(wineDir, "bin").exists()) {
-    progressCallback?.invoke(ProgressRanges.WINE_START, "Extracting Wine rootfs (53MB)...")
+   // Step 4: Extract Rootfs/Wine or Proton support files (0.4 - 1.0)
+   // CRITICAL: Check if runtime version has changed (Wine <-> Proton switch)
+   // We must re-extract rootfs if user switches runtimes in component_versions.json
+   val activeVersion = versionManager.getActiveVersion()
+   val rootfsAssetPath = versionManager.getActiveRootfsPath()
+   val runtimeMarkerFile = File(dataDir, ".active_runtime")
+   val currentRuntime = if (runtimeMarkerFile.exists()) runtimeMarkerFile.readText().trim() else ""
+   val needsExtraction = !File(wineDir, "bin").exists() || currentRuntime != activeVersion
 
-    // Extract rootfs.txz from assets
-    val rootfsTxzFile = File(dataDir, "rootfs.txz")
-    if (!rootfsTxzFile.exists()) {
-     extractAsset(ROOTFS_ASSET, rootfsTxzFile)
+   if (needsExtraction) {
+    if (currentRuntime.isNotEmpty() && currentRuntime != activeVersion) {
+     AppLogger.i(TAG, "Runtime change detected: '$currentRuntime' -> '$activeVersion'")
+     AppLogger.i(TAG, "Deleting old rootfs to switch runtime...")
+     // Delete old rootfs to avoid Wine/Proton binary conflicts
+     wineDir.deleteRecursively()
+     rootfsDir.mkdirs()
     }
 
-    progressCallback?.invoke(ProgressRanges.WINE_START, "Decompressing Wine rootfs...")
+    progressCallback?.invoke(ProgressRanges.WINE_START, "Extracting $activeVersion rootfs...")
+
+    // Extract rootfs from assets (Wine or Proton based on configuration)
+    val rootfsFileName = rootfsAssetPath.substringAfterLast('/')
+    val rootfsTxzFile = File(dataDir, rootfsFileName)
+    if (!rootfsTxzFile.exists()) {
+     extractAsset(rootfsAssetPath, rootfsTxzFile)
+    }
+
+    progressCallback?.invoke(ProgressRanges.WINE_START, "Decompressing $activeVersion rootfs...")
 
     // Extract .txz archive
     if (rootfsTxzFile.exists()) {
@@ -418,7 +460,16 @@ class WinlatorEmulator @Inject constructor(
        wineBinary.setExecutable(true, false)
        AppLogger.i(TAG, "Wine binary ready: ${wineBinary.absolutePath}")
 
-       // Set wineserver executable
+       // Set executable permissions for all Wine binaries
+       val binDir = File(wineDir, "bin")
+       binDir.listFiles()?.forEach { file ->
+        if (file.isFile) {
+         file.setExecutable(true, false)
+        }
+       }
+       AppLogger.i(TAG, "Set executable permissions for ${binDir.listFiles()?.size ?: 0} files in ${binDir.absolutePath}")
+
+       // Set wineserver executable (already covered by listFiles, but keep for clarity)
        val wineserver = File(wineDir, "bin/wineserver")
        if (wineserver.exists()) {
         wineserver.setExecutable(true, false)
@@ -444,6 +495,68 @@ class WinlatorEmulator @Inject constructor(
        AppLogger.d(TAG, ".img_version file already exists (version ${imageFs.getVersion()})")
       }
 
+      // PROTON SUPPORT: Extract prefixPack.txz if using Proton
+      if (versionManager.isProtonEnabled()) {
+       val prefixPackFilename = versionManager.getProtonPrefixPack()
+       if (prefixPackFilename != null) {
+        val prefixPackFile = File(rootfsDir, prefixPackFilename)
+        if (prefixPackFile.exists()) {
+         progressCallback?.invoke(ProgressRanges.WINE_END, "Extracting Proton Wine prefix template...")
+         AppLogger.i(TAG, "Extracting Proton prefix pack: $prefixPackFilename...")
+         try {
+          // Extract prefixPack.txz to rootfs directory
+          zstdDecompressor.extractTxz(
+           txzFile = prefixPackFile,
+           targetDir = rootfsDir
+          ) { extractProgress, status ->
+           // Map progress to small range after Wine extraction (0.96 - 1.0)
+           val overallProgress = 0.96f + (extractProgress * 0.04f)
+           progressCallback?.invoke(overallProgress, "Extracting Proton prefix: ${(extractProgress * 100).toInt()}%")
+           AppLogger.d(TAG, "PrefixPack extraction: ${(extractProgress * 100).toInt()}% - $status")
+          }.onSuccess {
+           AppLogger.i(TAG, "Proton prefix pack extracted successfully")
+           progressCallback?.invoke(1.0f, "Proton prefix template ready")
+           // Delete temporary prefixPack file
+           prefixPackFile.delete()
+           AppLogger.d(TAG, "Cleaned up $prefixPackFilename")
+          }.onFailure { error ->
+           AppLogger.w(TAG, "Failed to extract prefixPack (non-fatal): ${error.message}")
+           // Continue even if prefixPack extraction fails (non-fatal)
+          }
+         } catch (e: Exception) {
+          AppLogger.w(TAG, "PrefixPack extraction error (non-fatal)", e)
+         }
+        } else {
+         AppLogger.d(TAG, "PrefixPack file not found: ${prefixPackFile.absolutePath}")
+        }
+       }
+      }
+
+      // CRITICAL: Extract glibc from Wine 10.10 if using Proton
+      // Proton rootfs lacks glibc system libraries (no usr/ directory)
+      // Box64 requires glibc dynamic linker for execution
+      if (versionManager.isProtonEnabled()) {
+       progressCallback?.invoke(0.96f, "Extracting glibc system libraries...")
+       AppLogger.i(TAG, "Proton detected, extracting glibc from Wine 10.10 rootfs...")
+
+       val glibcResult = extractGlibcFromWine(
+        targetRootfsDir = rootfsDir
+       ) { glibcProgress, status ->
+        // Map glibc extraction progress (0.0-1.0) to range 0.96-0.98
+        val overallProgress = 0.96f + (glibcProgress * 0.02f)
+        progressCallback?.invoke(overallProgress, status)
+       }
+
+       if (glibcResult.isFailure) {
+        AppLogger.e(TAG, "Glibc extraction failed: ${glibcResult.exceptionOrNull()?.message}")
+        return@withContext Result.failure(
+         EmulatorException("Failed to extract glibc for Proton: ${glibcResult.exceptionOrNull()?.message}")
+        )
+       }
+
+       AppLogger.i(TAG, "Glibc extraction successful for Proton")
+      }
+
       // Setup hardcoded linker path now that rootfs is extracted
       setupHardcodedLinkerPath()
       AppLogger.d(TAG, "setupHardcodedLinkerPath() completed")
@@ -454,44 +567,54 @@ class WinlatorEmulator @Inject constructor(
       // Wine/Box64 commands with proot to bind our actual rootfs to the hardcoded path
       // See wineboot/wineserver/launchExecutable command construction
 
-      // CRITICAL FIX: Short Symlink Strategy for PT_INTERP size limit
-      // Problem: actualLinker path is 89 chars, PT_INTERP limit is 63 bytes
-      // Solution: Create short symlink (~43 chars) pointing to actual glibc linker
+      // CRITICAL FIX (2025-12-27): PT_INTERP size limit workaround
+      // Problem: PT_INTERP field is only 63 bytes, but full path is 87 bytes
+      // Solution: Create SHORT symlink at /data/user/0/.../files/l pointing to actual linker
       AppLogger.d(TAG, "Starting Box64 interpreter path patch...")
       val actualLinker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
+
+      // CRITICAL: Use SHORT symlink path (fits in 63-byte PT_INTERP limit)
+      // Short path: /data/user/0/com.steamdeck.mobile.debug/files/l (47 chars)
+      // Points to: rootfs/lib/ld-linux-aarch64.so.1 (which points to ../usr/lib/ld-linux-aarch64.so.1)
       val shortLinkerSymlink = File(context.filesDir, "l")
+      val interpreterShortPath = shortLinkerSymlink.absolutePath
 
       AppLogger.d(TAG, "actualLinker: ${actualLinker.absolutePath} (${actualLinker.absolutePath.length} chars)")
-      AppLogger.d(TAG, "shortSymlink: ${shortLinkerSymlink.absolutePath} (${shortLinkerSymlink.absolutePath.length} chars)")
+      AppLogger.d(TAG, "shortLinkerPath: $interpreterShortPath (${interpreterShortPath.length} chars)")
 
       if (actualLinker.exists() && box64Binary.exists()) {
        try {
-        // Remove old symlink if exists
-        if (shortLinkerSymlink.exists()) {
-         shortLinkerSymlink.delete()
-         AppLogger.d(TAG, "Removed existing symlink")
+        // Step 1: Ensure rootfs/lib/ld-linux-aarch64.so.1 symlink exists
+        val rootfsLibLinker = File(rootfsDir, "lib/ld-linux-aarch64.so.1")
+        if (!rootfsLibLinker.exists()) {
+         val libDir = File(rootfsDir, "lib")
+         libDir.mkdirs()
+
+         val relativeLinkerPath = "../usr/lib/ld-linux-aarch64.so.1"
+         ProcessBuilder("ln", "-s", relativeLinkerPath, rootfsLibLinker.absolutePath)
+          .redirectErrorStream(true)
+          .start()
+          .waitFor()
+         AppLogger.i(TAG, "Created rootfs linker symlink: ${rootfsLibLinker.absolutePath} -> $relativeLinkerPath")
         }
 
-        // Create symlink using native Android API (no external commands)
-        Os.symlink(actualLinker.absolutePath, shortLinkerSymlink.absolutePath)
-        AppLogger.i(TAG, "Created symlink: ${shortLinkerSymlink.absolutePath} -> ${actualLinker.absolutePath}")
-
-        // Verify symlink
+        // Step 2: Create SHORT symlink at /data/user/0/.../files/l
         if (!shortLinkerSymlink.exists()) {
-         AppLogger.e(TAG, "Symlink creation failed - file doesn't exist")
-         return@withContext Result.failure(
-          EmulatorException("Failed to create linker symlink")
-         )
+         ProcessBuilder("ln", "-s", rootfsLibLinker.absolutePath, shortLinkerSymlink.absolutePath)
+          .redirectErrorStream(true)
+          .start()
+          .waitFor()
+         AppLogger.i(TAG, "Created short linker symlink: ${shortLinkerSymlink.absolutePath} -> ${rootfsLibLinker.absolutePath}")
         }
 
-        // Patch Box64 to use short symlink path
+        // Step 3: Patch Box64 to use SHORT symlink path
         val patchResult = ElfPatcher.patchInterpreterPath(
          box64Binary,
-         shortLinkerSymlink.absolutePath
+         interpreterShortPath
         )
 
         if (patchResult.isSuccess) {
-         AppLogger.i(TAG, "Successfully patched Box64 interpreter to: ${shortLinkerSymlink.absolutePath}")
+         AppLogger.i(TAG, "Successfully patched Box64 interpreter to: $interpreterShortPath")
         } else {
          AppLogger.e(TAG, "Failed to patch Box64 interpreter", patchResult.exceptionOrNull())
          return@withContext Result.failure(
@@ -517,6 +640,15 @@ class WinlatorEmulator @Inject constructor(
       // Wine+Box64 needs libfreetype.so.6 for font rendering (Steam installer GUI)
       // Rootfs has libfreetype.so.6.20.2 but no .so.6 symlink → "cannot find FreeType library"
       setupLibrarySymlinks()
+
+      // CRITICAL: Write runtime marker file to track active Wine/Proton version
+      // This allows detecting runtime switches and re-extracting when needed
+      try {
+       runtimeMarkerFile.writeText(activeVersion)
+       AppLogger.d(TAG, "Runtime marker written: $activeVersion")
+      } catch (e: Exception) {
+       AppLogger.w(TAG, "Failed to write runtime marker (non-fatal)", e)
+      }
      }.onFailure { error ->
       AppLogger.e(TAG, "Rootfs extraction failed: ${error.message}", error)
       return@withContext Result.failure(
@@ -525,35 +657,72 @@ class WinlatorEmulator @Inject constructor(
      }
     }
    } else {
-    AppLogger.i(TAG, "Wine already extracted, skipping")
+    AppLogger.i(TAG, "Wine already extracted, skipping (active runtime: $activeVersion)")
+
+    // Update runtime marker if it doesn't match (shouldn't happen, but defensive programming)
+    if (currentRuntime != activeVersion) {
+     try {
+      runtimeMarkerFile.writeText(activeVersion)
+      AppLogger.i(TAG, "Updated runtime marker: '$currentRuntime' -> '$activeVersion'")
+     } catch (e: Exception) {
+      AppLogger.w(TAG, "Failed to update runtime marker (non-fatal)", e)
+     }
+    }
+
+    // Ensure Wine binaries have executable permissions (even if already extracted)
+    val binDir = File(wineDir, "bin")
+    if (binDir.exists()) {
+     binDir.listFiles()?.forEach { file ->
+      if (file.isFile && !file.canExecute()) {
+       file.setExecutable(true, false)
+      }
+     }
+     AppLogger.d(TAG, "Verified executable permissions for Wine binaries")
+    }
+
     // Ensure linker is setup even if rootfs was already extracted
     setupHardcodedLinkerPath()
 
     // NOTE: Wine hardcoded paths now handled by proot (see command construction)
 
-    // CRITICAL FIX: Short Symlink Strategy (also needed when Wine already extracted)
+    // CRITICAL FIX (2025-12-27): PT_INTERP size limit workaround
     val actualLinker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
     val shortLinkerSymlink = File(context.filesDir, "l")
+    val interpreterShortPath = shortLinkerSymlink.absolutePath
 
     if (actualLinker.exists() && box64Binary.exists()) {
      try {
-      // Remove old symlink if exists
-      if (shortLinkerSymlink.exists()) {
-       shortLinkerSymlink.delete()
+      // Step 1: Ensure rootfs/lib/ld-linux-aarch64.so.1 symlink exists
+      val rootfsLibLinker = File(rootfsDir, "lib/ld-linux-aarch64.so.1")
+      if (!rootfsLibLinker.exists()) {
+       val libDir = File(rootfsDir, "lib")
+       libDir.mkdirs()
+
+       val relativeLinkerPath = "../usr/lib/ld-linux-aarch64.so.1"
+       ProcessBuilder("ln", "-s", relativeLinkerPath, rootfsLibLinker.absolutePath)
+        .redirectErrorStream(true)
+        .start()
+        .waitFor()
+       AppLogger.i(TAG, "Created rootfs linker symlink: ${rootfsLibLinker.absolutePath} -> $relativeLinkerPath")
       }
 
-      // Create symlink using native Android API
-      Os.symlink(actualLinker.absolutePath, shortLinkerSymlink.absolutePath)
-      AppLogger.i(TAG, "Created symlink: ${shortLinkerSymlink.absolutePath} -> ${actualLinker.absolutePath}")
+      // Step 2: Create SHORT symlink at /data/user/0/.../files/l
+      if (!shortLinkerSymlink.exists()) {
+       ProcessBuilder("ln", "-s", rootfsLibLinker.absolutePath, shortLinkerSymlink.absolutePath)
+        .redirectErrorStream(true)
+        .start()
+        .waitFor()
+       AppLogger.i(TAG, "Created short linker symlink: ${shortLinkerSymlink.absolutePath} -> ${rootfsLibLinker.absolutePath}")
+      }
 
-      // Patch Box64 to use short symlink path
+      // Step 3: Patch Box64 to use SHORT symlink path
       val patchResult = ElfPatcher.patchInterpreterPath(
        box64Binary,
-       shortLinkerSymlink.absolutePath
+       interpreterShortPath
       )
 
       if (patchResult.isSuccess) {
-       AppLogger.i(TAG, "Successfully patched Box64 with short symlink")
+       AppLogger.i(TAG, "Successfully patched Box64 interpreter to: $interpreterShortPath")
       } else {
        AppLogger.e(TAG, "Box64 patch failed", patchResult.exceptionOrNull())
       }
@@ -662,7 +831,9 @@ class WinlatorEmulator @Inject constructor(
    // Wine 9.2+ WoW64 mode requires these DLLs to run 32-bit Windows executables
    try {
     val system32Dir = File(containerDir, "drive_c/windows/system32")
-    val wineLibDir = File(wineDir, "lib/wine/x86_64-windows")
+    // CRITICAL FIX (2025-12-27): Proton 10.0 ARM64EC uses aarch64-windows
+    val wineLibDir = File(wineDir, "lib/wine/aarch64-windows").takeIf { it.exists() }
+     ?: File(wineDir, "lib/wine/x86_64-windows")
     // WoW64 core DLLs + dependencies required for 32-bit app execution
     val wow64Dlls = listOf(
      "wow64.dll",       // WoW64 core
@@ -940,13 +1111,24 @@ class WinlatorEmulator @Inject constructor(
    // Priority: Game DLLs first, then Wine system DLLs (both 32-bit and 64-bit)
    // This allows Wine to find both game-specific DLLs (ffmpeg.dll) and Windows system DLLs (winhttp.dll)
    // IMPORTANT: Use proot-virtualized path for Wine system DLLs (rootfs is mounted to /data/data/com.winlator/files/rootfs)
-   // CRITICAL: Include both i386-windows (32-bit) and x86_64-windows (64-bit) for WoW64 support
+   // CRITICAL FIX (2025-12-27): Proton 10.0 ARM64EC uses aarch64-windows instead of x86_64-windows
    executable.parentFile?.let { exeDir ->
-    val wine32DllPath = "/data/data/com.winlator/files/rootfs/opt/wine/lib/wine/i386-windows"
-    val wine64DllPath = "/data/data/com.winlator/files/rootfs/opt/wine/lib/wine/x86_64-windows"
+    // CRITICAL FIX (2025-12-27): Dynamic Wine/Proton path detection
+    val winePathPrefix = if (versionManager.isProtonEnabled()) {
+     "/data/data/com.winlator/files/rootfs"  // Proton: binaries in /rootfs/lib/wine/
+    } else {
+     "/data/data/com.winlator/files/rootfs/opt/wine"  // Wine: binaries in /rootfs/opt/wine/lib/wine/
+    }
+    val wine32DllPath = "$winePathPrefix/lib/wine/i386-windows"
+    // Detect Proton (aarch64-windows) vs Wine (x86_64-windows)
+    val wine64DllPath = if (File(wineDir, "lib/wine/aarch64-windows").exists()) {
+     "$winePathPrefix/lib/wine/aarch64-windows"
+    } else {
+     "$winePathPrefix/lib/wine/x86_64-windows"
+    }
     val combinedPath = "${exeDir.absolutePath}:${wine32DllPath}:${wine64DllPath}"
     environmentVars["WINEDLLPATH"] = combinedPath
-    AppLogger.d(TAG, "Set WINEDLLPATH: $combinedPath")
+    AppLogger.d(TAG, "Set WINEDLLPATH (${if (versionManager.isProtonEnabled()) "Proton" else "Wine"}): $combinedPath")
    }
 
    // Additional Box64/Wine optimizations for Steam (merged from both implementations)
@@ -1023,7 +1205,19 @@ class WinlatorEmulator @Inject constructor(
    env.clear()
    env.putAll(environmentVars)
    // CRITICAL: Set LD_LIBRARY_PATH via environment (not as proot argument)
-   env["LD_LIBRARY_PATH"] = rootfsLibraryPath
+   // CRITICAL FIX (2025-12-27): For Proton 10.0 ARM64EC, use Proot virtualized paths
+   val isProton = versionManager.isProtonEnabled()
+   val wine64Unix = if (File(wineDir, "lib/wine/aarch64-unix").exists()) "aarch64-unix" else "x86_64-unix"
+   val ldLibraryPath = if (isProton) {
+    "/data/data/com.winlator/files/rootfs/usr/lib:" +
+     "/data/data/com.winlator/files/rootfs/lib:" +
+     "/data/data/com.winlator/files/rootfs/bin"
+   } else {
+    "$rootfsLibraryPath:" +
+     "${wineDir.absolutePath}/lib:" +
+     "${wineDir.absolutePath}/lib/wine/$wine64Unix"
+   }
+   env["LD_LIBRARY_PATH"] = ldLibraryPath
    processBuilder.redirectErrorStream(true)
 
    // WORKING DIRECTORY FIX: Set to executable's parent directory
@@ -1357,14 +1551,28 @@ class WinlatorEmulator @Inject constructor(
 
    // Paths
    put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}")
-   put(
-    "LD_LIBRARY_PATH",
+   // CRITICAL FIX (2025-12-27): Proton 10.0 ARM64EC uses aarch64-unix/aarch64-windows
+   val wine64Dir = if (File(wineDir, "lib/wine/aarch64-windows").exists()) "aarch64-windows" else "x86_64-windows"
+   val wine64Unix = if (File(wineDir, "lib/wine/aarch64-unix").exists()) "aarch64-unix" else "x86_64-unix"
+
+   // CRITICAL FIX (2025-12-27): For Proton 10.0 ARM64EC, use Proot virtualized paths
+   // Proton Wine binary is ARM64 native + glibc-linked, requires glibc from virtualized path
+   // Android linker reads GNU ld scripts which contain hardcoded Proot paths
+   val isProton = versionManager.isProtonEnabled()
+   val ldLibraryPath = if (isProton) {
+    // Proton: Use Proot virtualized paths (matches GNU ld script hardcoded paths after rewriting)
+    "/data/data/com.winlator/files/rootfs/usr/lib:" +
+     "/data/data/com.winlator/files/rootfs/lib:" +
+     "/data/data/com.winlator/files/rootfs/bin"
+   } else {
+    // Wine: Use real filesystem paths
     "${rootfsLibraryPath}:" +
      "${wineDir.absolutePath}/lib:" +
-     "${wineDir.absolutePath}/lib/wine/x86_64-unix"
-   )
-   // Include both 32-bit (i386-windows) and 64-bit (x86_64-windows) for WoW64 support
-   put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/i386-windows:${wineDir.absolutePath}/lib/wine/x86_64-windows")
+     "${wineDir.absolutePath}/lib/wine/$wine64Unix"
+   }
+   put("LD_LIBRARY_PATH", ldLibraryPath)
+   // Include both 32-bit (i386-windows) and 64-bit (aarch64-windows or x86_64-windows) for WoW64 support
+   put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/i386-windows:${wineDir.absolutePath}/lib/wine/$wine64Dir")
 
    // Box64 library paths (critical for Android dlopen restrictions)
    // CRITICAL FIX: Include both x86_64 (emulated) AND aarch64 (native) library paths
@@ -1373,7 +1581,7 @@ class WinlatorEmulator @Inject constructor(
     "BOX64_LD_LIBRARY_PATH",
     // x86_64 emulated libraries
     "${rootfsDir.absolutePath}/usr/lib/x86_64-linux-gnu:" +
-    "${wineDir.absolutePath}/lib/wine/x86_64-unix:" +
+    "${wineDir.absolutePath}/lib/wine/$wine64Unix:" +  // FIXED: Use wine64Unix variable
     // ARM64 native libraries (CRITICAL for Box64 native function calls)
     "${rootfsDir.absolutePath}/usr/lib:" +
     "${rootfsDir.absolutePath}/lib:" +
@@ -1516,43 +1724,74 @@ class WinlatorEmulator @Inject constructor(
    return@withContext Result.failure(WineBinaryNotFoundException())
   }
 
-  val winebootExe = File(wineDir, "lib/wine/x86_64-windows/wineboot.exe")
+  // CRITICAL FIX (2025-12-27): Proton 10.0 ARM64EC uses aarch64-windows directory
+  // Wine 10.10 uses x86_64-windows, Proton uses aarch64-windows for ARM64 emulation
+  val winebootExe = File(wineDir, "lib/wine/aarch64-windows/wineboot.exe").takeIf { it.exists() }
+   ?: File(wineDir, "lib/wine/x86_64-windows/wineboot.exe")
+
   val useWinebootBinary = winebootBinary.exists() && isElfBinary(winebootBinary)
   if (!useWinebootBinary && !winebootExe.exists()) {
    return@withContext Result.failure(
-    EmulatorException("wineboot not found: ${winebootBinary.absolutePath}")
+    EmulatorException("wineboot not found: ${winebootBinary.absolutePath} and ${winebootExe.absolutePath}")
    )
   }
   if (winebootBinary.exists() && !useWinebootBinary) {
-   AppLogger.w(TAG, "wineboot is not an ELF binary, falling back to wineboot.exe")
+   AppLogger.w(TAG, "wineboot is not an ELF binary, falling back to wineboot.exe at ${winebootExe.absolutePath}")
   }
 
-  val linker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
-  if (!linker.exists()) {
-   return@withContext Result.failure(
-    EmulatorException("Rootfs linker not found: ${linker.absolutePath}")
-   )
+  // CRITICAL FIX: Proton ARM64EC uses Android linker (/system/bin/linker64)
+  // Wine 10.10 uses glibc linker (usr/lib/ld-linux-aarch64.so.1)
+  // Only check linker for Wine, not Proton
+  if (!versionManager.isProtonEnabled()) {
+   val linker = File(rootfsDir, "usr/lib/ld-linux-aarch64.so.1")
+   if (!linker.exists()) {
+    return@withContext Result.failure(
+     EmulatorException("Wine rootfs linker not found: ${linker.absolutePath}")
+    )
+   }
+   AppLogger.i(TAG, "Using glibc linker: ${linker.absolutePath}")
+  } else {
+   AppLogger.i(TAG, "Using Android bionic linker: /system/bin/linker64 (hardcoded in Proton binaries)")
   }
 
   // CRITICAL: Verify required library directories exist
   // Missing libraries cause Box64 to fail with "quit=1" errors
-  val requiredLibDirs = listOf(
-   File(rootfsDir, "usr/lib"),
-   File(rootfsDir, "lib"),
-   File(rootfsDir, "usr/lib/aarch64-linux-gnu"),
-   File(rootfsDir, "usr/lib/x86_64-linux-gnu")
-  )
-  requiredLibDirs.forEach { dir ->
-   if (!dir.exists()) {
-    AppLogger.w(TAG, "Missing library directory: ${dir.absolutePath}")
-    AppLogger.w(TAG, "Box64 may fail to load native libraries (glibc, etc.)")
-   } else {
-    AppLogger.d(TAG, "Verified library directory exists: ${dir.absolutePath}")
+  // NOTE: Different directory structure for Wine (glibc) vs Proton (bionic)
+  if (!versionManager.isProtonEnabled()) {
+   // Wine 10.10: Requires glibc library directories
+   val requiredLibDirs = listOf(
+    File(rootfsDir, "usr/lib"),
+    File(rootfsDir, "lib"),
+    File(rootfsDir, "usr/lib/aarch64-linux-gnu"),
+    File(rootfsDir, "usr/lib/x86_64-linux-gnu")
+   )
+   requiredLibDirs.forEach { dir ->
+    if (!dir.exists()) {
+     AppLogger.w(TAG, "Missing library directory: ${dir.absolutePath}")
+     AppLogger.w(TAG, "Box64 may fail to load native libraries (glibc, etc.)")
+    } else {
+     AppLogger.d(TAG, "Verified library directory exists: ${dir.absolutePath}")
+    }
+   }
+  } else {
+   // Proton ARM64EC: Uses Android bionic libc (system libraries)
+   // Verify Wine library directories exist
+   val protonLibDirs = listOf(
+    File(rootfsDir, "lib/wine/aarch64-windows"),
+    File(rootfsDir, "lib/wine/aarch64-unix"),
+    File(rootfsDir, "lib/wine/i386-windows"),
+    File(rootfsDir, "bin")
+   )
+   protonLibDirs.forEach { dir ->
+    if (!dir.exists()) {
+     AppLogger.w(TAG, "Missing Proton directory: ${dir.absolutePath}")
+    } else {
+     AppLogger.d(TAG, "Verified Proton directory exists: ${dir.absolutePath}")
+    }
    }
   }
 
   AppLogger.i(TAG, "Initializing Wine prefix: ${containerDir.absolutePath}")
-  AppLogger.i(TAG, "Using linker: ${linker.absolutePath}")
   AppLogger.i(TAG, "Using box64: ${box64ToUse.absolutePath}")
   AppLogger.i(TAG, "Using wine: ${wineBinary.absolutePath}")
   AppLogger.i(
@@ -1619,7 +1858,19 @@ class WinlatorEmulator @Inject constructor(
    wineserverEnv["BOX64_TRACE_INIT"] = "1"
    wineserverEnv["BOX64_LOG"] = "3"
    // CRITICAL: Set LD_LIBRARY_PATH via environment (not as proot argument)
-   wineserverEnv["LD_LIBRARY_PATH"] = rootfsLibraryPath
+   // CRITICAL FIX (2025-12-27): For Proton 10.0 ARM64EC, use Proot virtualized paths
+   val isProton = versionManager.isProtonEnabled()
+   val wine64Unix = if (File(wineDir, "lib/wine/aarch64-unix").exists()) "aarch64-unix" else "x86_64-unix"
+   val ldLibraryPath = if (isProton) {
+    "/data/data/com.winlator/files/rootfs/usr/lib:" +
+     "/data/data/com.winlator/files/rootfs/lib:" +
+     "/data/data/com.winlator/files/rootfs/bin"
+   } else {
+    "$rootfsLibraryPath:" +
+     "${wineDir.absolutePath}/lib:" +
+     "${wineDir.absolutePath}/lib/wine/$wine64Unix"
+   }
+   wineserverEnv["LD_LIBRARY_PATH"] = ldLibraryPath
 
    val wineserverProcess = ProcessBuilder(wineserverCmd).apply {
     environment().clear()
@@ -1696,7 +1947,19 @@ class WinlatorEmulator @Inject constructor(
     env.clear()
     env.putAll(environmentVars)
     // CRITICAL: Set LD_LIBRARY_PATH via environment (not as proot argument)
-    env["LD_LIBRARY_PATH"] = rootfsLibraryPath
+    // CRITICAL FIX (2025-12-27): For Proton 10.0 ARM64EC, use Proot virtualized paths
+    val isProton = versionManager.isProtonEnabled()
+    val wine64Unix = if (File(wineDir, "lib/wine/aarch64-unix").exists()) "aarch64-unix" else "x86_64-unix"
+    val ldLibraryPath = if (isProton) {
+     "/data/data/com.winlator/files/rootfs/usr/lib:" +
+      "/data/data/com.winlator/files/rootfs/lib:" +
+      "/data/data/com.winlator/files/rootfs/bin"
+    } else {
+     "$rootfsLibraryPath:" +
+      "${wineDir.absolutePath}/lib:" +
+      "${wineDir.absolutePath}/lib/wine/$wine64Unix"
+    }
+    env["LD_LIBRARY_PATH"] = ldLibraryPath
     processBuilder.redirectErrorStream(true)
 
     AppLogger.d(TAG, "Running: ${command.joinToString(" ")}")
@@ -1834,6 +2097,188 @@ class WinlatorEmulator @Inject constructor(
  }
 
  /**
+  * Extract glibc system libraries from Wine 10.10 rootfs to Proton rootfs
+  *
+  * Proton 10.0 ARM64EC rootfs lacks glibc (no usr/ directory).
+  * This method extracts usr/ directory from Wine 10.10 rootfs to provide
+  * glibc 2.35+ for Box64 dynamic linking.
+  *
+  * @param targetRootfsDir Proton rootfs directory to receive glibc
+  * @param progressCallback Progress updates (0.0-1.0, status message)
+  * @return Result indicating success or failure
+  */
+ private suspend fun extractGlibcFromWine(
+  targetRootfsDir: File,
+  progressCallback: ((Float, String) -> Unit)? = null
+ ): Result<Unit> = withContext(Dispatchers.IO) {
+  try {
+   AppLogger.i(TAG, "Starting glibc extraction from Wine 10.10 rootfs...")
+
+   // Step 1: Get Wine asset path from version manager
+   val wineAssetPath = versionManager.getWineAssetPath()
+   AppLogger.d(TAG, "Wine asset path: $wineAssetPath")
+
+   // Step 2: Extract Wine asset to temporary file
+   val wineRootfsFileName = wineAssetPath.substringAfterLast('/')
+   val wineRootfsTxzFile = File(context.cacheDir, "wine_glibc_temp_$wineRootfsFileName")
+
+   if (!wineRootfsTxzFile.exists()) {
+    progressCallback?.invoke(0.0f, "Extracting Wine rootfs asset...")
+    context.assets.open(wineAssetPath).use { input ->
+     wineRootfsTxzFile.outputStream().use { output ->
+      input.copyTo(output)
+     }
+    }
+    AppLogger.d(TAG, "Wine rootfs asset extracted: ${wineRootfsTxzFile.absolutePath}")
+   }
+
+   if (!wineRootfsTxzFile.exists()) {
+    return@withContext Result.failure(
+     EmulatorException("Wine rootfs asset not found: $wineAssetPath")
+    )
+   }
+
+   // Step 3: Extract ONLY usr/ directory from Wine rootfs using pathFilter
+   progressCallback?.invoke(0.2f, "Extracting glibc libraries...")
+
+   // CRITICAL: TAR entries have "./" prefix (e.g., "./usr/lib/libc.so.6")
+   // Filter must handle both "./usr/" and "usr/" formats
+   val usrFilter: (String) -> Boolean = { path ->
+    path.startsWith("usr/") || path == "usr" ||
+    path.startsWith("./usr/") || path == "./usr"
+   }
+
+   zstdDecompressor.extractTxz(
+    txzFile = wineRootfsTxzFile,
+    targetDir = targetRootfsDir,
+    pathFilter = usrFilter
+   ) { extractProgress, status ->
+    // Map extraction progress (0.0-1.0) to overall range (0.2-0.9)
+    val overallProgress = 0.2f + (extractProgress * 0.7f)
+    progressCallback?.invoke(overallProgress, "Extracting glibc: ${(extractProgress * 100).toInt()}%")
+    AppLogger.d(TAG, "Glibc extraction: ${(extractProgress * 100).toInt()}% - $status")
+   }.onSuccess {
+    AppLogger.i(TAG, "Glibc extraction successful")
+
+    // Step 4: Verify linker exists
+    val linker = File(targetRootfsDir, "usr/lib/ld-linux-aarch64.so.1")
+    if (!linker.exists()) {
+     return@withContext Result.failure(
+      EmulatorException("Glibc linker not found after extraction: ${linker.absolutePath}")
+     )
+    }
+
+    // Set executable permission on linker (should already be set by extractTxz, but ensure)
+    linker.setExecutable(true, false)
+    AppLogger.i(TAG, "Glibc linker verified: ${linker.absolutePath}")
+
+    // Step 5: Path rewriting for Proton glibc compatibility
+    // NOTE: Proton 10.0 disabled due to architectural incompatibility (Android linker execution order)
+    // Keeping path rewriting code for potential future use with standalone glibc bundle
+    progressCallback?.invoke(0.95f, "Rewriting glibc paths...")
+    val rewriteResult = rewriteGlibcPaths(targetRootfsDir)
+    if (rewriteResult.isFailure) {
+     AppLogger.w(TAG, "Failed to rewrite glibc paths (non-fatal)", rewriteResult.exceptionOrNull())
+    } else {
+     AppLogger.i(TAG, "Glibc paths rewritten successfully")
+    }
+
+    // Step 6: Create linker symlink (lib/ld-linux-aarch64.so.1 -> ../usr/lib/ld-linux-aarch64.so.1)
+    // This is handled by setupHardcodedLinkerPath(), but verify directory exists
+    val libDir = File(targetRootfsDir, "lib")
+    libDir.mkdirs()
+
+    // Step 7: Clean up temporary Wine rootfs file
+    if (wineRootfsTxzFile.exists()) {
+     wineRootfsTxzFile.delete()
+     AppLogger.d(TAG, "Cleaned up temporary Wine rootfs file")
+    }
+
+    progressCallback?.invoke(1.0f, "Glibc extraction complete")
+    return@withContext Result.success(Unit)
+
+   }.onFailure { error ->
+    AppLogger.e(TAG, "Glibc extraction failed: ${error.message}", error)
+    // Clean up temporary file on failure
+    if (wineRootfsTxzFile.exists()) {
+     wineRootfsTxzFile.delete()
+    }
+    return@withContext Result.failure(
+     EmulatorException("Failed to extract glibc libraries: ${error.message}", error)
+    )
+   }
+
+   Result.success(Unit) // Should never reach here, but Kotlin requires it
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Glibc extraction error", e)
+   Result.failure(EmulatorException("Glibc extraction failed: ${e.message}", e))
+  }
+ }
+
+ /**
+  * Rewrite hardcoded paths in glibc linker scripts
+  *
+  * Wine 10.10 glibc contains GNU ld scripts with hardcoded paths pointing to
+  * /data/data/com.winlator/files/rootfs/...
+  *
+  * This method rewrites those paths to match our app's package name and file structure.
+  *
+  * @param rootfsDir Target rootfs directory
+  * @return Result indicating success or failure
+  */
+ private suspend fun rewriteGlibcPaths(rootfsDir: File): Result<Unit> = withContext(Dispatchers.IO) {
+  try {
+   val appDataPath = context.filesDir.absolutePath // e.g., /data/user/0/com.steamdeck.mobile.debug/files
+   val oldPath = "/data/data/com.winlator/files/rootfs"
+   val newPath = "$appDataPath/winlator/rootfs"
+
+   AppLogger.i(TAG, "Rewriting glibc paths: $oldPath -> $newPath")
+
+   // List of linker scripts that contain hardcoded paths
+   val linkerScripts = listOf(
+    "usr/lib/libc.so",
+    "usr/lib/libpthread.so",
+    "usr/lib/libm.so",
+    "usr/lib/libdl.so",
+    "usr/lib/librt.so"
+   )
+
+   var rewriteCount = 0
+   for (scriptPath in linkerScripts) {
+    val scriptFile = File(rootfsDir, scriptPath)
+    if (!scriptFile.exists()) {
+     AppLogger.d(TAG, "Linker script not found (skipping): $scriptPath")
+     continue
+    }
+
+    // Read entire file content
+    val originalContent = scriptFile.readText()
+
+    // Check if file contains old path
+    if (!originalContent.contains(oldPath)) {
+     AppLogger.d(TAG, "No hardcoded paths found in: $scriptPath")
+     continue
+    }
+
+    // Replace all occurrences of old path with new path
+    val newContent = originalContent.replace(oldPath, newPath)
+
+    // Write back to file
+    scriptFile.writeText(newContent)
+    rewriteCount++
+
+    AppLogger.i(TAG, "Rewrote paths in: $scriptPath")
+   }
+
+   AppLogger.i(TAG, "Path rewriting complete: $rewriteCount files updated")
+   Result.success(Unit)
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Failed to rewrite glibc paths", e)
+   Result.failure(e)
+  }
+ }
+
+ /**
   * Run wineboot with -u flag to update Wine prefix and load services
   *
   * This is equivalent to Winlator's "Normal (Load all services)" startup mode.
@@ -1966,19 +2411,30 @@ REGEDIT4
 
    // Add Wine environment with library paths
    // CRITICAL: Include all required paths for Box64 to find native libraries
+   // FIXED (2025-12-27): Dynamic Proton/Wine detection for library paths
+   val wine64Unix = if (File(wineDir, "lib/wine/aarch64-unix").exists()) "aarch64-unix" else "x86_64-unix"
+
    val fullEnv = wineEnv.toMutableMap().apply {
     put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:/usr/bin:/bin")
-    put("LD_LIBRARY_PATH",
+
+    // CRITICAL FIX (2025-12-27): For Proton 10.0 ARM64EC, use Proot virtualized paths
+    val isProton = versionManager.isProtonEnabled()
+    val ldLibraryPath = if (isProton) {
+     "/data/data/com.winlator/files/rootfs/usr/lib:" +
+      "/data/data/com.winlator/files/rootfs/lib:" +
+      "/data/data/com.winlator/files/rootfs/bin"
+    } else {
      "${rootfsDir.absolutePath}/usr/lib:" +
-     "${rootfsDir.absolutePath}/lib:" +
-     "${wineDir.absolutePath}/lib:" +
-     "${wineDir.absolutePath}/lib/wine/x86_64-unix"
-    )
+      "${rootfsDir.absolutePath}/lib:" +
+      "${wineDir.absolutePath}/lib:" +
+      "${wineDir.absolutePath}/lib/wine/$wine64Unix"
+    }
+    put("LD_LIBRARY_PATH", ldLibraryPath)
     put("BOX64_LD_LIBRARY_PATH",
      "${rootfsDir.absolutePath}/usr/lib:" +
      "${rootfsDir.absolutePath}/lib:" +
      "${rootfsDir.absolutePath}/usr/lib/x86_64-linux-gnu:" +
-     "${wineDir.absolutePath}/lib/wine/x86_64-unix"
+     "${wineDir.absolutePath}/lib/wine/$wine64Unix"
     )
     put("BOX64_PATH", "${wineDir.absolutePath}/bin")
     put("BOX64_EMULATED_LIBS", "libc.so.6:libpthread.so.0:libdl.so.2:librt.so.1:libm.so.6")
@@ -2128,19 +2584,30 @@ REGEDIT4
          val processBuilder = ProcessBuilder(command)
 
          // Add Wine environment with library paths
+         // FIXED (2025-12-27): Dynamic Proton/Wine detection for library paths
+         val wine64Unix = if (File(wineDir, "lib/wine/aarch64-unix").exists()) "aarch64-unix" else "x86_64-unix"
+
          val fullEnv = wineEnv.toMutableMap().apply {
              put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:/usr/bin:/bin")
-             put("LD_LIBRARY_PATH",
+
+             // CRITICAL FIX (2025-12-27): For Proton 10.0 ARM64EC, use Proot virtualized paths
+             val isProton = versionManager.isProtonEnabled()
+             val ldLibraryPath = if (isProton) {
+                 "/data/data/com.winlator/files/rootfs/usr/lib:" +
+                  "/data/data/com.winlator/files/rootfs/lib:" +
+                  "/data/data/com.winlator/files/rootfs/bin"
+             } else {
                  "${rootfsDir.absolutePath}/usr/lib:" +
-                 "${rootfsDir.absolutePath}/lib:" +
-                 "${wineDir.absolutePath}/lib:" +
-                 "${wineDir.absolutePath}/lib/wine/x86_64-unix"
-             )
+                  "${rootfsDir.absolutePath}/lib:" +
+                  "${wineDir.absolutePath}/lib:" +
+                  "${wineDir.absolutePath}/lib/wine/$wine64Unix"
+             }
+             put("LD_LIBRARY_PATH", ldLibraryPath)
              put("BOX64_LD_LIBRARY_PATH",
                  "${rootfsDir.absolutePath}/usr/lib:" +
                  "${rootfsDir.absolutePath}/lib:" +
                  "${rootfsDir.absolutePath}/usr/lib/x86_64-linux-gnu:" +
-                 "${wineDir.absolutePath}/lib/wine/x86_64-unix"
+                 "${wineDir.absolutePath}/lib/wine/$wine64Unix"
              )
              put("BOX64_PATH", "${wineDir.absolutePath}/bin")
              put("BOX64_EMULATED_LIBS", "libc.so.6:libpthread.so.0:libdl.so.2:librt.so.1:libm.so.6")
@@ -2465,7 +2932,7 @@ REGEDIT4
    // CRITICAL: Use minimal logging to prevent SIGSEGV crashes
    // Excessive logging (+all,+relay,+file) destabilizes Wine execution
    // NOTE: WINEDEBUG may be overridden by Steam-specific settings in launchExecutable()
-   put("WINEDEBUG", "+err,+process,+loaddll") // DEBUG: Enable Wine error/process/dll logs
+   put("WINEDEBUG", "+err,+warn,+x11drv") // DEBUG: Enable Wine error/warning/X11 driver logs
    put("WINEARCH", "win64") // 64-bit prefix with WoW64 for 32-bit app support (matches Winlator)
    put("WINELOADERNOEXEC", "1")
    // DO NOT set WINESERVER - let Wine find it via PATH (same reason as wineboot)
@@ -2529,22 +2996,27 @@ REGEDIT4
    val existingPath = System.getenv("PATH") ?: ""
    put("PATH", "${wineDir.absolutePath}/bin:${box64Dir.absolutePath}:$existingPath")
 
+   // CRITICAL FIX (2025-12-27): Proton 10.0 ARM64EC uses aarch64-unix/aarch64-windows
+   val wine64Dir = if (File(wineDir, "lib/wine/aarch64-windows").exists()) "aarch64-windows" else "x86_64-windows"
+   val wine64Unix = if (File(wineDir, "lib/wine/aarch64-unix").exists()) "aarch64-unix" else "x86_64-unix"
+
    // Set LD_LIBRARY_PATH for Box64/Wine loader (glibc from rootfs)
    put(
     "LD_LIBRARY_PATH",
     "${rootfsLibraryPath}:" +
      "${wineDir.absolutePath}/lib:" +
-     "${wineDir.absolutePath}/lib/wine/x86_64-unix"
+     "${wineDir.absolutePath}/lib/wine/$wine64Unix"
    )
 
    // Set Wine DLL path for Windows libraries
-   // Include both 32-bit (i386-windows) and 64-bit (x86_64-windows) for WoW64 support
-   put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/i386-windows:${wineDir.absolutePath}/lib/wine/x86_64-windows")
+   // Include both 32-bit (i386-windows) and 64-bit (aarch64-windows or x86_64-windows) for WoW64 support
+   put("WINEDLLPATH", "${wineDir.absolutePath}/lib/wine/i386-windows:${wineDir.absolutePath}/lib/wine/$wine64Dir")
 
    // Add Box64 library paths for better compatibility
+   // FIXED (2025-12-27): Use wine64Unix variable instead of hardcoded x86_64-unix
    put(
     "BOX64_LD_LIBRARY_PATH",
-    "${rootfsLibraryPath}:${rootfsDir.absolutePath}/usr/lib/x86_64-linux-gnu:${wineDir.absolutePath}/lib/wine/x86_64-unix"
+    "${rootfsLibraryPath}:${rootfsDir.absolutePath}/usr/lib/x86_64-linux-gnu:${wineDir.absolutePath}/lib/wine/$wine64Unix"
    )
    put("BOX64_PATH", "${wineDir.absolutePath}/bin")
 
@@ -2562,6 +3034,22 @@ REGEDIT4
    // Wine DirectInput Configuration
    // Enable XInput support for better controller compatibility
    put("WINE_ENABLE_XINPUT", "1")
+
+   // CRITICAL: Apply Proton/Wine environment variables from ProtonManager
+   // This includes Android-specific fixes (ESYNC/FSYNC disabled) and performance optimizations
+   // ProtonManager automatically selects correct env vars based on isProtonEnabled()
+   val runtimeEnvVars = protonManager.getSteamEnvironmentVariables()
+   AppLogger.d(TAG, "Applying ${runtimeEnvVars.size} runtime env vars from ProtonManager")
+
+   // IMPORTANT: ProtonManager vars OVERRIDE container defaults for Steam compatibility
+   // Critical vars like WINEDEBUG, PROTON_NO_ESYNC must take priority
+   runtimeEnvVars.forEach { (key, value) ->
+    val existingValue = get(key)
+    if (existingValue != null && existingValue != value) {
+     AppLogger.d(TAG, "ProtonManager overriding $key: '$existingValue' → '$value'")
+    }
+    put(key, value)  // Always apply ProtonManager values
+   }
 
    // Custom environment variables from config (takes final priority for most settings)
    putAll(config.customEnvVars)
@@ -2768,11 +3256,15 @@ REGEDIT4
  /**
   * Setup library symlinks for Wine/Box64 compatibility
   *
-  * Problem: Wine+Box64 looks for libfreetype.so.6 for font rendering
+  * Problem 1: Wine+Box64 looks for libfreetype.so.6 for font rendering
   * Rootfs has libfreetype.so.6.20.2 but no .so.6 symlink
   * Result: "Wine cannot find the FreeType font library" → Steam installer GUI fails
   *
-  * Solution: Create symlinks for versioned libraries (.so.6 → .so.6.x.x)
+  * Problem 2: Wine X11 driver looks for libX11.so, libxcb.so for graphical display
+  * Rootfs has libX11.so.6.4.0, libxcb.so.1.1.0 but no .so symlinks
+  * Result: Wine cannot connect to XServer → black screen (no display output)
+  *
+  * Solution: Create symlinks for versioned libraries (.so.6 → .so.6.x.x, .so → .so.6.x.x)
   */
  private fun setupLibrarySymlinks() {
   val libDir = File(rootfsDir, "usr/lib")
@@ -2794,7 +3286,17 @@ REGEDIT4
     Triple("libbz2.so.1.0.8", "libbz2.so", null), // libbz2.so -> libbz2.so.1.0.8
     Triple("libbrotlicommon.so.1.1.0", "libbrotlicommon.so.1", "libbrotlicommon.so"),
     Triple("libbrotlidec.so.1.1.0", "libbrotlidec.so.1", "libbrotlidec.so"),
-    Triple("libbrotlienc.so.1.1.0", "libbrotlienc.so.1", "libbrotlienc.so")
+    Triple("libbrotlienc.so.1.1.0", "libbrotlienc.so.1", "libbrotlienc.so"),
+    // X11 libraries (critical for Wine graphical display)
+    Triple("libX11.so.6.4.0", "libX11.so.6", "libX11.so"),
+    Triple("libxcb.so.1.1.0", "libxcb.so.1", "libxcb.so"),
+    Triple("libX11-xcb.so.1.0.0", "libX11-xcb.so.1", "libX11-xcb.so"),
+    Triple("libxcb-randr.so.0.1.0", "libxcb-randr.so.0", "libxcb-randr.so"),
+    Triple("libxcb-render.so.0.0.0", "libxcb-render.so.0", "libxcb-render.so"),
+    Triple("libxcb-shm.so.0.0.0", "libxcb-shm.so.0", "libxcb-shm.so"),
+    Triple("libxcb-sync.so.1.0.0", "libxcb-sync.so.1", "libxcb-sync.so"),
+    Triple("libxcb-dri3.so.0.1.0", "libxcb-dri3.so.0", "libxcb-dri3.so"),
+    Triple("libxcb-present.so.0.0.0", "libxcb-present.so.0", "libxcb-present.so")
    )
 
    for ((actual, symlink1, symlink2) in libraries) {

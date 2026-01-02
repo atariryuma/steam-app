@@ -6,7 +6,6 @@ import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
-import org.apache.commons.compress.compressors.zstandard.ZstdCompressorInputStream
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
@@ -15,11 +14,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Utility for decompressing tar-based archives (.txz, .tzst).
+ * Utility for decompressing tar-based archives (.txz).
  *
- * Zstandard (.tzst) support is provided by Apache Commons Compress with zstd-jni.
+ * XZ (.txz) support is provided by Apache Commons Compress.
  *
- * Reference: https://commons.apache.org/proper/commons-compress/
+ * Reference:
+ * - Apache Commons Compress: https://commons.apache.org/proper/commons-compress/
  */
 @Singleton
 class ZstdDecompressor @Inject constructor() {
@@ -59,98 +59,25 @@ class ZstdDecompressor @Inject constructor() {
  /**
   * Decompresses and extracts a .tzst archive in one step.
   *
-  * Uses Apache Commons Compress with zstd-jni for Zstandard decompression.
+  * NOTE: Zstandard (.tzst) is not supported on Android ARM64 due to library limitations.
+  * Use .tar.xz format instead (convert tzst files to tar.xz before using).
   *
   * @param tzstFile .tzst compressed archive
   * @param targetDir Directory to extract to
   * @param progressCallback Optional progress callback (0.0 to 1.0)
-  * @return Result with extracted directory
+  * @return Result indicating failure (not supported)
   */
  suspend fun decompressAndExtract(
   tzstFile: File,
   targetDir: File,
   progressCallback: ((Float, String) -> Unit)? = null
  ): Result<File> = withContext(Dispatchers.IO) {
-  try {
-   if (!tzstFile.exists()) {
-    return@withContext Result.failure(
-     IllegalArgumentException("Input file not found: ${tzstFile.absolutePath}")
-    )
-   }
-
-   targetDir.mkdirs()
-
-   val tzstFileSize = tzstFile.length()
-   var bytesProcessed = 0L
-
-   AppLogger.i(TAG, "Extracting tzst archive: ${tzstFile.name} (${tzstFileSize / 1024}KB)")
-   progressCallback?.invoke(0.0f, "Extracting ${tzstFile.name}...")
-
-   BufferedInputStream(FileInputStream(tzstFile)).use { bufferedInput ->
-    ZstdCompressorInputStream(bufferedInput).use { zstdInput ->
-     TarArchiveInputStream(zstdInput).use { tarInput ->
-      var entry: TarArchiveEntry? = tarInput.nextEntry as TarArchiveEntry?
-
-      while (entry != null) {
-       val outputFile = File(targetDir, entry.name)
-
-       // Security: Prevent path traversal attacks
-       if (!outputFile.canonicalPath.startsWith(targetDir.canonicalPath)) {
-        AppLogger.w(TAG, "Skipping suspicious entry: ${entry.name}")
-        entry = tarInput.nextEntry as TarArchiveEntry?
-        continue
-       }
-
-       if (entry.isDirectory) {
-        // Create directory
-        outputFile.mkdirs()
-        AppLogger.d(TAG, "Created directory: ${entry.name}")
-       } else if (entry.isSymbolicLink) {
-        // Skip symlinks (not supported on Android)
-        AppLogger.d(TAG, "Skipping symlink: ${entry.name} -> ${entry.linkName}")
-       } else {
-        // Extract file
-        outputFile.parentFile?.mkdirs()
-
-        FileOutputStream(outputFile).use { output ->
-         val buffer = ByteArray(BUFFER_SIZE)
-         var len: Int
-         while (tarInput.read(buffer).also { len = it } > 0) {
-          output.write(buffer, 0, len)
-          bytesProcessed += len
-         }
-        }
-
-        // Set executable permissions if present
-        val mode = entry.mode
-        val isExecutable = (mode and 0x49) != 0 // Check execute bits
-
-        if (isExecutable) {
-         outputFile.setExecutable(true, false)
-         AppLogger.d(TAG, "Set executable: ${entry.name} (mode: ${mode.toString(8)})")
-        }
-
-        AppLogger.d(TAG, "Extracted: ${entry.name} (${entry.size} bytes)")
-       }
-
-       // Report progress (estimate based on compression ratio)
-       val estimatedTotalBytes = tzstFileSize * TZST_COMPRESSION_RATIO
-       val progress = (bytesProcessed.toFloat() / estimatedTotalBytes).coerceIn(0f, 0.95f)
-       progressCallback?.invoke(progress, "Extracting...")
-
-       entry = tarInput.nextEntry as TarArchiveEntry?
-      }
-     }
-    }
-   }
-
-   AppLogger.i(TAG, "Tzst extraction complete: ${targetDir.absolutePath}")
-   progressCallback?.invoke(1.0f, "Extraction complete")
-   Result.success(targetDir)
-  } catch (e: Exception) {
-   AppLogger.e(TAG, "Tzst extraction failed", e)
-   Result.failure(e)
-  }
+  Result.failure(
+   UnsupportedOperationException(
+    "Zstandard (.tzst) decompression is not supported on Android ARM64. " +
+    "Please convert to .tar.xz format using: zstd -d file.tzst -o file.tar && xz file.tar"
+   )
+  )
  }
 
  /**
@@ -263,6 +190,7 @@ class ZstdDecompressor @Inject constructor() {
  suspend fun extractTxz(
   txzFile: File,
   targetDir: File,
+  pathFilter: ((String) -> Boolean)? = null,
   progressCallback: ((Float, String) -> Unit)? = null
  ): Result<File> = withContext(Dispatchers.IO) {
   try {
@@ -277,8 +205,9 @@ class ZstdDecompressor @Inject constructor() {
    val txzFileSize = txzFile.length()
    var bytesProcessed = 0L
 
-   AppLogger.i(TAG, "Extracting txz archive: ${txzFile.name} (${txzFileSize / 1024 / 1024}MB)")
-   progressCallback?.invoke(0.0f, "Extracting ${txzFile.name}...")
+   val filterMsg = if (pathFilter != null) " (filtered)" else ""
+   AppLogger.i(TAG, "Extracting txz archive$filterMsg: ${txzFile.name} (${txzFileSize / 1024 / 1024}MB)")
+   progressCallback?.invoke(0.0f, "Extracting ${txzFile.name}$filterMsg...")
 
    BufferedInputStream(FileInputStream(txzFile)).use { bufferedInput ->
     XZCompressorInputStream(bufferedInput).use { xzInput ->
@@ -286,6 +215,13 @@ class ZstdDecompressor @Inject constructor() {
       var entry: TarArchiveEntry? = tarInput.nextEntry as TarArchiveEntry?
 
       while (entry != null) {
+       // Apply path filter if provided
+       if (pathFilter != null && !pathFilter(entry.name)) {
+        AppLogger.d(TAG, "Skipping filtered entry: ${entry.name}")
+        entry = tarInput.nextEntry as TarArchiveEntry?
+        continue
+       }
+
        val outputFile = File(targetDir, entry.name)
 
        // Security: Prevent path traversal attacks
@@ -319,9 +255,18 @@ class ZstdDecompressor @Inject constructor() {
         val mode = entry.mode
         val isExecutable = (mode and 0x49) != 0 // Check execute bits
 
-        if (isExecutable) {
+        // CRITICAL FIX (2025-12-27): ALWAYS set executable on dynamic linker
+        // Box64 requires the linker to be executable for Proot to work
+        val isLinker = entry.name.contains("ld-linux-aarch64.so") ||
+                       entry.name.endsWith("/ld-linux-aarch64.so.1")
+
+        if (isExecutable || isLinker) {
          outputFile.setExecutable(true, false)
-         AppLogger.d(TAG, "Set executable: ${entry.name} (mode: ${mode.toString(8)})")
+         if (isLinker) {
+          AppLogger.i(TAG, "Set executable on LINKER: ${entry.name}")
+         } else {
+          AppLogger.d(TAG, "Set executable: ${entry.name} (mode: ${mode.toString(8)})")
+         }
         }
 
         AppLogger.d(TAG, "Extracted: ${entry.name} (${entry.size} bytes)")

@@ -283,23 +283,41 @@ public class WineProgramLauncherComponent extends EnvironmentComponent {
 
             android.util.Log.e("WineProgramLauncher", "Box64 copy successful, size: " + box64InRootfs.length() + " bytes");
 
-            // CRITICAL: Patch box64's ELF interpreter path to use Android linker
-            // box64 binary references /lib/ld-linux-aarch64.so.1 (standard Linux path)
-            // but Android uses /system/bin/linker64
-            // Since we bind-mount /system, we can directly use /system/bin/linker64
-            File androidLinker = new File("/system/bin/linker64");
-            if (androidLinker.exists()) {
-                // Patch box64's interpreter path to use Android's linker directly
-                // /system is bind-mounted in PRoot, so /system/bin/linker64 is accessible
-                String interpreterPath = "/system/bin/linker64";
+            // CRITICAL FIX (2025-12-27): Use Proot mount point path for Box64 interpreter
+            // Problem: Box64 is executed inside Proot, so it needs interpreter path that exists INSIDE Proot
+            // Proot mounts: rootDir -> /data/data/com.winlator/files/rootfs (line 203)
+            // Solution: Patch Box64 to use /data/data/com.winlator/files/rootfs/lib/ld-linux-aarch64.so.1
+            File actualLinker = new File(rootDir, "usr/lib/ld-linux-aarch64.so.1");
+            if (actualLinker.exists()) {
+                // CRITICAL: Use Proot mount point path (accessible from inside Proot)
+                // This path is 68 chars, within PT_INTERP 128-byte limit
+                String prootMountPoint = "/data/data/com.winlator/files/rootfs";
+                String interpreterPath = prootMountPoint + "/lib/ld-linux-aarch64.so.1";
+
+                // Ensure /rootfs/lib/ld-linux-aarch64.so.1 symlink exists (relative path)
+                File rootfsLibLinker = new File(rootDir, "lib/ld-linux-aarch64.so.1");
+                if (!rootfsLibLinker.exists()) {
+                    File libDir = new File(rootDir, "lib");
+                    libDir.mkdirs();
+
+                    // Create relative symlink: lib/ld-linux-aarch64.so.1 -> ../usr/lib/ld-linux-aarch64.so.1
+                    try {
+                        Runtime.getRuntime().exec(new String[]{"ln", "-s", "../usr/lib/ld-linux-aarch64.so.1", rootfsLibLinker.getAbsolutePath()}).waitFor();
+                        android.util.Log.i("WineProgramLauncher", "Created rootfs linker symlink: " + rootfsLibLinker.getAbsolutePath() + " -> ../usr/lib/ld-linux-aarch64.so.1");
+                    } catch (Exception e) {
+                        android.util.Log.e("WineProgramLauncher", "Failed to create linker symlink", e);
+                    }
+                }
+
+                // Patch box64's interpreter path to use Proot mount point path
                 boolean patchSuccess = ElfPatcher.patchInterpreterPathJava(box64InRootfs, interpreterPath);
                 if (patchSuccess) {
-                    android.util.Log.e("WineProgramLauncher", "Successfully patched box64 interpreter to: " + interpreterPath);
+                    android.util.Log.i("WineProgramLauncher", "Successfully patched box64 interpreter to: " + interpreterPath);
                 } else {
                     android.util.Log.e("WineProgramLauncher", "Failed to patch box64 interpreter (check ElfPatcher logs for details)");
                 }
             } else {
-                android.util.Log.e("WineProgramLauncher", "Android linker not found: " + androidLinker.getAbsolutePath());
+                android.util.Log.w("WineProgramLauncher", "Rootfs linker not found: " + actualLinker.getAbsolutePath());
             }
         } catch (Exception e) {
             android.util.Log.e("WineProgramLauncher", "Failed to copy box64", e);
@@ -394,12 +412,23 @@ public class WineProgramLauncherComponent extends EnvironmentComponent {
         // PRoot binds rootDir to /rootfs, so paths must reference /rootfs instead of absolute Android paths
         Context context = environment.getContext();
         ImageFs imageFs = environment.getImageFs();
+
+        // CRITICAL FIX (2025-12-27): Dynamic Proton/Wine architecture detection for library paths
+        // Detect 64-bit Unix library architecture (aarch64-unix for Proton, x86_64-unix for Wine)
+        String wineBasePath = imageFs.getWinePath();
+        String wine64UnixArch = "x86_64-unix";
+        File rootDir = imageFs.getRootDir();
+        File aarch64UnixDir = new File(rootDir, wineBasePath + "/lib/wine/aarch64-unix");
+        if (aarch64UnixDir.exists()) {
+            wine64UnixArch = "aarch64-unix";
+        }
+
         // Use /rootfs paths that match our PRoot bind mount (line 195)
         String rootfsLibPath = "/rootfs/usr/lib:/rootfs/lib";
-        String wineLibPath = imageFs.getWinePath() + "/lib/wine/x86_64-unix";
+        String wineLibPath = wineBasePath + "/lib/wine/" + wine64UnixArch;
         String x86_64LibPath = "/rootfs/usr/lib/x86_64-linux-gnu";
         envVars.put("BOX64_LD_LIBRARY_PATH", rootfsLibPath + ":" + x86_64LibPath + ":" + wineLibPath);
-        envVars.put("BOX64_PATH", imageFs.getWinePath() + "/bin");
+        envVars.put("BOX64_PATH", wineBasePath + "/bin");
     }
 
     public void suspendProcess() {

@@ -163,11 +163,33 @@ class WinlatorEngineImpl @Inject constructor(
    // 5. Create or get EmulatorContainer
    val emulatorContainer = getOrCreateEmulatorContainer(game, optimizedContainer)
 
-   // 6. Launch game
-   AppLogger.i(TAG, "Launching executable via Winlator: ${execFile.absolutePath}")
+   // 6. Prepare executable for Wine
+   // For imported games, copy to Wine container's C: drive
+   val executableForWine = if (game.source == com.steamdeck.mobile.domain.model.GameSource.IMPORTED) {
+    // Copy to container's Program Files
+    val containerDir = File(context.filesDir, "winlator/containers/${emulatorContainer.name}")
+    val importedGamesDir = File(containerDir, "drive_c/Program Files/ImportedGames/${game.name}")
+    importedGamesDir.mkdirs()
+
+    val targetFile = File(importedGamesDir, execFile.name)
+
+    // Copy if not already exists or source is newer
+    if (!targetFile.exists() || execFile.lastModified() > targetFile.lastModified()) {
+     AppLogger.i(TAG, "Copying imported game to Wine container: ${execFile.name}")
+     execFile.copyTo(targetFile, overwrite = true)
+    }
+
+    AppLogger.d(TAG, "Using Wine path for imported game: C:\\Program Files\\ImportedGames\\${game.name}\\${execFile.name}")
+    targetFile
+   } else {
+    execFile
+   }
+
+   // 7. Launch game
+   AppLogger.i(TAG, "Launching executable via Winlator: ${executableForWine.absolutePath}")
    val launchResult = winlatorEmulator.launchExecutable(
     container = emulatorContainer,
-    executable = execFile,
+    executable = executableForWine,
     arguments = parseCustomArgs(optimizedContainer.customArgs)
    )
 

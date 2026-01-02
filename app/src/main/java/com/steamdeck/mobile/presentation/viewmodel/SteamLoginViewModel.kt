@@ -129,6 +129,19 @@ class SteamLoginViewModel @Inject constructor(
  fun retry() {
   startOpenIdLogin()
  }
+
+ /**
+  * Clear WebView cookies (for fixing E502L3 and similar errors)
+  */
+ fun clearWebViewCookies() {
+  try {
+   android.webkit.CookieManager.getInstance().removeAllCookies(null)
+   android.webkit.CookieManager.getInstance().flush()
+   AppLogger.i(TAG, "WebView cookies cleared")
+  } catch (e: Exception) {
+   AppLogger.e(TAG, "Failed to clear cookies", e)
+  }
+ }
 }
 
 /**

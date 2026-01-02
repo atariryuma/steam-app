@@ -11,6 +11,7 @@ import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.repository.GameRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,15 +37,24 @@ class HomeViewModel @Inject constructor(
  private val _searchQuery = MutableStateFlow("")
  val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+ // FIXED (2025-12-26): Track Flow collection job for proper cancellation
+ private var loadGamesJob: Job? = null
+
  init {
   loadGames()
  }
 
  /**
   * Load game list
+  *
+  * FIXED (2025-12-26): Cancel previous Flow collector before starting new one
+  * Bug: Multiple rapid refresh() calls created concurrent collectors
+  * Impact: Race conditions, memory leak, duplicate UI updates
+  * Fix: Store job reference and cancel before new collection
   */
  private fun loadGames() {
-  viewModelScope.launch {
+  loadGamesJob?.cancel() // Cancel previous collection
+  loadGamesJob = viewModelScope.launch {
    try {
     gameRepository.getAllGames().collect { games ->
      _uiState.value = if (games.isEmpty()) {
@@ -266,6 +276,19 @@ class HomeViewModel @Inject constructor(
   * @return true if path is safe, false if potential security risk detected
   */
  private fun isPathSafe(path: String): Boolean = PathValidator.isPathSafe(path, context)
+
+ /**
+  * FIXED (2025-12-26): Cancel Flow collection on ViewModel destruction
+  *
+  * Bug: loadGames() launches infinite Flow.collect() without cancellation tracking
+  * Impact: Multiple collectors active on rapid refresh() → race conditions, memory leak
+  * Fix: Cancel loadGamesJob in onCleared()
+  */
+ override fun onCleared() {
+  super.onCleared()
+  loadGamesJob?.cancel()
+  AppLogger.d(TAG, "HomeViewModel cleared, loadGamesJob cancelled")
+ }
 }
 
 /**

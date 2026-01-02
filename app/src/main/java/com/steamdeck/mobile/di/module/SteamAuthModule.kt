@@ -86,12 +86,14 @@ object SteamAuthModule {
  fun provideSteamLauncher(
   @ApplicationContext context: Context,
   winlatorEmulator: WinlatorEmulator,
-  xServerManager: com.steamdeck.mobile.core.xserver.XServerManager
+  xServerManager: com.steamdeck.mobile.core.xserver.XServerManager,
+  protonManager: com.steamdeck.mobile.core.proton.ProtonManager
  ): SteamLauncher {
   return SteamLauncher(
    context = context,
    winlatorEmulator = winlatorEmulator,
-   xServerManager = xServerManager
+   xServerManager = xServerManager,
+   protonManager = protonManager
   )
  }
 

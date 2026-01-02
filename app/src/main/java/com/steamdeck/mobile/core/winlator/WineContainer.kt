@@ -25,7 +25,7 @@ data class WineContainer(
 ) {
  companion object {
   const val DEFAULT_SCREEN_SIZE = "1280x720"
-  const val DEFAULT_WINE_VERSION = "9.0"
+  const val DEFAULT_WINE_VERSION = "10.10"
 
   fun defaultEnvVars() = mapOf(
    "ZINK_DESCRIPTORS" to "lazy",

@@ -116,17 +116,21 @@ class SteamSetupManager @Inject constructor(
 
    // Step 1: Winlator emulator initialization (Box64/Wine extraction)
    // Progress: 0.00 ~ 0.25 (25%)
-   progressCallback?.invoke(ProgressRanges.INIT_START, "Checking Winlator initialization...", null)
+   AppLogger.i(TAG, "=== Step 1/5: Winlator Initialization ===")
+   progressCallback?.invoke(ProgressRanges.INIT_START, "Step 1/5: Checking Winlator...", null)
    val available = winlatorEmulator.isAvailable().getOrNull() ?: false
 
    if (!available) {
     AppLogger.w(TAG, "Winlator not initialized - starting initialization (this may take 2-3 minutes)...")
+    progressCallback?.invoke(ProgressRanges.INIT_START, "Step 1/5: Initializing Winlator (2-3 min)...", "Extracting Box64/Wine binaries")
 
     // Winlator initialization (Box64/Wine binary extraction)
     val initResult = winlatorEmulator.initialize { progress, message ->
      // Map sub-progress (0.0-1.0) to overall range (0.00-0.25)
      val overallProgress = mapProgress(progress, ProgressRanges.INIT_START, ProgressRanges.INIT_END)
-     progressCallback?.invoke(overallProgress, message, null)
+     val percentComplete = (overallProgress * 100).toInt()
+     progressCallback?.invoke(overallProgress, "Step 1/5: $message", "$percentComplete% complete")
+     AppLogger.d(TAG, "Step 1/5 progress: $percentComplete% - $message")
     }
 
     if (initResult.isFailure) {
@@ -147,12 +151,13 @@ class SteamSetupManager @Inject constructor(
     AppLogger.i(TAG, "Winlator initialization completed successfully")
    } else {
     AppLogger.i(TAG, "Winlator already initialized, skipping initialization")
-    progressCallback?.invoke(ProgressRanges.INIT_END, "Winlator ready", null)
+    progressCallback?.invoke(ProgressRanges.INIT_END, "Step 1/5: Winlator ready", "25% complete")
    }
 
    // Step 2: Create Wine container
    // Progress: 0.25 ~ 0.40 (15%)
-   progressCallback?.invoke(ProgressRanges.CONTAINER_START, "Creating Wine container...", null)
+   AppLogger.i(TAG, "=== Step 2/5: Wine Container Creation ===")
+   progressCallback?.invoke(ProgressRanges.CONTAINER_START, "Step 2/5: Creating Wine container...", "25% complete")
 
    // Get or create container
    val containerResult = getOrCreateContainer(containerId)
@@ -168,22 +173,24 @@ class SteamSetupManager @Inject constructor(
     )
    }
    AppLogger.i(TAG, "Using container: ${container.name} (${container.id})")
-   progressCallback?.invoke(ProgressRanges.CONTAINER_END, "Container ready", "ID: ${container.id}")
+   progressCallback?.invoke(ProgressRanges.CONTAINER_END, "Step 2/5: Container ready", "40% complete")
 
    // Define Steam installation directory
    val steamDir = File(container.rootPath, "drive_c/Program Files (x86)/Steam")
 
    // Step 3: Download SteamSetup.exe
    // Progress: 0.40 ~ 0.50 (10%)
-   progressCallback?.invoke(ProgressRanges.DOWNLOAD_START, "Downloading Steam installer...", null)
+   AppLogger.i(TAG, "=== Step 3/5: Downloading SteamSetup.exe ===")
+   progressCallback?.invoke(ProgressRanges.DOWNLOAD_START, "Step 3/5: Downloading Steam installer...", "40% complete")
 
    AppLogger.i(TAG, "Downloading SteamSetup.exe (~3MB)...")
    val downloadResult = steamInstallerService.downloadSteamSetup { bytesDownloaded, totalBytes ->
     // Map download progress to overall range (0.40-0.50)
     val downloadProgress = bytesDownloaded.toFloat() / totalBytes.toFloat()
     val overallProgress = mapProgress(downloadProgress, ProgressRanges.DOWNLOAD_START, ProgressRanges.DOWNLOAD_END)
+    val percentComplete = (overallProgress * 100).toInt()
     val detail = "${bytesDownloaded / 1024}KB / ${totalBytes / 1024}KB"
-    progressCallback?.invoke(overallProgress, "Downloading SteamSetup.exe", detail)
+    progressCallback?.invoke(overallProgress, "Step 3/5: Downloading SteamSetup.exe", "$percentComplete% - $detail")
    }
 
    if (downloadResult.isFailure) {
@@ -199,11 +206,12 @@ class SteamSetupManager @Inject constructor(
     )
    }
    AppLogger.i(TAG, "SteamSetup.exe downloaded successfully: ${setupFile.absolutePath} (${setupFile.length() / 1024}KB)")
-   progressCallback?.invoke(ProgressRanges.DOWNLOAD_END, "Steam installer downloaded", "${setupFile.length() / 1024}KB")
+   progressCallback?.invoke(ProgressRanges.DOWNLOAD_END, "Step 3/5: Download complete", "50% - ${setupFile.length() / 1024}KB")
 
    // Step 4: Extract Steam files from NSIS installer using 7-Zip
    // Progress: 0.50 ~ 0.90 (40%)
-   progressCallback?.invoke(ProgressRanges.INSTALLER_START, "Extracting Steam files...", null)
+   AppLogger.i(TAG, "=== Step 4/5: Extracting Steam Files (NSIS + CDN) ===")
+   progressCallback?.invoke(ProgressRanges.INSTALLER_START, "Step 4/5: Preparing extraction...", "50% complete")
 
    // Target directory: C:\Program Files (x86)\Steam in Wine container
    val steamInstallDir = File(container.rootPath, "drive_c/Program Files (x86)/Steam")
@@ -211,7 +219,7 @@ class SteamSetupManager @Inject constructor(
    AppLogger.i(TAG, "Extracting to: ${steamInstallDir.absolutePath}")
 
    // Extract using 7-Zip-JBinding-4Android
-   var lastProgress = 0
+   var lastReportedPercent = 0
    val extractionResult = steamInstallerService.extractSteamFromNSIS(
     setupFile = setupFile,
     targetDir = steamInstallDir,
@@ -219,11 +227,13 @@ class SteamSetupManager @Inject constructor(
      // Map NSIS extraction progress to range 0.50-0.60 (10%)
      val extractionProgress = if (totalFiles > 0) filesExtracted.toFloat() / totalFiles else 0f
      val overallProgress = mapProgress(extractionProgress, 0.50f, 0.60f)
+     val percentComplete = (overallProgress * 100).toInt()
 
-     val currentProgress = (extractionProgress * 100).toInt()
-     if (currentProgress >= lastProgress + 10) {
-      progressCallback?.invoke(overallProgress, "Extracting bootstrapper... ($filesExtracted/$totalFiles)", null)
-      lastProgress = currentProgress
+     // Report every 2% change (smoother UI updates)
+     if (percentComplete >= lastReportedPercent + 2 || filesExtracted == 1 || filesExtracted == totalFiles) {
+      progressCallback?.invoke(overallProgress, "Step 4/5: Extracting bootstrapper", "$percentComplete% - $filesExtracted/$totalFiles files")
+      AppLogger.d(TAG, "NSIS extraction: $filesExtracted/$totalFiles files ($percentComplete%)")
+      lastReportedPercent = percentComplete
      }
     },
     onCdnProgress = { currentPackage, totalPackages, bytesDownloaded, totalBytes ->
@@ -232,13 +242,15 @@ class SteamSetupManager @Inject constructor(
      val downloadProgress = if (totalBytes > 0) bytesDownloaded.toFloat() / totalBytes else 0f
      val combinedProgress = (packageProgress * 0.5f) + (downloadProgress * 0.5f)
      val overallProgress = mapProgress(combinedProgress, 0.60f, 0.90f)
+     val percentComplete = (overallProgress * 100).toInt()
 
-     val currentPercent = (combinedProgress * 100).toInt()
-     if (currentPercent >= lastProgress + 5) {
+     // Report every 2% change
+     if (percentComplete >= lastReportedPercent + 2 || currentPackage == totalPackages) {
       val mbDownloaded = bytesDownloaded / 1024 / 1024
       val mbTotal = totalBytes / 1024 / 1024
-      progressCallback?.invoke(overallProgress, "Downloading Steam packages... ($currentPackage/$totalPackages)", "${mbDownloaded}MB / ${mbTotal}MB")
-      lastProgress = currentPercent
+      progressCallback?.invoke(overallProgress, "Step 4/5: Downloading packages ($currentPackage/$totalPackages)", "$percentComplete% - ${mbDownloaded}MB/${mbTotal}MB")
+      AppLogger.d(TAG, "CDN download: Package $currentPackage/$totalPackages, ${mbDownloaded}MB/${mbTotal}MB ($percentComplete%)")
+      lastReportedPercent = percentComplete
      }
     }
    )
@@ -252,11 +264,12 @@ class SteamSetupManager @Inject constructor(
 
    val filesExtracted = extractionResult.getOrNull() ?: 0
    AppLogger.i(TAG, "NSIS extraction completed: $filesExtracted files extracted")
-   progressCallback?.invoke(ProgressRanges.INSTALLER_END, "Extraction completed", "$filesExtracted files")
+   progressCallback?.invoke(ProgressRanges.INSTALLER_END, "Step 4/5: Extraction complete", "90% - $filesExtracted files")
 
    // Step 5: Verify installation
    // Progress: 0.90 ~ 1.00 (10%)
-   progressCallback?.invoke(ProgressRanges.VERIFY_START, "Verifying installation...", null)
+   AppLogger.i(TAG, "=== Step 5/5: Verifying Installation ===")
+   progressCallback?.invoke(ProgressRanges.VERIFY_START, "Step 5/5: Verifying Steam files...", "90% complete")
 
    // Verify critical Steam files exist
    val steamExe = File(steamDir, "Steam.exe")
@@ -313,8 +326,11 @@ class SteamSetupManager @Inject constructor(
     status = SteamInstallStatus.INSTALLED
    )
 
-   progressCallback?.invoke(ProgressRanges.VERIFY_END, "Installation complete", "Steam ready to launch")
-   AppLogger.i(TAG, "Wine-based Steam installation completed successfully")
+   progressCallback?.invoke(ProgressRanges.VERIFY_END, "Step 5/5: Installation complete!", "100% - Steam ready")
+   AppLogger.i(TAG, "=== Steam installation completed successfully ===")
+   AppLogger.i(TAG, "Total files extracted: $filesExtracted")
+   AppLogger.i(TAG, "Installation path: $DEFAULT_STEAM_PATH")
+   AppLogger.i(TAG, "Container ID: ${container.id}")
 
    Result.success(SteamInstallResult.Success(
     installPath = DEFAULT_STEAM_PATH,
@@ -379,8 +395,12 @@ class SteamSetupManager @Inject constructor(
 
      // If container doesn't exist, create new one with default Steam configuration
      AppLogger.i(TAG, "Container not found, creating new container for ID: $containerId")
+
+     // CRITICAL FIX: Use "Default Container" name to trigger default_shared_container ID
+     // WinlatorEmulator.createContainer() uses fixed ID "default_shared_container" when name == "Default Container"
+     // This prevents duplicate container creation and enables efficient container reuse
      val config = com.steamdeck.mobile.domain.emulator.EmulatorContainerConfig(
-      name = "Steam Client",
+      name = "Default Container",  // Triggers fixed ID: default_shared_container
       performancePreset = com.steamdeck.mobile.domain.emulator.PerformancePreset.MAXIMUM_STABILITY // Steam prioritizes stability
      )
 

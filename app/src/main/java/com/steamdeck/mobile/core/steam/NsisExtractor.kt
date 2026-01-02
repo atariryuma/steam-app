@@ -77,19 +77,22 @@ class NsisExtractor @Inject constructor() {
     val totalFiles = archive.numberOfItems
     AppLogger.i(TAG, "Found $totalFiles items in NSIS archive")
 
-    // Extract all items
+    // Extract all items with frequent progress updates
+    // Update progress every 5 files (instead of 10) for smoother UI feedback
     for (item in archive.simpleInterface.archiveItems) {
      if (!item.isFolder) {
       extractItem(item, targetDir)
       filesExtracted++
 
-      if (filesExtracted % 10 == 0) {
+      // Report progress every 5 files OR on first/last file
+      if (filesExtracted == 1 || filesExtracted % 5 == 0 || filesExtracted == totalFiles) {
        progressCallback?.invoke(filesExtracted, totalFiles)
-       AppLogger.d(TAG, "Extracted $filesExtracted/$totalFiles files")
+       AppLogger.d(TAG, "Extracted $filesExtracted/$totalFiles files (${filesExtracted * 100 / totalFiles}%)")
       }
      }
     }
 
+    // Final progress update
     progressCallback?.invoke(filesExtracted, totalFiles)
     AppLogger.i(TAG, "NSIS extraction completed: $filesExtracted files extracted")
     Result.success(filesExtracted)

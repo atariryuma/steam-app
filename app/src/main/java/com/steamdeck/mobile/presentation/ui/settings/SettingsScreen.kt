@@ -206,7 +206,11 @@ fun SettingsScreen(
      onNavigateToControllerSettings = onNavigateToControllerSettings,
      onSaveApiKey = viewModel::saveSteamApiKey,
      onInstallSteam = viewModel::installSteamClient,
-     onOpenSteam = onNavigateToSteamDisplay,
+     onOpenSteam = { containerId ->
+      // Launch Steam client via ViewModel first, then navigate
+      viewModel.openSteamClient(containerId)
+      onNavigateToSteamDisplay(containerId)
+     },
      onUninstallSteam = viewModel::uninstallSteamClient,
      onNavigateBack = onNavigateBack,
      onNavigateToStep = { step -> selectedSection = step },
@@ -1835,12 +1839,14 @@ private fun ControllerContent(
 /**
  * Wine Test integrated content (formerly separate WineTestScreen)
  * Combines Wine diagnostics into Settings Section 4
+ * Minimized to essential tests only: Availability, Initialize, Container
  */
 @Composable
 private fun WineTestIntegratedContent(
  viewModel: WineTestViewModel
 ) {
  val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+ val context = LocalContext.current
 
  Column(
   modifier = Modifier
@@ -1848,9 +1854,9 @@ private fun WineTestIntegratedContent(
    .padding(0.dp),
   verticalArrangement = Arrangement.spacedBy(16.dp)
  ) {
-  // Header
+  // Header - use string resource
   Text(
-   text = "🧪 Wine Environment Test",
+   text = stringResource(R.string.wine_test_header),
    style = MaterialTheme.typography.headlineSmall,
    fontWeight = FontWeight.Bold
   )
@@ -1858,32 +1864,30 @@ private fun WineTestIntegratedContent(
   // Status card
   WineTestCompactStatusRow(uiState = uiState)
 
-  // Test buttons
+  // Test buttons - essential tests only
   if (uiState !is WineTestUiState.Testing) {
    WineTestCompactTestButtons(
     onCheckWine = viewModel::checkWineAvailability,
     onInitialize = viewModel::initializeEmulator,
-    onCreateContainer = viewModel::testCreateContainer,
-    onListContainers = viewModel::listContainers,
-    onTestX11 = viewModel::testX11Client
+    onCreateContainer = viewModel::testCreateContainer
    )
   }
 
-  // Progress/Results
+  // Progress/Results - use string resources
   when (val state = uiState) {
    is WineTestUiState.Testing -> {
     WineTestTestingProgressCard(message = state.message)
    }
    is WineTestUiState.Success -> {
     WineTestTestResultCard(
-     title = "✓ Test Success",
+     title = stringResource(R.string.wine_test_result_success),
      message = state.message,
      isSuccess = true
     )
    }
    is WineTestUiState.Error -> {
     WineTestTestResultCard(
-     title = "✗ Error",
+     title = stringResource(R.string.wine_test_result_error),
      message = state.message,
      isSuccess = false
     )
@@ -1927,12 +1931,13 @@ private fun WineTestCompactStatusRow(uiState: WineTestUiState) {
       else -> MaterialTheme.colorScheme.onSurfaceVariant
      }
     )
+    // Use string resources for status labels
     Text(
      text = when (uiState) {
-      is WineTestUiState.Idle -> "Ready"
-      is WineTestUiState.Testing -> "Running..."
-      is WineTestUiState.Success -> "Available"
-      is WineTestUiState.Error -> "Error"
+      is WineTestUiState.Idle -> stringResource(R.string.wine_test_status_ready)
+      is WineTestUiState.Testing -> stringResource(R.string.wine_test_status_running)
+      is WineTestUiState.Success -> stringResource(R.string.wine_test_status_available)
+      is WineTestUiState.Error -> stringResource(R.string.wine_test_status_error)
      },
      style = MaterialTheme.typography.titleSmall,
      fontWeight = FontWeight.Bold
@@ -1948,13 +1953,15 @@ private fun WineTestCompactStatusRow(uiState: WineTestUiState) {
  }
 }
 
+/**
+ * Essential Wine test buttons (minimized from 5 to 3 tests)
+ * Uses string resources for maintainability
+ */
 @Composable
 private fun WineTestCompactTestButtons(
  onCheckWine: () -> Unit,
  onInitialize: () -> Unit,
- onCreateContainer: () -> Unit,
- onListContainers: () -> Unit,
- onTestX11: () -> Unit = {}
+ onCreateContainer: () -> Unit
 ) {
  Column(
   modifier = Modifier.fillMaxWidth(),
@@ -1969,43 +1976,32 @@ private fun WineTestCompactTestButtons(
     onClick = onCheckWine,
     modifier = Modifier.weight(1f)
    ) {
-    Text("1. Check", style = MaterialTheme.typography.labelLarge)
+    Text(
+     text = stringResource(R.string.wine_test_check_availability),
+     style = MaterialTheme.typography.labelLarge
+    )
    }
 
    Button(
     onClick = onInitialize,
     modifier = Modifier.weight(1f)
    ) {
-    Text("2. Initialize", style = MaterialTheme.typography.labelLarge)
+    Text(
+     text = stringResource(R.string.wine_test_init_emulator),
+     style = MaterialTheme.typography.labelLarge
+    )
    }
   }
 
-  // Row 2: Create & List
-  Row(
-   modifier = Modifier.fillMaxWidth(),
-   horizontalArrangement = Arrangement.spacedBy(12.dp)
-  ) {
-   Button(
-    onClick = onCreateContainer,
-    modifier = Modifier.weight(1f)
-   ) {
-    Text("3. Create", style = MaterialTheme.typography.labelLarge)
-   }
-
-   Button(
-    onClick = onListContainers,
-    modifier = Modifier.weight(1f)
-   ) {
-    Text("4. List", style = MaterialTheme.typography.labelLarge)
-   }
-  }
-
-  // Row 3: X11 Test (connection + window display)
+  // Row 2: Create Container (full width for clarity)
   Button(
-   onClick = onTestX11,
+   onClick = onCreateContainer,
    modifier = Modifier.fillMaxWidth()
   ) {
-   Text("5. Test X11", style = MaterialTheme.typography.labelLarge)
+   Text(
+    text = stringResource(R.string.wine_test_create_container),
+    style = MaterialTheme.typography.labelLarge
+   )
   }
  }
 }

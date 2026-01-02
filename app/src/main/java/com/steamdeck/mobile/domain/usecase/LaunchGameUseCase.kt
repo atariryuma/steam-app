@@ -90,9 +90,9 @@ class LaunchGameUseCase @Inject constructor(
     )
    }
 
-   // NEW: Start controller input routing before game launch
-   AppLogger.i(TAG, "Starting controller input routing")
-   controllerInputRouter.startRouting(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO))
+   // REMOVED (2025-12-26): Controller routing moved to ViewModel for proper scope management
+   // Previous code started routing in new CoroutineScope(Dispatchers.IO) - caused resource leak
+   // Now: ViewModel calls startControllerRouting() with viewModelScope
 
    // Launch game (container is managed internally by WinlatorEngine)
    when (val result = winlatorEngine.launchGame(gameToLaunch, null)) {
@@ -121,8 +121,8 @@ class LaunchGameUseCase @Inject constructor(
     }
     is LaunchResult.Error -> {
      AppLogger.e(TAG, "Game launch failed: ${result.message}", result.cause)
-     // Stop routing on launch failure
-     controllerInputRouter.stopRouting()
+     // NOTE (2025-12-26): Controller routing stop is handled by ViewModel
+     // ViewModel will call stopGame() which stops routing properly
      DataResult.Error(
       AppError.Unknown(Exception(result.message, result.cause))
      )
@@ -130,8 +130,8 @@ class LaunchGameUseCase @Inject constructor(
    }
   } catch (e: Exception) {
    AppLogger.e(TAG, "Exception during game launch", e)
-   // Stop routing on exception
-   controllerInputRouter.stopRouting()
+   // NOTE (2025-12-26): Controller routing stop is handled by ViewModel
+   // ViewModel will call stopGame() which stops routing properly
    DataResult.Error(AppError.from(e))
   }
  }

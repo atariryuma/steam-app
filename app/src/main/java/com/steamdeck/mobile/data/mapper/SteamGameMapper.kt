@@ -3,6 +3,7 @@ package com.steamdeck.mobile.data.mapper
 import com.steamdeck.mobile.data.remote.steam.model.SteamGame
 import com.steamdeck.mobile.domain.model.Game
 import com.steamdeck.mobile.domain.model.GameSource
+import com.steamdeck.mobile.domain.model.InstallationStatus
 
 /**
  * Mapper for converting between SteamGame (data layer DTO)
@@ -15,6 +16,9 @@ object SteamGameMapper {
   *
   * @param steamGame The Steam API game data
   * @return Game domain model with default values for non-Steam fields
+  *
+  * FIXED (2025-12-26): Explicitly set installation status to NOT_INSTALLED
+  * for proper UI state management and download flow.
   */
  fun toDomain(steamGame: SteamGame): Game {
   return Game(
@@ -30,7 +34,10 @@ object SteamGameMapper {
    iconPath = null, // Will be downloaded separately
    bannerPath = null, // Will be downloaded separately
    addedTimestamp = System.currentTimeMillis(),
-   isFavorite = false
+   isFavorite = false,
+   installationStatus = InstallationStatus.NOT_INSTALLED, // Synced games start as not installed
+   installProgress = 0, // No progress initially
+   statusUpdatedTimestamp = System.currentTimeMillis() // Track when status was set
   )
  }
 

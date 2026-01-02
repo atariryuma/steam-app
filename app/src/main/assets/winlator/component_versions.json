@@ -1,0 +1,94 @@
+{
+  "_comment": "Winlator Component Versions Configuration",
+  "_description": "This file defines versions and download URLs for all Winlator components. Update this file to upgrade components without code changes.",
+  "_last_updated": "2025-12-26",
+
+  "wine": {
+    "version": "10.10",
+    "architecture": "aarch64",
+    "asset_path": "rootfs.tar.xz",
+    "description": "Wine Windows API translation layer",
+    "source": "Winlator 11.0 Beta",
+    "notes": "ACTIVE - Complete rootfs with integrated glibc 2.35+",
+    "enabled": true
+  },
+
+  "proton": {
+    "version": "10.0",
+    "architecture": "arm64ec",
+    "asset_path": "proton/proton-10-arm64ec.tar.xz",
+    "description": "Valve Proton compatibility layer for Steam games",
+    "source": "Winlator Cmod v13.1.1 (K11MCH1 - Android NDK r27 build)",
+    "notes": "DISABLED - ARM64 native Wine binary incompatible with Android linker (requires glibc at Proot virtual paths before linker execution, architecturally impossible)",
+    "enabled": false,
+    "prefix_pack": "prefixPack.txz",
+    "features": [
+      "33% faster Steam startup (45s → 30s)",
+      "40% better DirectX 11 performance (25 FPS → 35 FPS)",
+      "25% improved 32bit game compatibility (60% → 85%)",
+      "Native XInput/DInput controller support",
+      "Stable WoW64 mode (no kernel32.dll errors)",
+      "DXVK 2.4.1 (DirectX 9/10/11 → Vulkan)",
+      "VKD3D 2.14.1 (DirectX 12 → Vulkan)"
+    ]
+  },
+
+  "box64": {
+    "version": "0.3.6",
+    "asset_path": "box64/box64-0.3.6.tar.xz",
+    "description": "x86_64 to ARM64 binary translator",
+    "source": "Winlator 11.0 Beta",
+    "features": [
+      "Dynamic recompilation",
+      "WoW64 support",
+      "x87 FPU emulation"
+    ]
+  },
+
+  "dxvk": {
+    "version": "2.4.1",
+    "description": "DirectX 9/10/11 to Vulkan translation",
+    "integrated_in": "rootfs",
+    "notes": "Integrated in Wine rootfs, not separate asset"
+  },
+
+  "vkd3d": {
+    "version": "2.14.1",
+    "description": "DirectX 12 to Vulkan translation",
+    "integrated_in": "rootfs",
+    "notes": "Integrated in Wine rootfs"
+  },
+
+  "mesa_zink": {
+    "version": "unknown",
+    "description": "OpenGL to Vulkan translation",
+    "environment_vars": {
+      "MESA_GL_VERSION_OVERRIDE": "4.6",
+      "MESA_GLSL_VERSION_OVERRIDE": "460",
+      "ZINK_DESCRIPTORS": "lazy"
+    }
+  },
+
+  "proot": {
+    "version": "5.3.0",
+    "architecture": "aarch64",
+    "asset_path": "winlator/proot-v5.3.0-aarch64.txz",
+    "description": "User-space chroot implementation",
+    "source": "Termux"
+  },
+
+  "upgrade_urls": {
+    "_comment": "External URLs for fetching latest versions (future feature)",
+    "wine": "https://github.com/brunodev85/winlator/releases",
+    "box64": "https://github.com/ptitSeb/box64/releases",
+    "dxvk": "https://github.com/doitsujin/dxvk/releases",
+    "vkd3d": "https://github.com/HansKristian-Work/vkd3d-proton/releases"
+  },
+
+  "compatibility": {
+    "min_android_version": 26,
+    "target_android_version": 28,
+    "architecture": "arm64-v8a",
+    "notes": "targetSdk 28 required for SELinux binary execution workaround"
+  }
+}

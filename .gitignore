@@ -125,3 +125,21 @@ GameNative/
 # Documentation (work in progress)
 CODE_REVIEW_REPORT.md
 IMPLEMENTATION_GUIDE_*.md
+
+# Steam installation files
+SteamSetup.exe
+steam_extracted/
+
+# Screenshots and images
+screenshot.png
+*.png
+
+# Large asset files (>100MB, use download scripts instead)
+*.tar.xz
+*.tzst
+*.tar
+extra_libs.*
+proton-10-*.tar.xz
+**/proton/*.tar.xz
+logcat_dump.txt
+convert_*.py

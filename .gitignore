@@ -125,6 +125,16 @@ GameNative/
 # Documentation (work in progress)
 CODE_REVIEW_REPORT.md
 IMPLEMENTATION_GUIDE_*.md
+BOX64_GRAPHICS_2025_ANALYSIS.md
+BUILD-STABILITY.md
+CONTRIBUTING.md
+QUICK_REFERENCE.md
+SCRIPTS.md
+THIRD_PARTY_LICENSES.md
+USER_MANUAL.md
+JAVA_SETUP_README.md
+docs/
+.github/
 
 # Steam installation files
 SteamSetup.exe
